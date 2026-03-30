@@ -1,5 +1,10 @@
 import { expect } from "vitest";
 
+// Top-level regex constants for performance
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ISO_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
+
 // Custom assertion helpers
 export function assertValidDate(date: string | Date) {
   const d = new Date(date);
@@ -8,14 +13,11 @@ export function assertValidDate(date: string | Date) {
 }
 
 export function assertValidUuid(uuid: string) {
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  expect(uuid).toMatch(uuidRegex);
+  expect(uuid).toMatch(UUID_REGEX);
 }
 
 export function assertValidEmail(email: string) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  expect(email).toMatch(emailRegex);
+  expect(email).toMatch(EMAIL_REGEX);
 }
 
 export function assertValidUrl(url: string) {
@@ -23,12 +25,19 @@ export function assertValidUrl(url: string) {
 }
 
 export function assertIsoTimestamp(timestamp: string) {
-  const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
-  expect(timestamp).toMatch(isoRegex);
+  expect(timestamp).toMatch(ISO_TIMESTAMP_REGEX);
   assertValidDate(timestamp);
 }
 
-export function assertPaginatedResponse(response: any) {
+export function assertPaginatedResponse(response: {
+  items: unknown;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}) {
   expect(response).toHaveProperty("items");
   expect(response).toHaveProperty("pagination");
   expect(response.pagination).toHaveProperty("page");
@@ -41,7 +50,17 @@ export function assertPaginatedResponse(response: any) {
   expect(typeof response.pagination.totalPages).toBe("number");
 }
 
-export function assertApiResponse(response: any, expectedStatus = 200) {
+export function assertApiResponse(
+  response: {
+    status: number;
+    data?: unknown;
+    error?: {
+      code: string;
+      message: string;
+    };
+  },
+  expectedStatus = 200
+) {
   expect(response).toHaveProperty("status");
   expect(response.status).toBe(expectedStatus);
 
@@ -55,7 +74,7 @@ export function assertApiResponse(response: any, expectedStatus = 200) {
 }
 
 export function assertError(
-  error: any,
+  error: Error & { code?: string },
   expectedCode?: string,
   expectedMessage?: string
 ) {
@@ -71,12 +90,12 @@ export function assertError(
   }
 }
 
-export function assertMockCalled(mock: any, times = 1) {
+export function assertMockCalled(mock: { mock: { calls: unknown[] } }, times = 1) {
   expect(mock).toHaveBeenCalled();
   expect(mock).toHaveBeenCalledTimes(times);
 }
 
-export function assertMockCalledWith(mock: any, ...args: any[]) {
+export function assertMockCalledWith(mock: { mock: { calls: unknown[] } }, ...args: unknown[]) {
   expect(mock).toHaveBeenCalledWith(...args);
 }
 
@@ -92,7 +111,7 @@ export function assertConsoleOutput(
   }
 }
 
-export function assertProcessExit(mockProcess: any, code = 0) {
+export function assertProcessExit(mockProcess: { exit: { mock: { calls: unknown[] } } }, code = 0) {
   expect(mockProcess.exit).toHaveBeenCalledWith(code);
 }
 
@@ -100,17 +119,17 @@ export function assertEnvironmentVariables(
   env: Record<string, string | undefined>,
   expected: Record<string, string>
 ) {
-  Object.entries(expected).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(expected)) {
     expect(env[key]).toBe(value);
-  });
+  }
 }
 
 export function assertFileExists(filePath: string) {
   expect(() => require("node:fs").accessSync(filePath)).not.toThrow();
 }
 
-export function assertJsonStructure(obj: any, structure: Record<string, any>) {
-  Object.entries(structure).forEach(([key, type]) => {
+export function assertJsonStructure(obj: Record<string, unknown>, structure: Record<string, unknown>) {
+  for (const [key, type] of Object.entries(structure)) {
     expect(obj).toHaveProperty(key);
 
     if (type === "string") {
@@ -124,8 +143,8 @@ export function assertJsonStructure(obj: any, structure: Record<string, any>) {
       expect(obj[key]).not.toBeNull();
     } else if (type === "array") {
       expect(Array.isArray(obj[key])).toBe(true);
-    } else if (typeof type === "object") {
-      assertJsonStructure(obj[key], type);
+    } else if (typeof type === "object" && type !== null) {
+      assertJsonStructure(obj[key] as Record<string, unknown>, type as Record<string, unknown>);
     }
-  });
+  }
 }

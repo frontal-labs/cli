@@ -3,7 +3,7 @@ import { vi } from "vitest";
 
 // Test helper functions
 export function createMockFetch(
-  response: any,
+  response: unknown,
   options: { status?: number; delay?: number } = {}
 ) {
   const { status = 200, delay = 0 } = options;
@@ -34,7 +34,7 @@ export function createMockFetch(
   );
 }
 
-export function createMockStream(events: any[]) {
+export function createMockStream(events: unknown[]) {
   return async function* mockStream() {
     for (const event of events) {
       yield event;
@@ -45,21 +45,33 @@ export function createMockStream(events: any[]) {
 
 export function mockConsole() {
   const consoleSpy = {
-    log: vi.spyOn(console, "log").mockImplementation(() => {}),
-    warn: vi.spyOn(console, "warn").mockImplementation(() => {}),
-    error: vi.spyOn(console, "error").mockImplementation(() => {}),
-    info: vi.spyOn(console, "info").mockImplementation(() => {}),
-    debug: vi.spyOn(console, "debug").mockImplementation(() => {}),
+    log: vi.spyOn(console, "log").mockImplementation(() => {
+      // Silently ignore console output
+    }),
+    warn: vi.spyOn(console, "warn").mockImplementation(() => {
+      // Silently ignore console output
+    }),
+    error: vi.spyOn(console, "error").mockImplementation(() => {
+      // Silently ignore console output
+    }),
+    info: vi.spyOn(console, "info").mockImplementation(() => {
+      // Silently ignore console output
+    }),
+    debug: vi.spyOn(console, "debug").mockImplementation(() => {
+      // Silently ignore console output
+    }),
   };
 
   return consoleSpy;
 }
 
 export function restoreConsole(consoleSpy: ReturnType<typeof mockConsole>) {
-  Object.values(consoleSpy).forEach((spy) => spy.mockRestore());
+  for (const spy of Object.values(consoleSpy)) {
+    spy.mockRestore();
+  }
 }
 
-export function createTempConfig(overrides: Record<string, any> = {}) {
+export function createTempConfig(overrides: Record<string, unknown> = {}) {
   return {
     default: {
       apiUrl: "https://api.test.com",
@@ -117,17 +129,17 @@ export function createMockProcess(overrides: Partial<NodeJS.Process> = {}) {
       write: vi.fn(),
     },
     ...overrides,
-  } as any;
+  } as NodeJS.Process;
 }
 
 export function captureStdout() {
   const outputs: string[] = [];
   const originalWrite = process.stdout.write;
 
-  process.stdout.write = vi.fn((chunk: any) => {
-    outputs.push(chunk);
+  process.stdout.write = vi.fn((chunk: Buffer | string) => {
+    outputs.push(chunk.toString());
     return true;
-  }) as any;
+  }) as typeof process.stdout.write;
 
   return {
     outputs,
@@ -141,10 +153,10 @@ export function captureStderr() {
   const outputs: string[] = [];
   const originalWrite = process.stderr.write;
 
-  process.stderr.write = vi.fn((chunk: any) => {
-    outputs.push(chunk);
+  process.stderr.write = vi.fn((chunk: Buffer | string) => {
+    outputs.push(chunk.toString());
     return true;
-  }) as any;
+  }) as typeof process.stderr.write;
 
   return {
     outputs,

@@ -2,8 +2,8 @@ import { vi } from "vitest";
 
 // Mock fetch globally
 export function mockFetchGlobal() {
-  const mockFetch = vi.fn();
-  global.fetch = mockFetch as any;
+  const mockFetch = vi.fn() as unknown as typeof global.fetch;
+  global.fetch = mockFetch;
   return mockFetch;
 }
 
@@ -152,9 +152,9 @@ export function mockEnv(initialEnv: Record<string, string> = {}) {
   const originalEnv = { ...process.env };
 
   // Clear existing env
-  Object.keys(process.env).forEach((key) => {
+  for (const key of Object.keys(process.env)) {
     delete process.env[key];
-  });
+  }
 
   // Set new env
   Object.assign(process.env, initialEnv);
@@ -168,9 +168,9 @@ export function mockEnv(initialEnv: Record<string, string> = {}) {
       delete process.env[key];
     },
     restore: () => {
-      Object.keys(process.env).forEach((key) => {
+      for (const key of Object.keys(process.env)) {
         delete process.env[key];
-      });
+      }
       Object.assign(process.env, originalEnv);
     },
   };
@@ -191,7 +191,7 @@ export function mockNetwork() {
     return Promise.resolve(mockResponse);
   });
 
-  global.fetch = mockFetch as any;
+  global.fetch = mockFetch as unknown as typeof global.fetch;
 
   return {
     mockFetch,
