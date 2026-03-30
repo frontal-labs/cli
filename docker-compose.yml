@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  frontal-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: frontal/cli:latest
+    container_name: frontal-cli
+    environment:
+      - NODE_ENV=production
+      - FRONTAL_API_KEY=${FRONTAL_API_KEY}
+      - FRONTAL_API_URL=${FRONTAL_API_URL:-https://api.frontal.dev/v1}
+      - FRONTAL_ORG=${FRONTAL_ORG}
+      - FRONTAL_WORKSPACE=${FRONTAL_WORKSPACE}
+    volumes:
+      - frontal-config:/home/frontal/.frontal
+      - ./workspace:/workspace
+    working_dir: /workspace
+    entrypoint: ["dumb-init", "--"]
+    command: ["frontal"]
+    restart: unless-stopped
+    networks:
+      - frontal-network
+
+volumes:
+  frontal-config:
+    driver: local
+
+networks:
+  frontal-network:
+    driver: bridge

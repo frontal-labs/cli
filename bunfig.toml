@@ -1,0 +1,78 @@
+# Frontal CLI Bun Configuration
+
+[install]
+# Cache node_modules in .bun/install/cache
+cache = true
+
+# Install exact versions
+exact = true
+
+# Prefer deduping dependencies
+dedupe = true
+
+[install.scopes]
+# Configure scoped package registries if needed
+"@frontal" = "https://registry.npmjs.org/"
+
+[run]
+# Environment variables for scripts
+env = { NODE_ENV = "development" }
+
+[test]
+# Test configuration
+preload = ["./tests/setup.ts"]
+
+[build]
+# Build configuration
+target = "node"
+minify = true
+sourcemap = true
+
+# Define build entry points
+entrypoints = [
+  "./src/index.ts",
+  "./bin/frontal.ts"
+]
+
+# Output directory
+outdir = "./dist"
+
+# External dependencies (don't bundle)
+external = [
+  "commander",
+  "@clack/prompts",
+  "chalk",
+  "cli-table3",
+  "ora",
+  "yaml",
+  "zod"
+]
+
+[bundle]
+# Bundle configuration for distribution
+compress = true
+format = "esm"
+
+[dev]
+# Development server configuration
+hot = true
+port = 3000
+
+[lockfile]
+# Lockfile configuration
+print = "yarn"
+save = true
+
+[loglevel]
+# Log level for bun operations
+level = "info"
+
+[cache]
+# Cache configuration
+dir = ".bun/cache"
+max_size = "2GB"
+
+[define]
+# Compile-time constants
+FRONTAL_CLI_VERSION = "\"0.1.0\""
+FRONTAL_API_BASE_URL = "\"https://api.frontal.dev/v1\""

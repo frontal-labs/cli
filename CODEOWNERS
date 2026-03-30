@@ -1,0 +1,177 @@
+# Code Owners
+
+This file defines the code owners for the Frontal CLI project. Code owners are automatically requested for review when pull requests are opened.
+
+## Global Owners
+
+# Core team members who review all changes
+* @frontal/core-team
+* @frontal/maintainers
+
+## Directory-Specific Owners
+
+# Core CLI functionality
+/src/ @frontal/cli-team
+/src/index.ts @frontal/cli-team
+/src/version.ts @frontal/cli-team
+
+# Command implementations
+/src/commands/ @frontal/commands-team
+/src/commands/auth.ts @frontal/auth-team
+/src/commands/config.ts @frontal/config-team
+/src/commands/orgs.ts @frontal/platform-team
+/src/commands/workspaces.ts @frontal/platform-team
+/src/commands/teams.ts @frontal/platform-team
+/src/commands/roles.ts @frontal/platform-team
+/src/commands/policies.ts @frontal/platform-team
+/src/commands/api-keys.ts @frontal/auth-team
+/src/commands/billing.ts @frontal/billing-team
+/src/commands/agents.ts @frontal/ai-team
+/src/commands/functions.ts @frontal/runtime-team
+/src/commands/containers.ts @frontal/runtime-team
+/src/commands/deployments.ts @frontal/runtime-team
+/src/commands/workflows.ts @frontal/workflows-team
+/src/commands/pipelines.ts @frontal/workflows-team
+/src/commands/metrics.ts @frontal/observability-team
+/src/commands/logs.ts @frontal/observability-team
+/src/commands/webhooks.ts @frontal/integrations-team
+/src/commands/flags.ts @frontal/platform-team
+/src/commands/status.ts @frontal/observability-team
+/src/commands/marketplace.ts @frontal/platform-team
+/src/commands/support.ts @frontal/support-team
+/src/commands/services.ts @frontal/platform-team
+/src/commands/completion.ts @frontal/cli-team
+
+# Core modules
+/src/config/ @frontal/cli-team
+/src/errors/ @frontal/cli-team
+/src/http/ @frontal/cli-team
+/src/output/ @frontal/cli-team
+/src/utils/ @frontal/cli-team
+
+# Data and storage
+/src/commands/blob.ts @frontal/storage-team
+/src/commands/graph.ts @frontal/data-team
+/src/commands/ontology.ts @frontal/data-team
+
+# Configuration and build files
+/package.json @frontal/cli-team
+/tsconfig.json @frontal/cli-team
+/biome.jsonc @frontal/cli-team
+/tsup.config.ts @frontal/cli-team
+/vitest.config.ts @frontal/cli-team
+/bunfig.toml @frontal/cli-team
+
+# Documentation
+/docs/ @frontal/docs-team
+/README.md @frontal/docs-team
+/CONTRIBUTING.md @frontal/docs-team
+/CHANGELOG.md @frontal/docs-team
+/SECURITY.md @frontal/security-team
+
+# GitHub workflows and templates
+/.github/ @frontal/devops-team
+/.github/workflows/ @frontal/devops-team
+/.github/ISSUE_TEMPLATE/ @frontal/support-team
+/.github/pull_request_template.md @frontal/support-team
+
+# Test files
+/tests/ @frontal/qa-team
+/tests/unit/ @frontal/qa-team
+/tests/integration/ @frontal/qa-team
+
+# Environment and configuration
+/.env.example @frontal/cli-team
+/.gitignore @frontal/cli-team
+/LICENSE @frontal/legal-team
+
+## File-Specific Owners
+
+# Critical security and configuration files
+/src/config/manager.ts @frontal/security-team
+/src/config/schema.ts @frontal/security-team
+/src/http/client.ts @frontal/security-team
+/src/errors/handler.ts @frontal/cli-team
+
+# Build and distribution
+/bin/ @frontal/cli-team
+/dist/ @frontal/cli-team
+
+## Review Rules
+
+### Automatic Review Requests
+
+- All PRs will automatically request review from:
+  - Global owners for major changes
+  - Directory-specific owners for targeted changes
+  - Security team for authentication/authorization changes
+
+### Review Requirements
+
+- **Security Changes**: Must be approved by @frontal/security-team
+- **Breaking Changes**: Must be approved by @frontal/core-team
+- **Documentation Changes**: Must be approved by @frontal/docs-team
+- **Workflow Changes**: Must be approved by @frontal/devops-team
+
+### Review Escalation
+
+If owners are unresponsive after 3 business days:
+1. Tag @frontal/core-team for escalation
+2. Create issue in project board for tracking
+3. Consider alternative approvers from global owners list
+
+## Approval Requirements
+
+### Required Approvers
+
+| Change Type | Required Approvers | Minimum Reviews |
+|--------------|-------------------|-----------------|
+| Security | @frontal/security-team | 2 |
+| Breaking Changes | @frontal/core-team | 2 |
+| New Features | Directory owners | 1 |
+| Bug Fixes | Directory owners | 1 |
+| Documentation | @frontal/docs-team | 1 |
+| Infrastructure | @frontal/devops-team | 1 |
+
+### Merge Requirements
+
+- All automated checks must pass
+- Required approvals must be received
+- No merge conflicts
+- PR must be open for at least 24 hours (except for urgent fixes)
+
+## Emergency Changes
+
+For critical security fixes or production issues:
+
+1. Create PR with "emergency" label
+2. Immediate review from @frontal/core-team
+3. Can merge after single approval from core team
+4. Must create follow-up issue for post-mortem
+
+## Contact Information
+
+### Team Contacts
+
+- **Core Team**: @frontal/core-team
+- **Maintainers**: @frontal/maintainers
+- **Security**: @frontal/security-team
+- **DevOps**: @frontal/devops-team
+
+### External Contacts
+
+For urgent matters outside of GitHub:
+- **Security**: security@frontal.dev
+- **Support**: support@frontal.dev
+
+## Updating This File
+
+Changes to CODEOWNERS must:
+1. Be approved by @frontal/core-team
+2. Include justification for ownership changes
+3. Update relevant team documentation
+4. Be communicated to affected teams
+
+---
+
+This file helps ensure proper code review and maintain code quality across the Frontal CLI project.
