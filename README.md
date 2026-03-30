@@ -21,6 +21,10 @@ npm install frontal-cli
 
 # Or use with bun
 bun install frontal-cli
+
+# Or install with Homebrew
+brew tap frontal-labs/cli
+brew install frontal-cli
 ```
 
 ### Authentication
@@ -350,6 +354,48 @@ frontal deploy --help
 
 # Show version
 frontal --version
+```
+
+## Homebrew Management
+
+### Installation
+
+```bash
+# Add the tap
+brew tap frontal-labs/cli
+
+# Install the CLI
+brew install frontal-cli
+```
+
+### Updates
+
+```bash
+# Update to latest version
+brew upgrade frontal-cli
+
+# Or update all packages
+brew upgrade
+```
+
+### Uninstallation
+
+```bash
+# Remove the CLI
+brew uninstall frontal-cli
+
+# Remove the tap
+brew untap frontal-labs/cli
+```
+
+### Troubleshooting
+
+```bash
+# Reinstall if issues occur
+brew reinstall frontal-cli
+
+# Force upgrade to latest
+brew upgrade frontal-cli --force
 ```
 
 ## Contributing

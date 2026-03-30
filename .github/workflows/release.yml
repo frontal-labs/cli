@@ -61,12 +61,18 @@ jobs:
             
             ## Installation
             
+            ### NPM
             ```bash
             npm install -g frontal-cli@${{ github.ref_name }}
             ```
             
-            ## Docker
+            ### Homebrew
+            ```bash
+            brew tap frontal-labs/cli
+            brew install frontal-cli
+            ```
             
+            ### Docker
             ```bash
             docker pull frontal/cli:${{ github.ref_name }}
             ```
