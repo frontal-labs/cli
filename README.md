@@ -8,6 +8,16 @@
 
 The official command-line interface for the Frontal cloud platform.
 
+## v2 Status
+
+This repository now defaults to the **v2 client CLI** surface with:
+
+- Public API contract enforcement from `https://openapi.frontal.dev/openapi.spec3.yaml` (with local fallback in development)
+- Phase 1 command groups: `auth`, `workflows`, `invocations`, `runs`, `events`
+- Migration assistant: `frontal migrate-v2`
+
+Legacy command families (for example `orgs`, `workspaces`, `deployments`, `agents`) are intentionally not exposed in v2 Phase 1.
+
 ## Quick Start
 
 ### Installation
