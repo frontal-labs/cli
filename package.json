@@ -11,7 +11,9 @@
   ],
   "scripts": {
     "dev": "bun run bin/frontal.ts",
-    "build": "tsup && node -e \"const fs=require('fs');const f='dist/bin/frontal.js';const c=fs.readFileSync(f,'utf8');if(!c.startsWith('#!'))fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c)\"",
+    "generate:openapi-ops": "node ./scripts/generate-openapi-operations.mjs",
+    "validate:bindings": "node ./scripts/validate-command-bindings.mjs",
+    "build": "bun run generate:openapi-ops && bun run validate:bindings && tsup && node -e \"const fs=require('fs');const f='dist/bin/frontal.js';const c=fs.readFileSync(f,'utf8');if(!c.startsWith('#!'))fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c)\"",
     "type-check": "tsc --noEmit",
     "lint": "biome lint src/ tests/",
     "format": "biome format --write src/ tests/",
@@ -24,7 +26,7 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "bun run build && changeset publish",
-    "check": "ultracite check",
+    "check": "bun run generate:openapi-ops && bun run validate:bindings && ultracite check",
     "fix": "ultracite fix"
   },
   "dependencies": {

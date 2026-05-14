@@ -15,8 +15,14 @@ const profileSchema = z.object({
 export type ProfileConfig = z.infer<typeof profileSchema>;
 
 const configSchema = z.object({
+  schemaVersion: z.number().int().positive().default(2),
   activeProfile: z.string().default("default"),
   profiles: z.record(z.string(), profileSchema).default({}),
+  telemetry: z
+    .object({
+      enabled: z.boolean().default(false),
+    })
+    .default({}),
   defaults: z
     .object({
       outputFormat: z.enum(["table", "json", "yaml"]).default("table"),

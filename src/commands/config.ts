@@ -50,7 +50,9 @@ export function registerConfigCommands(program: Command): void {
         const cfg = configManager.load();
         const fmt = Formatter.from(cmd.optsWithGlobals());
         fmt.object({
+          schemaVersion: cfg.schemaVersion,
           activeProfile: cfg.activeProfile,
+          telemetryEnabled: cfg.telemetry.enabled,
           profiles: Object.keys(cfg.profiles).join(", ") || "(none)",
           ...cfg.defaults,
           ...configManager.getProfile(),
@@ -75,8 +77,10 @@ export function registerConfigCommands(program: Command): void {
         }
 
         configManager.save({
+          schemaVersion: 2,
           activeProfile: "default",
           profiles: {},
+          telemetry: { enabled: false },
           defaults: { outputFormat: "table", paginationLimit: 25 },
         });
         console.log(theme.success("Configuration reset to defaults."));
@@ -123,6 +127,53 @@ export function registerConfigCommands(program: Command): void {
         handleError(err, cmd.optsWithGlobals());
       }
     });
+
+  const telemetry = config
+    .command("telemetry")
+    .description("Manage CLI telemetry consent");
+
+  telemetry
+    .command("enable")
+    .description("Enable telemetry")
+    .action(async (_opts, cmd) => {
+      try {
+        const cfg = configManager.load();
+        cfg.telemetry.enabled = true;
+        configManager.save(cfg);
+        const fmt = Formatter.from(cmd.optsWithGlobals());
+        fmt.object({ telemetry: "enabled" });
+      } catch (err) {
+        handleError(err, cmd.optsWithGlobals());
+      }
+    });
+
+  telemetry
+    .command("disable")
+    .description("Disable telemetry")
+    .action(async (_opts, cmd) => {
+      try {
+        const cfg = configManager.load();
+        cfg.telemetry.enabled = false;
+        configManager.save(cfg);
+        const fmt = Formatter.from(cmd.optsWithGlobals());
+        fmt.object({ telemetry: "disabled" });
+      } catch (err) {
+        handleError(err, cmd.optsWithGlobals());
+      }
+    });
+
+  telemetry
+    .command("status")
+    .description("Show telemetry consent status")
+    .action(async (_opts, cmd) => {
+      try {
+        const cfg = configManager.load();
+        const fmt = Formatter.from(cmd.optsWithGlobals());
+        fmt.object({ telemetryEnabled: cfg.telemetry.enabled });
+      } catch (err) {
+        handleError(err, cmd.optsWithGlobals());
+      }
+    });
 }
 
 function setNestedValue(
@@ -138,7 +189,11 @@ function setNestedValue(
     }
     current = current[parts[i]] as Record<string, unknown>;
   }
-  current[parts.at(-1)] = value;
+  const last = parts[parts.length - 1];
+  if (!last) {
+    return;
+  }
+  current[last] = value;
 }
 
 function getNestedValue(obj: Record<string, unknown>, path: string): unknown {

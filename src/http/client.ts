@@ -91,7 +91,6 @@ export class ApiClient {
     const url = this.buildUrl(path);
     const headers = this.baseHeaders();
     headers["Content-Type"] = contentType;
-    headers["Content-Type"] = undefined;
 
     const response = await this.fetchWithTimeout(url, {
       method: "PUT",
