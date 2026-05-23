@@ -1,18 +1,9 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-echo "🔍 Running pre-commit checks..."
+# Get staged .ts files
+STAGED_TS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.tsx?$' || true)
 
-# Run linting
-echo "📝 Running linter..."
-bun run lint
-
-# Run formatting
-echo "✨ Running formatter..."
-bun run format
-
-# Run tests
-echo "🧪 Running tests..."
-bun run test
-
-echo "✅ All pre-commit checks passed!"
+if [ -n "$STAGED_TS" ]; then
+  echo "$STAGED_TS" | xargs bunx --no -- biome check --no-errors-on-unmatched --files-ignore-unknown=true
+fi

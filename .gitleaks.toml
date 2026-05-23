@@ -1,0 +1,25 @@
+title = "frontal"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore test fixtures, example env files, documentation, and vendor code"
+paths = [
+  '''(^|.*/)fixtures(/.*|$)''',
+  '''(^|.*/)testdata(/.*|$)''',
+  '''\.env\.example$''',
+  '''\.env\.sample$''',
+  '''\.env$''',
+  '''(^|.*/)vendor(/.*|$)''',
+  '''README\.md$''',
+  '''AGENTS\.md$''',
+  '''docs/''',
+  '''\.test\.ts$''',
+  '''\.spec\.ts$''',
+  '''test\.env$''',
+  '''\.agents/''',
+  '''\.cursor/''',
+  '''skills/''',
+  '''/tests/''',
+]

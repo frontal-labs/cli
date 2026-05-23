@@ -12,7 +12,6 @@ dedupe = true
 
 [install.scopes]
 # Configure scoped package registries if needed
-"@frontal" = "https://registry.npmjs.org/"
 
 [run]
 # Environment variables for scripts

@@ -5,7 +5,6 @@ yarn-debug.log*
 yarn-error.log*
 
 # Ignore files for Bun
-bun.lockb
 .bun/
 
 # Build outputs

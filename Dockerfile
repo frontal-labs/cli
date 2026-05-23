@@ -1,7 +1,7 @@
 # Dockerfile for Frontal CLI
 
 # Build stage
-FROM oven/bun:1.3.8-alpine AS builder
+FROM oven/bun:1.3.8-slim AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY . .
 RUN bun run build
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:22-alpine AS production
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
