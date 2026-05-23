@@ -12,146 +12,193 @@ import {
 import { theme } from "../output/theme.js";
 import { EXIT_CODES } from "./exit-codes.js";
 
+interface MachineError {
+  code: string;
+  message: string;
+  requestId?: string;
+  statusCode?: number;
+}
+
+interface HumanMessage {
+  suggestion?: string;
+  title: string;
+}
+
+function classifyError(err: unknown): {
+  exitCode: number;
+  machine: MachineError;
+  human: HumanMessage;
+} {
+  if (err instanceof UnauthorizedError) {
+    return {
+      exitCode: EXIT_CODES.AUTH_ERROR,
+      machine: {
+        code: err.code,
+        message: err.message,
+        statusCode: err.statusCode,
+        requestId: err.requestId,
+      },
+      human: {
+        title: "Authentication failed. Run `frontal auth login`.",
+        suggestion: "Run 'frontal auth login' to authenticate.",
+      },
+    };
+  }
+
+  if (err instanceof ForbiddenError) {
+    return {
+      exitCode: EXIT_CODES.PERMISSION_ERROR,
+      machine: {
+        code: err.code,
+        message: err.message,
+        statusCode: err.statusCode,
+        requestId: err.requestId,
+      },
+      human: {
+        title: "Permission denied. Check your role/policy.",
+        suggestion: "Check your role with 'frontal auth whoami'.",
+      },
+    };
+  }
+
+  if (err instanceof NotFoundError) {
+    return {
+      exitCode: EXIT_CODES.NOT_FOUND,
+      machine: {
+        code: err.code,
+        message: err.message,
+        statusCode: err.statusCode,
+        requestId: err.requestId,
+      },
+      human: {
+        title: `Resource not found: ${err.message}`,
+        suggestion:
+          "Verify the resource ID. List resources with 'frontal <resource> list'.",
+      },
+    };
+  }
+
+  if (err instanceof ValidationError) {
+    return {
+      exitCode: EXIT_CODES.VALIDATION_ERROR,
+      machine: {
+        code: err.code,
+        message: err.message,
+        statusCode: err.statusCode,
+        requestId: err.requestId,
+      },
+      human: {
+        title: `Validation failed:${err.fields ? "" : ` ${err.message}`}`,
+        suggestion: err.fields ? undefined : undefined,
+      },
+    };
+  }
+
+  if (err instanceof RateLimitError) {
+    const retryMsg = err.retryAfter ? ` Retry after ${err.retryAfter}s.` : "";
+    return {
+      exitCode: EXIT_CODES.RATE_LIMITED,
+      machine: {
+        code: err.code,
+        message: err.message,
+        statusCode: err.statusCode,
+        requestId: err.requestId,
+      },
+      human: {
+        title: `Rate limit exceeded.${retryMsg}`,
+        suggestion: err.retryAfter
+          ? `Wait ${err.retryAfter}s and try again.`
+          : "Wait and try again.",
+      },
+    };
+  }
+
+  if (err instanceof ConflictError) {
+    return {
+      exitCode: EXIT_CODES.GENERAL_ERROR,
+      machine: {
+        code: err.code,
+        message: err.message,
+        statusCode: err.statusCode,
+        requestId: err.requestId,
+      },
+      human: { title: `Conflict: ${err.message}` },
+    };
+  }
+
+  if (err instanceof NetworkError) {
+    return {
+      exitCode: EXIT_CODES.NETWORK_ERROR,
+      machine: { code: "NETWORK_ERROR", message: err.message },
+      human: {
+        title: "Could not reach the Frontal API.",
+        suggestion:
+          "Check your connection. Verify API URL with 'frontal config list'.",
+      },
+    };
+  }
+
+  if (err instanceof TimeoutError) {
+    return {
+      exitCode: EXIT_CODES.TIMEOUT_ERROR,
+      machine: { code: "TIMEOUT_ERROR", message: err.message },
+      human: {
+        title: err.message,
+        suggestion: "Request timed out. Try again or increase --timeout.",
+      },
+    };
+  }
+
+  if (err instanceof ApiError) {
+    return {
+      exitCode: EXIT_CODES.GENERAL_ERROR,
+      machine: {
+        code: err.code,
+        message: err.message,
+        statusCode: err.statusCode,
+        requestId: err.requestId,
+      },
+      human: {
+        title: `Server error (${err.statusCode}): ${err.message}`,
+      },
+    };
+  }
+
+  if (err instanceof Error) {
+    return {
+      exitCode: EXIT_CODES.GENERAL_ERROR,
+      machine: { code: "UNHANDLED_ERROR", message: err.message },
+      human: { title: err.message },
+    };
+  }
+
+  return {
+    exitCode: EXIT_CODES.GENERAL_ERROR,
+    machine: {
+      code: "UNEXPECTED_ERROR",
+      message: "An unexpected error occurred.",
+    },
+    human: { title: "An unexpected error occurred." },
+  };
+}
+
 export function handleError(
   err: unknown,
   globalOpts?: Record<string, unknown>
 ): never {
   const debug = globalOpts?.debug as boolean;
   const json = globalOpts?.json as boolean;
-  const logHuman = !json;
+  const { exitCode, machine, human } = classifyError(err);
 
-  let exitCode: number = EXIT_CODES.GENERAL_ERROR;
-  let machineCode = "UNEXPECTED_ERROR";
-  let machineMessage = "An unexpected error occurred.";
-  let machineStatusCode: number | undefined;
-  let machineRequestId: string | undefined;
-
-  if (err instanceof UnauthorizedError) {
-    machineCode = err.code;
-    machineMessage = err.message;
-    machineStatusCode = err.statusCode;
-    machineRequestId = err.requestId;
-    if (logHuman) {
-      console.error(
-        theme.error("Authentication failed. Run `frontal auth login`.")
-      );
-      console.error(
-        theme.dim("Suggestion: Run 'frontal auth login' to authenticate.")
-      );
-    }
-    exitCode = EXIT_CODES.AUTH_ERROR;
-  } else if (err instanceof ForbiddenError) {
-    machineCode = err.code;
-    machineMessage = err.message;
-    machineStatusCode = err.statusCode;
-    machineRequestId = err.requestId;
-    if (logHuman) {
-      console.error(theme.error("Permission denied. Check your role/policy."));
-      console.error(
-        theme.dim("Suggestion: Check your role with 'frontal auth whoami'.")
-      );
-    }
-    exitCode = EXIT_CODES.PERMISSION_ERROR;
-  } else if (err instanceof NotFoundError) {
-    machineCode = err.code;
-    machineMessage = err.message;
-    machineStatusCode = err.statusCode;
-    machineRequestId = err.requestId;
-    if (logHuman) {
-      console.error(theme.error(`Resource not found: ${err.message}`));
-      console.error(
-        theme.dim(
-          "Suggestion: Verify the resource ID. List resources with 'frontal <resource> list'."
-        )
-      );
-    }
-    exitCode = EXIT_CODES.NOT_FOUND;
-  } else if (err instanceof ValidationError) {
-    machineCode = err.code;
-    machineMessage = err.message;
-    machineStatusCode = err.statusCode;
-    machineRequestId = err.requestId;
-    if (logHuman) {
-      console.error(theme.error("Validation failed:"));
-      if (err.fields) {
-        for (const f of err.fields) {
-          console.error(theme.error(`  - ${f.field}: ${f.message}`));
-        }
-      } else {
-        console.error(theme.error(`  ${err.message}`));
+  if (!json) {
+    console.error(theme.error(human.title));
+    if (err instanceof ValidationError && err.fields) {
+      for (const f of err.fields) {
+        console.error(theme.error(`  - ${f.field}: ${f.message}`));
       }
     }
-    exitCode = EXIT_CODES.VALIDATION_ERROR;
-  } else if (err instanceof RateLimitError) {
-    machineCode = err.code;
-    machineMessage = err.message;
-    machineStatusCode = err.statusCode;
-    machineRequestId = err.requestId;
-    const retryMsg = err.retryAfter ? ` Retry after ${err.retryAfter}s.` : "";
-    if (logHuman) {
-      console.error(theme.error(`Rate limit exceeded.${retryMsg}`));
-      console.error(
-        theme.dim(
-          err.retryAfter
-            ? `Suggestion: Wait ${err.retryAfter}s and try again.`
-            : "Suggestion: Wait and try again."
-        )
-      );
-    }
-    exitCode = EXIT_CODES.RATE_LIMITED;
-  } else if (err instanceof ConflictError) {
-    machineCode = err.code;
-    machineMessage = err.message;
-    machineStatusCode = err.statusCode;
-    machineRequestId = err.requestId;
-    if (logHuman) {
-      console.error(theme.error(`Conflict: ${err.message}`));
-    }
-    exitCode = EXIT_CODES.GENERAL_ERROR;
-  } else if (err instanceof NetworkError) {
-    machineCode = "NETWORK_ERROR";
-    machineMessage = err.message;
-    if (logHuman) {
-      console.error(theme.error("Could not reach the Frontal API."));
-      console.error(
-        theme.dim(
-          "Suggestion: Check your connection. Verify API URL with 'frontal config list'."
-        )
-      );
-    }
-    exitCode = EXIT_CODES.NETWORK_ERROR;
-  } else if (err instanceof TimeoutError) {
-    machineCode = "TIMEOUT_ERROR";
-    machineMessage = err.message;
-    if (logHuman) {
-      console.error(theme.error(err.message));
-      console.error(
-        theme.dim(
-          "Suggestion: Request timed out. Try again or increase --timeout."
-        )
-      );
-    }
-    exitCode = EXIT_CODES.TIMEOUT_ERROR;
-  } else if (err instanceof ApiError) {
-    machineCode = err.code;
-    machineMessage = err.message;
-    machineStatusCode = err.statusCode;
-    machineRequestId = err.requestId;
-    if (logHuman) {
-      console.error(
-        theme.error(`Server error (${err.statusCode}): ${err.message}`)
-      );
-    }
-    exitCode = EXIT_CODES.GENERAL_ERROR;
-  } else if (err instanceof Error) {
-    machineCode = "UNHANDLED_ERROR";
-    machineMessage = err.message;
-    if (logHuman) {
-      console.error(theme.error(err.message));
-    }
-  } else {
-    if (logHuman) {
-      console.error(theme.error("An unexpected error occurred."));
+    if (human.suggestion) {
+      console.error(theme.dim(`Suggestion: ${human.suggestion}`));
     }
   }
 
@@ -159,10 +206,10 @@ export function handleError(
     console.error(
       JSON.stringify({
         error: {
-          code: machineCode,
-          message: machineMessage,
-          statusCode: machineStatusCode,
-          requestId: machineRequestId,
+          code: machine.code,
+          message: machine.message,
+          statusCode: machine.statusCode,
+          requestId: machine.requestId,
         },
       })
     );
