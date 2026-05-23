@@ -157,11 +157,12 @@ export const createMockErrorHandler = () => {
   };
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // Mock CLI validation
 export const createMockValidator = () => ({
   validateEmail: vi.fn((email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email) ? true : "Invalid email format";
+    return EMAIL_REGEX.test(email) ? true : "Invalid email format";
   }),
   validateApiKey: vi.fn((key: string) => {
     return key.startsWith("fr_") ? true : "Invalid API key format";

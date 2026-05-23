@@ -145,7 +145,8 @@ describe("CLI E2E Workflows", () => {
   });
 });
 
-// Helper functions for E2E testing
+// biome-ignore lint/complexity/noStaticOnlyClass: E2E test utility helper
+// biome-ignore lint/correctness/noUnusedVariables: E2E test utility helper
 class CLIHelper {
   static async runCommand(
     args: string[],
@@ -263,6 +264,7 @@ class CLIHelper {
 }
 
 // Mock server for E2E testing
+// biome-ignore lint/correctness/noUnusedVariables: E2E test utility stub
 class MockServer {
   private readonly responses: Map<string, any> = new Map();
 

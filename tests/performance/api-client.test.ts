@@ -64,27 +64,33 @@ describe("API Client Performance Tests", () => {
     });
 
     it("should handle request timeout efficiently", async () => {
+      vi.useFakeTimers();
+
       const slowClient = new ApiClient({
         apiKey: "test-api-key",
         baseUrl: "https://api.test.com",
-        timeout: 100, // 100ms timeout
+        timeout: 100,
       });
 
       mockFetch.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 200)) // 200ms delay
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            // Timer is only needed so we can clearTimeout on abort
+            const timer = setTimeout(() => undefined, 200);
+            init?.signal?.addEventListener("abort", () => {
+              clearTimeout(timer);
+              reject(new DOMException("Request timed out", "AbortError"));
+            });
+          })
       );
 
-      const startTime = performance.now();
+      const promise = slowClient.get("/test");
 
-      await expect(slowClient.get("/test")).rejects.toThrow(
-        "Request timed out"
-      );
+      await vi.advanceTimersByTimeAsync(100);
 
-      const endTime = performance.now();
-      const duration = endTime - startTime;
+      await expect(promise).rejects.toThrow("Request timed out");
 
-      // Should timeout within reasonable time (slightly more than configured timeout)
-      expect(duration).toBeLessThan(500); // Should be close to 100ms + some overhead
+      vi.useRealTimers();
     });
   });
 
@@ -230,7 +236,7 @@ describe("API Client Performance Tests", () => {
       });
 
       const startTime = performance.now();
-      const receivedEvents = [];
+      const receivedEvents: unknown[] = [];
 
       // Note: This assumes the client has a stream method that handles SSE
       try {

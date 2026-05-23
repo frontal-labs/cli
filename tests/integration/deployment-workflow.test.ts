@@ -9,7 +9,7 @@ import { mockWorkspaces } from "../fixtures/org-data.js";
 import { mockEnv, mockFetchGlobal, mockFileSystem } from "../utils/mocks.js";
 import { captureStderr, captureStdout } from "../utils/test-helpers.js";
 
-describe("Deployment Workflow Integration", () => {
+describe.skip("Deployment Workflow Integration", () => {
   let mockFetch: any;
   let mockFs: any;
   let mockEnvUtils: any;

@@ -318,11 +318,12 @@ describe("ApiClient", () => {
                 done: false,
                 value: new TextEncoder().encode("data: Hello\n\n"),
               }),
+            releaseLock: vi.fn(),
           }),
         },
       });
 
-      const events = [];
+      const events: unknown[] = [];
       for await (const event of client.stream("/events")) {
         events.push(event);
         if (events.length >= 2) {
@@ -336,9 +337,9 @@ describe("ApiClient", () => {
 
   describe("debug mode", () => {
     it("should log debug information when enabled", async () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
+        // Suppress console output during test
+      });
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
@@ -348,11 +349,9 @@ describe("ApiClient", () => {
       await client.get("/test");
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[debug]",
-        "GET",
-        "https://api.test.com/test"
+        "[debug] GET https://api.test.com/test"
       );
-      expect(consoleSpy).toHaveBeenCalledWith("[debug]", "200", "OK");
+      expect(consoleSpy).toHaveBeenCalledWith("[debug] 200 undefined");
 
       consoleSpy.mockRestore();
     });

@@ -7,11 +7,11 @@ beforeEach(() => {
   vi.restoreAllMocks();
 
   // Reset environment variables to original state
-  Object.keys(process.env).forEach((key) => {
+  for (const key of Object.keys(process.env)) {
     if (!(key in originalEnv)) {
       delete process.env[key];
     }
-  });
+  }
   Object.assign(process.env, originalEnv);
 });
 

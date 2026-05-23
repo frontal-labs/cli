@@ -1,7 +1,8 @@
 import { expect } from "vitest";
 
 // Top-level regex constants for performance
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ISO_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
 
@@ -90,12 +91,18 @@ export function assertError(
   }
 }
 
-export function assertMockCalled(mock: { mock: { calls: unknown[] } }, times = 1) {
+export function assertMockCalled(
+  mock: { mock: { calls: unknown[] } },
+  times = 1
+) {
   expect(mock).toHaveBeenCalled();
   expect(mock).toHaveBeenCalledTimes(times);
 }
 
-export function assertMockCalledWith(mock: { mock: { calls: unknown[] } }, ...args: unknown[]) {
+export function assertMockCalledWith(
+  mock: { mock: { calls: unknown[] } },
+  ...args: unknown[]
+) {
   expect(mock).toHaveBeenCalledWith(...args);
 }
 
@@ -111,7 +118,10 @@ export function assertConsoleOutput(
   }
 }
 
-export function assertProcessExit(mockProcess: { exit: { mock: { calls: unknown[] } } }, code = 0) {
+export function assertProcessExit(
+  mockProcess: { exit: { mock: { calls: unknown[] } } },
+  code = 0
+) {
   expect(mockProcess.exit).toHaveBeenCalledWith(code);
 }
 
@@ -128,7 +138,10 @@ export function assertFileExists(filePath: string) {
   expect(() => require("node:fs").accessSync(filePath)).not.toThrow();
 }
 
-export function assertJsonStructure(obj: Record<string, unknown>, structure: Record<string, unknown>) {
+export function assertJsonStructure(
+  obj: Record<string, unknown>,
+  structure: Record<string, unknown>
+) {
   for (const [key, type] of Object.entries(structure)) {
     expect(obj).toHaveProperty(key);
 
@@ -144,7 +157,10 @@ export function assertJsonStructure(obj: Record<string, unknown>, structure: Rec
     } else if (type === "array") {
       expect(Array.isArray(obj[key])).toBe(true);
     } else if (typeof type === "object" && type !== null) {
-      assertJsonStructure(obj[key] as Record<string, unknown>, type as Record<string, unknown>);
+      assertJsonStructure(
+        obj[key] as Record<string, unknown>,
+        type as Record<string, unknown>
+      );
     }
   }
 }
