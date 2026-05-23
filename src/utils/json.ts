@@ -1,4 +1,7 @@
-export function parseJsonInput(value: string | undefined, label: string): unknown {
+export function parseJsonInput(
+  value: string | undefined,
+  label: string
+): unknown {
   if (!value) {
     return undefined;
   }

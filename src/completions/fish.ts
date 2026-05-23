@@ -1,5 +1,9 @@
 import type { Command } from "commander";
 
+const STRIP_LEADING_DASHES = /^--/;
+const ESCAPE_FISH_BACKSLASH = /\\/g;
+const ESCAPE_FISH_QUOTE = /"/g;
+
 export function generateFishCompletions(program: Command): string {
   const lines: string[] = [
     "# fish completion for frontal",
@@ -8,7 +12,7 @@ export function generateFishCompletions(program: Command): string {
   ];
 
   for (const cmd of program.commands) {
-    if ((cmd as any)._hidden) {
+    if ((cmd as { _hidden?: boolean })._hidden) {
       continue;
     }
     const name = cmd.name();
@@ -18,7 +22,7 @@ export function generateFishCompletions(program: Command): string {
     );
 
     for (const sub of cmd.commands) {
-      if ((sub as any)._hidden) {
+      if ((sub as { _hidden?: boolean })._hidden) {
         continue;
       }
       const subDesc = sub.description() || sub.name();
@@ -30,7 +34,7 @@ export function generateFishCompletions(program: Command): string {
     for (const opt of cmd.options) {
       const optDesc = opt.description || "";
       if (opt.long) {
-        const flag = opt.long.replace(/^--/, "");
+        const flag = opt.long.replace(STRIP_LEADING_DASHES, "");
         lines.push(
           `complete -c frontal -n "__fish_seen_subcommand_from ${name}" -l ${flag} -d "${escapeFish(optDesc)}"`
         );
@@ -42,7 +46,7 @@ export function generateFishCompletions(program: Command): string {
   for (const opt of program.options) {
     const optDesc = opt.description || "";
     if (opt.long) {
-      const flag = opt.long.replace(/^--/, "");
+      const flag = opt.long.replace(STRIP_LEADING_DASHES, "");
       lines.push(
         `complete -c frontal -n "__fish_use_subcommand" -l ${flag} -d "${escapeFish(optDesc)}"`
       );
@@ -54,5 +58,7 @@ export function generateFishCompletions(program: Command): string {
 }
 
 function escapeFish(str: string): string {
-  return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return str
+    .replace(ESCAPE_FISH_BACKSLASH, "\\\\")
+    .replace(ESCAPE_FISH_QUOTE, '\\"');
 }

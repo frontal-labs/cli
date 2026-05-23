@@ -1,3 +1,4 @@
+// biome-ignore lint/performance/noBarrelFile: public API surface for config module
 export { ConfigManager, configManager } from "./manager.js";
 export type { GlobalOptions, ResolvedConfig } from "./resolve.js";
 export { resolveConfig } from "./resolve.js";

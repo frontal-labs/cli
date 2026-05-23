@@ -53,12 +53,14 @@ export class Formatter {
       return;
     }
     for (const [key, value] of Object.entries(data)) {
-      const displayValue =
-        value === null || value === undefined
-          ? theme.dim("-")
-          : typeof value === "object"
-            ? JSON.stringify(value)
-            : String(value);
+      let displayValue: string;
+      if (value === null || value === undefined) {
+        displayValue = theme.dim("-");
+      } else if (typeof value === "object") {
+        displayValue = JSON.stringify(value);
+      } else {
+        displayValue = String(value);
+      }
       console.log(`${theme.bold(key)}: ${displayValue}`);
     }
   }

@@ -5,7 +5,7 @@ export function generateZshCompletions(program: Command): string {
   const subcases: string[] = [];
 
   for (const cmd of program.commands) {
-    if ((cmd as any)._hidden) {
+    if ((cmd as { _hidden?: boolean })._hidden) {
       continue;
     }
     const name = cmd.name();
@@ -14,7 +14,7 @@ export function generateZshCompletions(program: Command): string {
 
     const subs: string[] = [];
     for (const sub of cmd.commands) {
-      if ((sub as any)._hidden) {
+      if ((sub as { _hidden?: boolean })._hidden) {
         continue;
       }
       const subDesc = sub.description() || sub.name();

@@ -15,7 +15,7 @@ export function registerConfigCommands(program: Command): void {
     .description("Set a configuration value")
     .argument("<key>", "Config key (e.g., defaults.outputFormat)")
     .argument("<value>", "Config value")
-    .action(async (key, value, _opts, cmd) => {
+    .action((key, value, _opts, cmd) => {
       try {
         const cfg = configManager.load();
         setNestedValue(cfg, key, parseValue(value));
@@ -30,7 +30,7 @@ export function registerConfigCommands(program: Command): void {
     .command("get")
     .description("Get a configuration value")
     .argument("<key>", "Config key")
-    .action(async (key, _opts, cmd) => {
+    .action((key, _opts, cmd) => {
       try {
         const cfg = configManager.load();
         const value = getNestedValue(cfg, key);
@@ -45,7 +45,7 @@ export function registerConfigCommands(program: Command): void {
   config
     .command("list")
     .description("Display all configuration for active profile")
-    .action(async (_opts, cmd) => {
+    .action((_opts, cmd) => {
       try {
         const cfg = configManager.load();
         const fmt = Formatter.from(cmd.optsWithGlobals());
@@ -92,7 +92,7 @@ export function registerConfigCommands(program: Command): void {
   config
     .command("profiles")
     .description("List all profiles")
-    .action(async (_opts, cmd) => {
+    .action((_opts, cmd) => {
       try {
         const cfg = configManager.load();
         const fmt = Formatter.from(cmd.optsWithGlobals());
@@ -119,7 +119,7 @@ export function registerConfigCommands(program: Command): void {
     .command("use")
     .description("Switch active profile")
     .argument("<profile>", "Profile name")
-    .action(async (profile, _opts, cmd) => {
+    .action((profile, _opts, cmd) => {
       try {
         configManager.setActiveProfile(profile);
         console.log(theme.success(`Switched to profile "${profile}".`));
@@ -135,7 +135,7 @@ export function registerConfigCommands(program: Command): void {
   telemetry
     .command("enable")
     .description("Enable telemetry")
-    .action(async (_opts, cmd) => {
+    .action((_opts, cmd) => {
       try {
         const cfg = configManager.load();
         cfg.telemetry.enabled = true;
@@ -150,7 +150,7 @@ export function registerConfigCommands(program: Command): void {
   telemetry
     .command("disable")
     .description("Disable telemetry")
-    .action(async (_opts, cmd) => {
+    .action((_opts, cmd) => {
       try {
         const cfg = configManager.load();
         cfg.telemetry.enabled = false;
@@ -165,7 +165,7 @@ export function registerConfigCommands(program: Command): void {
   telemetry
     .command("status")
     .description("Show telemetry consent status")
-    .action(async (_opts, cmd) => {
+    .action((_opts, cmd) => {
       try {
         const cfg = configManager.load();
         const fmt = Formatter.from(cmd.optsWithGlobals());
@@ -184,12 +184,16 @@ function setNestedValue(
   const parts = path.split(".");
   let current: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
-    if (typeof current[parts[i]] !== "object" || current[parts[i]] === null) {
-      current[parts[i]] = {};
+    const part = parts[i];
+    if (part === undefined) {
+      continue;
     }
-    current = current[parts[i]] as Record<string, unknown>;
+    if (typeof current[part] !== "object" || current[part] === null) {
+      current[part] = {};
+    }
+    current = current[part] as Record<string, unknown>;
   }
-  const last = parts[parts.length - 1];
+  const last = parts.at(-1);
   if (!last) {
     return;
   }

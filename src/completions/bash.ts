@@ -1,35 +1,44 @@
-import type { Command } from "commander";
+import type { Command, Option } from "commander";
+
+function collectOptionFlags(opts: readonly Option[]): string[] {
+  const flags: string[] = [];
+  for (const opt of opts) {
+    if (opt.long) {
+      flags.push(opt.long);
+    }
+    if (opt.short) {
+      flags.push(opt.short);
+    }
+  }
+  return flags;
+}
+
+function collectVisibleSubcommandNames(cmds: readonly Command[]): string[] {
+  const names: string[] = [];
+  for (const cmd of cmds) {
+    if ((cmd as { _hidden?: boolean })._hidden) {
+      continue;
+    }
+    names.push(cmd.name());
+  }
+  return names;
+}
 
 export function generateBashCompletions(program: Command): string {
   const topLevel: string[] = [];
   const cases: string[] = [];
 
   for (const cmd of program.commands) {
-    if ((cmd as any)._hidden) {
+    if ((cmd as { _hidden?: boolean })._hidden) {
       continue;
     }
     const name = cmd.name();
     topLevel.push(name);
 
-    const subs: string[] = [];
-    for (const sub of cmd.commands) {
-      if ((sub as any)._hidden) {
-        continue;
-      }
-      subs.push(sub.name());
-    }
-
-    const opts: string[] = [];
-    for (const opt of cmd.options) {
-      if (opt.long) {
-        opts.push(opt.long);
-      }
-      if (opt.short) {
-        opts.push(opt.short);
-      }
-    }
-
+    const subs = collectVisibleSubcommandNames(cmd.commands);
+    const opts = collectOptionFlags(cmd.options);
     const words = [...subs, ...opts].join(" ");
+
     if (words) {
       cases.push(
         `    ${name})\n      COMPREPLY=( $(compgen -W "${words}" -- "$cur") )\n      ;;`
@@ -37,16 +46,7 @@ export function generateBashCompletions(program: Command): string {
     }
   }
 
-  const globalOpts: string[] = [];
-  for (const opt of program.options) {
-    if (opt.long) {
-      globalOpts.push(opt.long);
-    }
-    if (opt.short) {
-      globalOpts.push(opt.short);
-    }
-  }
-
+  const globalOpts = collectOptionFlags(program.options);
   const allTopLevel = [...topLevel, ...globalOpts].join(" ");
 
   return `# bash completion for frontal

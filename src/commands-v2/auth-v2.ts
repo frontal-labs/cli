@@ -10,9 +10,9 @@ import {
 import { generateCodeChallenge, generateCodeVerifier } from "../auth/pkce.js";
 import {
   decodeTokenExpiry,
+  exchangeCode,
   isTokenExpired,
   refreshTokens,
-  exchangeCode,
 } from "../auth/token-manager.js";
 import { configManager } from "../config/manager.js";
 import { resolveConfig } from "../config/resolve.js";
@@ -81,10 +81,10 @@ export function registerAuthV2Commands(program: Command): void {
 
         configManager.setProfile(profileName, {
           ...(typeof token === "string" ? { accessToken: token } : {}),
-          ...(typeof refreshToken === "string"
-            ? { refreshToken }
+          ...(typeof refreshToken === "string" ? { refreshToken } : {}),
+          ...(typeof expiresAt === "number"
+            ? { tokenExpiresAt: expiresAt }
             : {}),
-          ...(typeof expiresAt === "number" ? { tokenExpiresAt: expiresAt } : {}),
         });
         configManager.setActiveProfile(profileName);
 
@@ -119,7 +119,7 @@ export function registerAuthV2Commands(program: Command): void {
     .command("logout")
     .description("Remove credentials from a profile")
     .option("--profile <name>", "Profile to logout from")
-    .action(async (opts, cmd) => {
+    .action((opts, cmd) => {
       try {
         const profileName =
           opts.profile ?? cmd.optsWithGlobals().profile ?? "default";
@@ -132,7 +132,9 @@ export function registerAuthV2Commands(program: Command): void {
         });
 
         if (!(cmd.optsWithGlobals().json as boolean)) {
-          console.log(theme.success(`Logged out from profile "${profileName}".`));
+          console.log(
+            theme.success(`Logged out from profile "${profileName}".`)
+          );
         }
       } catch (err) {
         handleError(err, cmd.optsWithGlobals());
@@ -142,17 +144,18 @@ export function registerAuthV2Commands(program: Command): void {
   auth
     .command("whoami")
     .description("Show current authentication status")
-    .action(async (_opts, cmd) => {
+    .action((_opts, cmd) => {
       try {
         const globalOpts = cmd.optsWithGlobals();
         const config = resolveConfig(globalOpts);
         const fmt = Formatter.from(globalOpts);
 
-        const authMethod = config.accessToken
-          ? "oauth"
-          : config.apiKey
-            ? "api-key"
-            : "none";
+        let authMethod = "none";
+        if (config.accessToken) {
+          authMethod = "oauth";
+        } else if (config.apiKey) {
+          authMethod = "api-key";
+        }
 
         fmt.object({
           profile: configManager.getActiveProfileName(),
@@ -176,7 +179,7 @@ export function registerAuthV2Commands(program: Command): void {
   auth
     .command("token")
     .description("Print the raw access token or API key to stdout")
-    .action(async (_opts, cmd) => {
+    .action((_opts, cmd) => {
       try {
         const config = resolveConfig(cmd.optsWithGlobals());
 
@@ -186,7 +189,9 @@ export function registerAuthV2Commands(program: Command): void {
         }
 
         if (!config.apiKey) {
-          throw new Error("No credentials configured. Run `frontal auth login`.");
+          throw new Error(
+            "No credentials configured. Run `frontal auth login`."
+          );
         }
 
         process.stdout.write(config.apiKey);
@@ -205,7 +210,9 @@ export function registerAuthV2Commands(program: Command): void {
         const profileName = globalOpts.profile ?? "default";
 
         if (!(config.refreshToken && config.authUrl)) {
-          throw new Error("No OAuth tokens to refresh. Run `frontal auth login`.");
+          throw new Error(
+            "No OAuth tokens to refresh. Run `frontal auth login`."
+          );
         }
 
         const tokens = await refreshTokens({
@@ -229,7 +236,9 @@ export function registerAuthV2Commands(program: Command): void {
       }
     });
 
-  const mfa = auth.command("mfa").description("Manage multi-factor authentication");
+  const mfa = auth
+    .command("mfa")
+    .description("Manage multi-factor authentication");
 
   mfa
     .command("status")
@@ -240,7 +249,8 @@ export function registerAuthV2Commands(program: Command): void {
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
         const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.get<Record<string, unknown>>("/auth/mfa/status");
+        const result =
+          await api.get<Record<string, unknown>>("/auth/mfa/status");
         fmt.object(result);
       } catch (err) {
         handleError(err, cmd.optsWithGlobals());
@@ -256,7 +266,8 @@ export function registerAuthV2Commands(program: Command): void {
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
         const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.post<Record<string, unknown>>("/auth/mfa/setup");
+        const result =
+          await api.post<Record<string, unknown>>("/auth/mfa/setup");
         fmt.object(result);
       } catch (err) {
         handleError(err, cmd.optsWithGlobals());
@@ -273,9 +284,12 @@ export function registerAuthV2Commands(program: Command): void {
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
         const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.post<Record<string, unknown>>("/auth/mfa/enable", {
-          code: opts.code,
-        });
+        const result = await api.post<Record<string, unknown>>(
+          "/auth/mfa/enable",
+          {
+            code: opts.code,
+          }
+        );
         fmt.object(result);
       } catch (err) {
         handleError(err, cmd.optsWithGlobals());
@@ -314,9 +328,12 @@ export function registerAuthV2Commands(program: Command): void {
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
         const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.post<Record<string, unknown>>("/auth/mfa/verify", {
-          code: opts.code,
-        });
+        const result = await api.post<Record<string, unknown>>(
+          "/auth/mfa/verify",
+          {
+            code: opts.code,
+          }
+        );
         fmt.object(result);
       } catch (err) {
         handleError(err, cmd.optsWithGlobals());
@@ -342,9 +359,15 @@ export function registerAuthV2Commands(program: Command): void {
     });
 }
 
-async function loginWithApiKey(profileName: string, cmd: Command): Promise<void> {
+async function loginWithApiKey(
+  profileName: string,
+  cmd: Command
+): Promise<void> {
   const apiKey = await promptSecret("Enter your API key (frt_...):");
-  const baseUrl = await promptText("API base URL:", "https://api.frontal.dev/v1");
+  const baseUrl = await promptText(
+    "API base URL:",
+    "https://api.frontal.dev/v1"
+  );
 
   const api = new ApiClient({ apiKey, baseUrl });
   try {
@@ -358,7 +381,9 @@ async function loginWithApiKey(profileName: string, cmd: Command): Promise<void>
   configManager.setActiveProfile(profileName);
 
   if (!(cmd.optsWithGlobals().json as boolean)) {
-    console.log(theme.success(`Authenticated. Profile "${profileName}" saved.`));
+    console.log(
+      theme.success(`Authenticated. Profile "${profileName}" saved.`)
+    );
   }
 }
 
@@ -393,7 +418,7 @@ async function loginWithBrowser(
   authorizeUrl.searchParams.set("state", state);
 
   const opened = await openBrowser(authorizeUrl.toString());
-  if (!opened && !(globalOpts.json as boolean)) {
+  if (!(opened || (globalOpts.json as boolean))) {
     console.log(theme.warn("Could not open browser automatically."));
     console.log(theme.dim(authorizeUrl.toString()));
   }
@@ -423,7 +448,9 @@ async function loginWithBrowser(
     configManager.setActiveProfile(profileName);
 
     if (!(globalOpts.json as boolean)) {
-      console.log(theme.success(`Authenticated. Profile "${profileName}" saved.`));
+      console.log(
+        theme.success(`Authenticated. Profile "${profileName}" saved.`)
+      );
     }
   } finally {
     server.close();

@@ -33,7 +33,7 @@ export function registerCompletionCommands(program: Command): void {
   program
     .command("__complete", { hidden: true })
     .argument("<type>")
-    .action(async (type: string) => {
+    .action((type: string) => {
       // Dynamic completion helper — can call API to resolve resource IDs
       // Usage: frontal __complete orgs
       // For now outputs nothing; extend later with API-backed lookups

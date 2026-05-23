@@ -22,9 +22,16 @@ export function registerWorkflowsV2Commands(program: Command): void {
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
         const params: Record<string, string> = {};
-        if (opts.limit) params.limit = String(opts.limit);
-        if (opts.cursor) params.cursor = opts.cursor;
-        const result = await api.get<Record<string, unknown>>("/workflows", params);
+        if (opts.limit) {
+          params.limit = String(opts.limit);
+        }
+        if (opts.cursor) {
+          params.cursor = opts.cursor;
+        }
+        const result = await api.get<Record<string, unknown>>(
+          "/workflows",
+          params
+        );
         const fmt = Formatter.from(cmd.optsWithGlobals());
         fmt.raw(result);
       } catch (err) {
@@ -42,7 +49,10 @@ export function registerWorkflowsV2Commands(program: Command): void {
         const body = parseJsonInput(opts.body, "--body");
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
-        const result = await api.post<Record<string, unknown>>("/workflows", body);
+        const result = await api.post<Record<string, unknown>>(
+          "/workflows",
+          body
+        );
         const fmt = Formatter.from(cmd.optsWithGlobals());
         fmt.object(result);
       } catch (err) {
@@ -60,7 +70,10 @@ export function registerWorkflowsV2Commands(program: Command): void {
         const body = parseJsonInput(opts.body, "--body");
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
-        const result = await api.post<Record<string, unknown>>("/workflows/search", body);
+        const result = await api.post<Record<string, unknown>>(
+          "/workflows/search",
+          body
+        );
         const fmt = Formatter.from(cmd.optsWithGlobals());
         fmt.raw(result);
       } catch (err) {
@@ -78,7 +91,10 @@ export function registerWorkflowsV2Commands(program: Command): void {
         const body = parseJsonInput(opts.body, "--body");
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
-        const result = await api.post<Record<string, unknown>>("/workflows/batch", body);
+        const result = await api.post<Record<string, unknown>>(
+          "/workflows/batch",
+          body
+        );
         const fmt = Formatter.from(cmd.optsWithGlobals());
         fmt.raw(result);
       } catch (err) {

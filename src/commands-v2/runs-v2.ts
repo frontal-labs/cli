@@ -20,8 +20,12 @@ export function registerRunsV2Commands(program: Command): void {
         const config = resolveConfig(cmd.optsWithGlobals());
         const api = new ApiClient(config);
         const params: Record<string, string> = {};
-        if (opts.limit) params.limit = String(opts.limit);
-        if (opts.cursor) params.cursor = opts.cursor;
+        if (opts.limit) {
+          params.limit = String(opts.limit);
+        }
+        if (opts.cursor) {
+          params.cursor = opts.cursor;
+        }
         const result = await api.get<Record<string, unknown>>("/runs", params);
         const fmt = Formatter.from(cmd.optsWithGlobals());
         fmt.raw(result);

@@ -88,9 +88,7 @@ const DEPENDENCY_MAP: Array<{ pkg: string; framework: Framework }> = [
   { pkg: "vite", framework: "vite" },
 ];
 
-export async function detectFramework(
-  dir: string
-): Promise<Framework | undefined> {
+export function detectFramework(dir: string): Framework | undefined {
   // 1. Check config files
   for (const { patterns, framework } of CONFIG_FILE_MAP) {
     for (const pattern of patterns) {

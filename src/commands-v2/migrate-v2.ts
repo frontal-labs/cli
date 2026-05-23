@@ -41,7 +41,7 @@ export function registerMigrateV2Command(program: Command): void {
   program
     .command("migrate-v2")
     .description("Show v1->v2 command migration guidance")
-    .action(async (_opts, cmd) => {
+    .action((_opts, cmd) => {
       try {
         const fmt = Formatter.from(cmd.optsWithGlobals());
         const cfg = configManager.load();

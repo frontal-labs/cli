@@ -27,6 +27,7 @@ export interface ApiClientConfig {
 const DEFAULT_TIMEOUT = 30_000;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY = 1000;
+const TRAILING_SLASHES = /\/+$/;
 
 export class ApiClient {
   private readonly config: Required<
@@ -43,7 +44,7 @@ export class ApiClient {
   constructor(config: ApiClientConfig) {
     this.config = {
       apiKey: config.apiKey,
-      baseUrl: config.baseUrl.replace(/\/+$/, ""),
+      baseUrl: config.baseUrl.replace(TRAILING_SLASHES, ""),
       timeout: config.timeout ?? DEFAULT_TIMEOUT,
       debug: config.debug ?? false,
       headers: config.headers ?? {},
@@ -55,25 +56,22 @@ export class ApiClient {
     };
   }
 
-  async get<T = unknown>(
-    path: string,
-    params?: Record<string, string>
-  ): Promise<T> {
+  get<T = unknown>(path: string, params?: Record<string, string>): Promise<T> {
     const url = this.buildUrl(path, params);
     return this.request<T>("GET", url);
   }
 
-  async post<T = unknown>(path: string, body?: unknown): Promise<T> {
+  post<T = unknown>(path: string, body?: unknown): Promise<T> {
     const url = this.buildUrl(path);
     return this.request<T>("POST", url, body);
   }
 
-  async put<T = unknown>(path: string, body?: unknown): Promise<T> {
+  put<T = unknown>(path: string, body?: unknown): Promise<T> {
     const url = this.buildUrl(path);
     return this.request<T>("PUT", url, body);
   }
 
-  async patch<T = unknown>(path: string, body?: unknown): Promise<T> {
+  patch<T = unknown>(path: string, body?: unknown): Promise<T> {
     const url = this.buildUrl(path);
     return this.request<T>("PATCH", url, body);
   }
@@ -258,59 +256,69 @@ export class ApiClient {
     }
   }
 
+  private async executeRequest<T>(
+    method: string,
+    url: string,
+    body?: unknown
+  ): Promise<T> {
+    if (this.config.debug) {
+      console.error(`[debug] ${method} ${url}`);
+    }
+
+    const response = await this.fetchWithTimeout(url, {
+      method,
+      headers: this.baseHeaders(),
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    if (this.config.debug) {
+      console.error(`[debug] ${response.status} ${response.statusText}`);
+    }
+
+    if (!response.ok) {
+      throw await this.parseError(response);
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
+  }
+
+  private isNetworkError(err: unknown): boolean {
+    if (!(err instanceof TypeError)) {
+      return false;
+    }
+    const msg = err.message.toLowerCase();
+    return msg.includes("fetch") || msg.includes("network");
+  }
+
   private async request<T>(
     method: string,
     url: string,
     body?: unknown
   ): Promise<T> {
-    let lastError: Error | undefined;
-
     await this.ensureFreshToken();
+
+    let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        if (this.config.debug) {
-          console.error(`[debug] ${method} ${url}`);
-        }
-
-        const response = await this.fetchWithTimeout(url, {
-          method,
-          headers: this.baseHeaders(),
-          body: body === undefined ? undefined : JSON.stringify(body),
-        });
-
-        if (this.config.debug) {
-          console.error(`[debug] ${response.status} ${response.statusText}`);
-        }
-
-        if (!response.ok) {
-          const error = await this.parseError(response);
-
-          if (this.shouldRetry(error, attempt)) {
-            const delay = this.retryDelay(attempt, error);
-            await sleep(delay);
-            lastError = error;
-            continue;
-          }
-
-          throw error;
-        }
-
-        if (response.status === 204) {
-          return undefined as T;
-        }
-
-        return (await response.json()) as T;
+        return await this.executeRequest<T>(method, url, body);
       } catch (err) {
         if (err instanceof ApiError) {
+          if (this.shouldRetry(err, attempt)) {
+            const delay = this.retryDelay(attempt, err);
+            await sleep(delay);
+            lastError = err;
+            continue;
+          }
           throw err;
         }
 
-        if (
-          err instanceof TypeError &&
-          (err.message.includes("fetch") || err.message.includes("network"))
-        ) {
-          lastError = new NetworkError(err.message);
+        if (this.isNetworkError(err)) {
+          lastError = new NetworkError((err as TypeError).message);
           if (attempt < MAX_RETRIES) {
             await sleep(this.retryDelay(attempt));
             continue;

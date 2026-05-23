@@ -5,6 +5,104 @@ import {
   poll,
 } from "../utils/polling.js";
 
+type ActionHandler = (...args: unknown[]) => Promise<void>;
+
+function createCaptureLogger() {
+  let lastOutput = "";
+  const originalLog = console.log;
+
+  const captureLog = (...logArgs: unknown[]) => {
+    const line = logArgs.map(String).join(" ");
+    lastOutput += `${line}\n`;
+    originalLog(...logArgs);
+  };
+
+  return {
+    getOutput: () => lastOutput,
+    resetOutput: () => {
+      lastOutput = "";
+    },
+    hijack: () => {
+      console.log = captureLog;
+    },
+    restore: () => {
+      console.log = originalLog;
+    },
+  };
+}
+
+async function runOnce(
+  handler: ActionHandler,
+  context: Command,
+  args: unknown[],
+  capture: ReturnType<typeof createCaptureLogger>
+) {
+  capture.resetOutput();
+  capture.hijack();
+  try {
+    await handler.apply(context, args);
+  } finally {
+    capture.restore();
+  }
+}
+
+function tryParseOutput(output: string): unknown {
+  try {
+    return JSON.parse(output.trim());
+  } catch {
+    return {};
+  }
+}
+
+async function pollUntil(
+  handler: ActionHandler,
+  context: Command,
+  args: unknown[],
+  condition: ReturnType<typeof parseUntilCondition>,
+  interval: number,
+  capture: ReturnType<typeof createCaptureLogger>
+) {
+  for await (const _ of poll(
+    async () => {
+      await runOnce(handler, context, args, capture);
+      return tryParseOutput(capture.getOutput());
+    },
+    {
+      interval,
+      until: (data: unknown) => evaluateCondition(data, condition),
+    }
+  )) {
+    // Generator yields each poll result; we continue until condition met
+  }
+}
+
+async function watchLoop(
+  handler: ActionHandler,
+  context: Command,
+  args: unknown[],
+  condition: ReturnType<typeof parseUntilCondition> | undefined,
+  interval: number,
+  capture: ReturnType<typeof createCaptureLogger>
+) {
+  const maxAttempts = condition ? 150 : Number.POSITIVE_INFINITY;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      process.stdout.write("\x1b[2J\x1b[H");
+    }
+
+    await runOnce(handler, context, args, capture);
+
+    if (condition) {
+      const data = tryParseOutput(capture.getOutput());
+      if (evaluateCondition(data, condition)) {
+        break;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+}
+
 export function installWatchMiddleware(program: Command): void {
   program
     .option("--watch [interval]", "Re-run command at interval (seconds)")
@@ -15,12 +113,10 @@ export function installWatchMiddleware(program: Command): void {
     const watchInterval = opts.watch;
     const untilExpr = opts.until;
 
-    // Skip if neither --watch nor --until is set, or if the command handles them itself
     if (watchInterval === undefined && !untilExpr) {
       return;
     }
 
-    // Skip for commands that handle their own polling (deploy)
     const commandName = thisCommand.name();
     if (
       [
@@ -36,11 +132,8 @@ export function installWatchMiddleware(program: Command): void {
       return;
     }
 
-    // Access Commander's internal _actionHandler (not in public typings)
     const cmd = thisCommand as unknown as Record<string, unknown>;
-    const originalAction = cmd._actionHandler as
-      | ((...args: unknown[]) => Promise<void>)
-      | undefined;
+    const originalAction = cmd._actionHandler as ActionHandler | undefined;
     if (!originalAction) {
       return;
     }
@@ -50,68 +143,26 @@ export function installWatchMiddleware(program: Command): void {
       typeof watchInterval === "string" ? Number(watchInterval) * 1000 : 2000;
 
     cmd._actionHandler = async (...args: unknown[]) => {
-      // Capture console output for condition evaluation
-      const originalLog = console.log;
-      let lastOutput = "";
-
-      const captureLog = (...logArgs: unknown[]) => {
-        const line = logArgs.map(String).join(" ");
-        lastOutput += `${line}\n`;
-        originalLog(...logArgs);
-      };
-
-      const runOnce = async () => {
-        lastOutput = "";
-        console.log = captureLog;
-        try {
-          await originalAction.apply(thisCommand, args);
-        } finally {
-          console.log = originalLog;
-        }
-      };
+      const capture = createCaptureLogger();
 
       if (condition && !watchInterval) {
-        // --until without --watch: silent polling
-        for await (const _ of poll(
-          async () => {
-            await runOnce();
-            try {
-              const data = JSON.parse(lastOutput.trim());
-              return data;
-            } catch {
-              return {};
-            }
-          },
-          {
-            interval,
-            until: (data: unknown) => evaluateCondition(data, condition),
-          }
-        )) {
-          // Generator yields each poll result; we continue until condition met
-        }
+        await pollUntil(
+          originalAction,
+          thisCommand,
+          args,
+          condition,
+          interval,
+          capture
+        );
       } else {
-        // --watch mode: re-run with clear
-        const maxAttempts = condition ? 150 : Number.POSITIVE_INFINITY;
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          if (attempt > 0) {
-            process.stdout.write("\x1b[2J\x1b[H");
-          }
-
-          await runOnce();
-
-          if (condition) {
-            try {
-              const data = JSON.parse(lastOutput.trim());
-              if (evaluateCondition(data, condition)) {
-                break;
-              }
-            } catch {
-              // Not JSON, can't evaluate condition
-            }
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, interval));
-        }
+        await watchLoop(
+          originalAction,
+          thisCommand,
+          args,
+          condition,
+          interval,
+          capture
+        );
       }
     };
   });
