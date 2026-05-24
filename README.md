@@ -1,7 +1,7 @@
 <picture>
- <source srcset="./assets/images/banner-dark.png" media="(prefers-color-scheme: dark)">
- <source srcset="./assets/images/banner.png" media="(prefers-color-scheme: light)">
- <img src="./assets/images/banner-dark.png" alt="Frontal Banner">
+ <source srcset="./banner-dark.png" media="(prefers-color-scheme: dark)">
+ <source srcset="./banner.png" media="(prefers-color-scheme: light)">
+ <img src="./banner-dark.png" alt="Frontal Banner">
 </picture>
 
 # Frontal CLI
@@ -262,7 +262,7 @@ frontal deploy
 
 ```bash
 # Clone the repository
-git clone https://github.com/frontal-cloud/cli.git
+git clone https://github.com/frontal-labs/cli.git
 cd cli
 
 # Install dependencies
@@ -428,8 +428,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Support
 
 - **Documentation**: [docs.frontal.dev](https://docs.frontal.dev)
-- **Issues**: [GitHub Issues](https://github.com/frontal-cloud/cli/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/frontal-cloud/cli/discussions)
+- **Issues**: [GitHub Issues](https://github.com/frontal-labs/cli/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/frontal-labs/cli/discussions)
 - **Email**: support@frontal.dev
 
 ## Changelog
