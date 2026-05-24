@@ -9,13 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const outputPath = path.resolve(repoRoot, 'src', 'generated', 'openapi-operations.generated.ts');
-const localFallbackPath = path.resolve(
-  repoRoot,
-  '..',
-  'openapi',
-  'openapi',
-  'openapi.spec3.yaml'
-);
+const localFallbackPath =
+  process.env.OPENAPI_LOCAL_PATH ??
+  path.resolve(repoRoot, '..', 'openapi', 'openapi', 'openapi.spec3.yaml');
 const remoteSpecUrl =
   process.env.OPENAPI_SPEC_URL ??
   'https://openapi.frontal.dev/openapi.spec3.yaml';
