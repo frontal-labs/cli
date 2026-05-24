@@ -65,12 +65,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Checkout OpenAPI spec
-        uses: actions/checkout@v4
-        with:
-          repository: frontal-labs/openapi
-          path: openapi
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -81,8 +75,6 @@ jobs:
 
       - name: Build project
         run: bun run build
-        env:
-          OPENAPI_LOCAL_PATH: ${{ github.workspace }}/openapi/openapi/openapi.spec3.yaml
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

@@ -50,9 +50,10 @@ async function readSpecSource() {
     }
 
     if (!fs.existsSync(localFallbackPath)) {
-      throw new Error(
-        `Remote spec unavailable (${remoteSpecUrl}) and local fallback not found (${localFallbackPath}).`
+      console.warn(
+        `Remote spec unavailable (${remoteSpecUrl}) and local fallback not found (${localFallbackPath}). Keeping existing generated file.`
       );
+      return null;
     }
 
     console.warn(
@@ -63,6 +64,9 @@ async function readSpecSource() {
 }
 
 const specRaw = await readSpecSource();
+if (specRaw === null) {
+  process.exit(0);
+}
 const spec = YAML.parse(specRaw);
 const paths = spec.paths ?? {};
 
