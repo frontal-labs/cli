@@ -10,6 +10,7 @@ yarn-error.log*
 # Build outputs
 dist/
 build/
+bin/frontal.js
 *.tsbuildinfo
 
 # Environment files
