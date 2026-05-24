@@ -48,7 +48,7 @@ jobs:
         run: bun run lint
 
       - name: Format check
-        run: bun run format --check
+        run: bunx biome format src/ tests/
 
       - name: Run tests
         run: bun run test:coverage
