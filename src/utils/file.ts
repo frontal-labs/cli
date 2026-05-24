@@ -4,7 +4,7 @@ import YAML from "yaml";
 import {
   type FrontalProjectConfig,
   frontalConfigSchema,
-} from "../schemas/frontal-json.js";
+} from "@/schemas/frontal-json.js";
 
 export function readDefinitionFile(path: string): Record<string, unknown> {
   const absPath = resolve(path);

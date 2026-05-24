@@ -1,12 +1,12 @@
 import type { Command } from "commander";
-import { resolveConfig } from "../config/resolve.js";
-import { assertOperationSupported } from "../contract/operations.js";
-import { handleError } from "../errors/handler.js";
-import { ApiClient } from "../http/client.js";
-import { Formatter } from "../output/formatter.js";
-import { parseJsonInput } from "../utils/json.js";
+import { resolveConfig } from "@/config/resolve.js";
+import { assertOperationSupported } from "@/contract/operations.js";
+import { handleError } from "@/errors/handler.js";
+import { ApiClient } from "@/http/client.js";
+import { Formatter } from "@/output/formatter.js";
+import { parseJsonInput } from "@/utils/json.js";
 
-export function registerEventsV2Commands(program: Command): void {
+export function registerEventsCommands(program: Command): void {
   const events = program
     .command("events")
     .description("Manage event resources");

@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { AUTH_TIMEOUT_MS, CALLBACK_PATH } from "./constants.js";
+import { AUTH_TIMEOUT_MS, CALLBACK_PATH } from "@/auth/constants.js";
 
 interface CallbackResult {
   code: string;

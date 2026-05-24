@@ -1,9 +1,9 @@
 import type { Command } from "commander";
-import { configManager } from "../config/manager.js";
-import { handleError } from "../errors/handler.js";
-import { Formatter } from "../output/formatter.js";
-import { theme } from "../output/theme.js";
-import { confirmAction } from "../utils/interactive.js";
+import { configManager } from "@/config/manager.js";
+import { handleError } from "@/errors/handler.js";
+import { Formatter } from "@/output/formatter.js";
+import { theme } from "@/output/theme.js";
+import { confirmAction } from "@/utils/interactive.js";
 
 export function registerConfigCommands(program: Command): void {
   const config = program

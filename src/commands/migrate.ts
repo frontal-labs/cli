@@ -1,46 +1,50 @@
 import type { Command } from "commander";
-import { configManager } from "../config/manager.js";
-import { handleError } from "../errors/handler.js";
-import { Formatter } from "../output/formatter.js";
+import { configManager } from "@/config/manager.js";
+import { handleError } from "@/errors/handler.js";
+import { Formatter } from "@/output/formatter.js";
 
-const COMMAND_MAPPING: Array<{ legacy: string; v2: string; status: string }> = [
-  { legacy: "orgs *", v2: "removed", status: "not in public API scope" },
+const COMMAND_MAPPING: {
+  legacy: string;
+  current: string;
+  status: string;
+}[] = [
+  { legacy: "orgs *", current: "removed", status: "not in public API scope" },
   {
     legacy: "workspaces *",
-    v2: "removed",
+    current: "removed",
     status: "not in public API scope",
   },
   {
     legacy: "workflows trigger",
-    v2: "workflows run/get|summary|timeline",
+    current: "workflows run/get|summary|timeline",
     status: "changed",
   },
   {
     legacy: "agents *",
-    v2: "removed",
+    current: "removed",
     status: "not in Phase 1",
   },
   {
     legacy: "functions *",
-    v2: "invocations create",
+    current: "invocations create",
     status: "changed",
   },
   {
     legacy: "pipelines *",
-    v2: "runs *",
+    current: "runs *",
     status: "partially mapped",
   },
   {
     legacy: "auth mfa:*",
-    v2: "auth mfa <subcommand>",
+    current: "auth mfa <subcommand>",
     status: "renamed",
   },
 ];
 
-export function registerMigrateV2Command(program: Command): void {
+export function registerMigrateCommand(program: Command): void {
   program
-    .command("migrate-v2")
-    .description("Show v1->v2 command migration guidance")
+    .command("migrate-legacy")
+    .description("Show v1->current command migration guidance")
     .action((_opts, cmd) => {
       try {
         const fmt = Formatter.from(cmd.optsWithGlobals());
@@ -64,7 +68,7 @@ export function registerMigrateV2Command(program: Command): void {
 
         fmt.table(COMMAND_MAPPING, [
           { key: "legacy", header: "LEGACY" },
-          { key: "v2", header: "V2" },
+          { key: "current", header: "CURRENT" },
           { key: "status", header: "STATUS" },
         ]);
         fmt.object(checks);

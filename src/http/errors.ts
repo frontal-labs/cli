@@ -39,11 +39,11 @@ export class ForbiddenError extends ApiError {
 }
 
 export class ValidationError extends ApiError {
-  fields?: Array<{ field: string; message: string }>;
+  fields?: { field: string; message: string }[];
 
   constructor(
     message = "Validation failed",
-    fields?: Array<{ field: string; message: string }>,
+    fields?: { field: string; message: string }[],
     requestId?: string
   ) {
     super(message, 422, "validation_error", requestId);
@@ -93,7 +93,7 @@ export function parseApiError(
     code?: string;
     message?: string;
     requestId?: string;
-    errors?: Array<{ field: string; message: string }>;
+    errors?: { field: string; message: string }[];
   }
 ): ApiError {
   const msg = body.message ?? `HTTP ${statusCode}`;

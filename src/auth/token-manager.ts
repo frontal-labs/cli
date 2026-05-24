@@ -1,4 +1,7 @@
-import { CLI_CLIENT_ID, TOKEN_REFRESH_BUFFER_SECONDS } from "./constants.js";
+import {
+  CLI_CLIENT_ID,
+  TOKEN_REFRESH_BUFFER_SECONDS,
+} from "@/auth/constants.js";
 
 interface TokenResponse {
   access_token: string;

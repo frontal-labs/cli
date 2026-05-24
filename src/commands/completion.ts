@@ -1,7 +1,7 @@
 import type { Command } from "commander";
-import { generateBashCompletions } from "../completions/bash.js";
-import { generateFishCompletions } from "../completions/fish.js";
-import { generateZshCompletions } from "../completions/zsh.js";
+import { generateBashCompletions } from "@/completions/bash.js";
+import { generateFishCompletions } from "@/completions/fish.js";
+import { generateZshCompletions } from "@/completions/zsh.js";
 
 export function registerCompletionCommands(program: Command): void {
   const completion = program

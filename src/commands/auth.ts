@@ -1,34 +1,34 @@
 import { randomBytes } from "node:crypto";
 import type { Command } from "commander";
-import { startCallbackServer } from "../auth/callback-server.js";
+import { startCallbackServer } from "@/auth/callback-server.js";
 import {
   CALLBACK_PATH,
   CLI_CLIENT_ID,
   CLI_SCOPES,
   DEFAULT_AUTH_URL,
-} from "../auth/constants.js";
-import { generateCodeChallenge, generateCodeVerifier } from "../auth/pkce.js";
+} from "@/auth/constants.js";
+import { generateCodeChallenge, generateCodeVerifier } from "@/auth/pkce.js";
 import {
   decodeTokenExpiry,
   exchangeCode,
   isTokenExpired,
   refreshTokens,
-} from "../auth/token-manager.js";
-import { configManager } from "../config/manager.js";
-import { resolveConfig } from "../config/resolve.js";
-import { assertOperationSupported } from "../contract/operations.js";
-import { handleError } from "../errors/handler.js";
-import { ApiClient } from "../http/client.js";
-import { Formatter } from "../output/formatter.js";
-import { theme } from "../output/theme.js";
-import { openBrowser } from "../utils/browser.js";
+} from "@/auth/token-manager.js";
+import { configManager } from "@/config/manager.js";
+import { resolveConfig } from "@/config/resolve.js";
+import { assertOperationSupported } from "@/contract/operations.js";
+import { handleError } from "@/errors/handler.js";
+import { ApiClient } from "@/http/client.js";
+import { Formatter } from "@/output/formatter.js";
+import { theme } from "@/output/theme.js";
+import { openBrowser } from "@/utils/browser.js";
 import {
   isInteractive,
   promptSecret,
   promptText,
-} from "../utils/interactive.js";
+} from "@/utils/interactive.js";
 
-export function registerAuthV2Commands(program: Command): void {
+export function registerAuthCommands(program: Command): void {
   const auth = program.command("auth").description("Authentication commands");
 
   auth

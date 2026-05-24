@@ -1,5 +1,5 @@
-import type { ApiClientConfig } from "../http/client.js";
-import { configManager } from "./manager.js";
+import { configManager } from "@/config/manager.js";
+import type { ApiClientConfig } from "@/http/client.js";
 
 const DEFAULT_BASE_URL = "https://api.frontal.dev/v1";
 

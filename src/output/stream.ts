@@ -1,5 +1,5 @@
-import type { SSEEvent } from "../http/stream.js";
-import { theme } from "./theme.js";
+import type { SSEEvent } from "@/http/stream.js";
+import { theme } from "@/output/theme.js";
 
 export interface StreamRenderOptions {
   json?: boolean;

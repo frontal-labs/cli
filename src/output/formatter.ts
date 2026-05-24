@@ -1,7 +1,7 @@
 import YAML from "yaml";
-import { suppressSpinner } from "./spinner.js";
-import { type Column, renderTable } from "./table.js";
-import { theme } from "./theme.js";
+import { suppressSpinner } from "@/output/spinner.js";
+import { type Column, renderTable } from "@/output/table.js";
+import { theme } from "@/output/theme.js";
 
 export interface FormatOptions {
   json?: boolean;

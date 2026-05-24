@@ -1,12 +1,12 @@
 import type { Command } from "commander";
-import { resolveConfig } from "../config/resolve.js";
-import { assertOperationSupported } from "../contract/operations.js";
-import { handleError } from "../errors/handler.js";
-import { ApiClient } from "../http/client.js";
-import { Formatter } from "../output/formatter.js";
-import { parseJsonInput } from "../utils/json.js";
+import { resolveConfig } from "@/config/resolve.js";
+import { assertOperationSupported } from "@/contract/operations.js";
+import { handleError } from "@/errors/handler.js";
+import { ApiClient } from "@/http/client.js";
+import { Formatter } from "@/output/formatter.js";
+import { parseJsonInput } from "@/utils/json.js";
 
-export function registerRunsV2Commands(program: Command): void {
+export function registerRunsCommands(program: Command): void {
   const runs = program.command("runs").description("Manage run resources");
 
   runs
