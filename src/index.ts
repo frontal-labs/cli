@@ -1,11 +1,19 @@
 import { Command } from "commander";
-import { registerV2Commands } from "./v2-registry.js";
+import { registerAuthCommands } from "./commands/auth.js";
+import { registerCompletionCommands } from "./commands/completion.js";
+import { registerConfigCommands } from "./commands/config.js";
+import { registerEventsCommands } from "./commands/events.js";
+import { registerInvocationsCommands } from "./commands/invocations.js";
+import { registerMigrateCommand } from "./commands/migrate.js";
+import { registerRunsCommands } from "./commands/runs.js";
+import { registerWorkflowsCommands } from "./commands/workflows.js";
+import { installWatchMiddleware } from "./middleware/watch.js";
 import { VERSION } from "./version.js";
 
 export async function run(argv: string[]) {
   const program = new Command()
     .name("frontal")
-    .description("Frontal CLI v2")
+    .description("Frontal CLI")
     .version(VERSION)
     .option("-p, --profile <name>", "Config profile", "default")
     .option("--api-key <key>", "Override API key")
@@ -17,7 +25,16 @@ export async function run(argv: string[]) {
     .option("--debug", "Debug mode")
     .option("--no-color", "Disable colors");
 
-  registerV2Commands(program);
+  registerAuthCommands(program);
+  registerConfigCommands(program);
+  registerWorkflowsCommands(program);
+  registerInvocationsCommands(program);
+  registerRunsCommands(program);
+  registerEventsCommands(program);
+  registerMigrateCommand(program);
+  registerCompletionCommands(program);
+
+  installWatchMiddleware(program);
 
   await program.parseAsync(argv);
 }

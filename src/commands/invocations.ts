@@ -6,7 +6,7 @@ import { ApiClient } from "../http/client.js";
 import { Formatter } from "../output/formatter.js";
 import { parseJsonInput } from "../utils/json.js";
 
-export function registerInvocationsV2Commands(program: Command): void {
+export function registerInvocationsCommands(program: Command): void {
   const invocations = program
     .command("invocations")
     .description("Submit runtime invocations");

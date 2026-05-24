@@ -6,7 +6,7 @@ import { ApiClient } from "../http/client.js";
 import { Formatter } from "../output/formatter.js";
 import { parseJsonInput } from "../utils/json.js";
 
-export function registerRunsV2Commands(program: Command): void {
+export function registerRunsCommands(program: Command): void {
   const runs = program.command("runs").description("Manage run resources");
 
   runs

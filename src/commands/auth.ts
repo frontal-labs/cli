@@ -28,7 +28,7 @@ import {
   promptText,
 } from "../utils/interactive.js";
 
-export function registerAuthV2Commands(program: Command): void {
+export function registerAuthCommands(program: Command): void {
   const auth = program.command("auth").description("Authentication commands");
 
   auth
