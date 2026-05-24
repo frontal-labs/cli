@@ -1,8 +1,8 @@
-export type { FormatOptions } from "./formatter.js";
+export type { FormatOptions } from "@/output/formatter.js";
 // biome-ignore lint/performance/noBarrelFile: public API surface for output module
-export { Formatter } from "./formatter.js";
-export { createSpinner, suppressSpinner } from "./spinner.js";
-export { renderSSEStream } from "./stream.js";
-export type { Column } from "./table.js";
-export { renderTable } from "./table.js";
-export { theme } from "./theme.js";
+export { Formatter } from "@/output/formatter.js";
+export { createSpinner, suppressSpinner } from "@/output/spinner.js";
+export { renderSSEStream } from "@/output/stream.js";
+export type { Column } from "@/output/table.js";
+export { renderTable } from "@/output/table.js";
+export { theme } from "@/output/theme.js";

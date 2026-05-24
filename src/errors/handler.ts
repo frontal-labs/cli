@@ -1,3 +1,4 @@
+import { EXIT_CODES } from "@/errors/exit-codes.js";
 import {
   ApiError,
   ConflictError,
@@ -8,9 +9,8 @@ import {
   TimeoutError,
   UnauthorizedError,
   ValidationError,
-} from "../http/errors.js";
-import { theme } from "../output/theme.js";
-import { EXIT_CODES } from "./exit-codes.js";
+} from "@/http/errors.js";
+import { theme } from "@/output/theme.js";
 
 interface MachineError {
   code: string;

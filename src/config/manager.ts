@@ -5,7 +5,7 @@ import {
   configSchema,
   type FrontalConfig,
   type ProfileConfig,
-} from "./schema.js";
+} from "@/config/schema.js";
 
 const CONFIG_DIR = join(homedir(), ".frontal");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");

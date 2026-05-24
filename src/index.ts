@@ -1,14 +1,14 @@
 import { Command } from "commander";
-import { registerAuthCommands } from "./commands/auth.js";
-import { registerCompletionCommands } from "./commands/completion.js";
-import { registerConfigCommands } from "./commands/config.js";
-import { registerEventsCommands } from "./commands/events.js";
-import { registerInvocationsCommands } from "./commands/invocations.js";
-import { registerMigrateCommand } from "./commands/migrate.js";
-import { registerRunsCommands } from "./commands/runs.js";
-import { registerWorkflowsCommands } from "./commands/workflows.js";
-import { installWatchMiddleware } from "./middleware/watch.js";
-import { VERSION } from "./version.js";
+import { registerAuthCommands } from "@/commands/auth.js";
+import { registerCompletionCommands } from "@/commands/completion.js";
+import { registerConfigCommands } from "@/commands/config.js";
+import { registerEventsCommands } from "@/commands/events.js";
+import { registerInvocationsCommands } from "@/commands/invocations.js";
+import { registerMigrateCommand } from "@/commands/migrate.js";
+import { registerRunsCommands } from "@/commands/runs.js";
+import { registerWorkflowsCommands } from "@/commands/workflows.js";
+import { installWatchMiddleware } from "@/middleware/watch.js";
+import { VERSION } from "@/version.js";
 
 export async function run(argv: string[]) {
   const program = new Command()

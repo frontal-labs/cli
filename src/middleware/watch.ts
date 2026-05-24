@@ -3,7 +3,7 @@ import {
   evaluateCondition,
   parseUntilCondition,
   poll,
-} from "../utils/polling.js";
+} from "@/utils/polling.js";
 
 type ActionHandler = (...args: unknown[]) => Promise<void>;
 

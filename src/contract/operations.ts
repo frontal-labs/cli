@@ -1,4 +1,4 @@
-import { OPENAPI_OPERATION_KEYS } from "../generated/openapi-operations.generated.js";
+import { OPENAPI_OPERATION_KEYS } from "@/generated/openapi-operations.generated.js";
 
 function normalizePath(path: string): string {
   if (!path.startsWith("/")) {

@@ -4,8 +4,8 @@ import {
   parseApiError,
   RateLimitError,
   TimeoutError,
-} from "./errors.js";
-import { parseSSEStream, type SSEEvent } from "./stream.js";
+} from "@/http/errors.js";
+import { parseSSEStream, type SSEEvent } from "@/http/stream.js";
 
 export interface ApiClientConfig {
   accessToken?: string;

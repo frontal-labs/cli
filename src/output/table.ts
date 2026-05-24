@@ -1,5 +1,5 @@
 import Table from "cli-table3";
-import { theme } from "./theme.js";
+import { theme } from "@/output/theme.js";
 
 export interface Column {
   formatter?: (value: unknown) => string;

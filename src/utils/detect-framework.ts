@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Framework } from "../schemas/frontal-json.js";
+import type { Framework } from "@/schemas/frontal-json.js";
 
 interface FrameworkDefaults {
   build?: string;
@@ -61,7 +61,7 @@ export const FRAMEWORK_DEFAULTS: Record<Framework, FrameworkDefaults> = {
   custom: { output: "dist", install: "npm install" },
 };
 
-const CONFIG_FILE_MAP: Array<{ patterns: string[]; framework: Framework }> = [
+const CONFIG_FILE_MAP: { patterns: string[]; framework: Framework }[] = [
   {
     patterns: ["next.config.js", "next.config.mjs", "next.config.ts"],
     framework: "nextjs",
@@ -77,7 +77,7 @@ const CONFIG_FILE_MAP: Array<{ patterns: string[]; framework: Framework }> = [
   },
 ];
 
-const DEPENDENCY_MAP: Array<{ pkg: string; framework: Framework }> = [
+const DEPENDENCY_MAP: { pkg: string; framework: Framework }[] = [
   { pkg: "next", framework: "nextjs" },
   { pkg: "react-scripts", framework: "react" },
   { pkg: "@sveltejs/kit", framework: "svelte" },

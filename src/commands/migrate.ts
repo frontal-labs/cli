@@ -1,13 +1,13 @@
 import type { Command } from "commander";
-import { configManager } from "../config/manager.js";
-import { handleError } from "../errors/handler.js";
-import { Formatter } from "../output/formatter.js";
+import { configManager } from "@/config/manager.js";
+import { handleError } from "@/errors/handler.js";
+import { Formatter } from "@/output/formatter.js";
 
-const COMMAND_MAPPING: Array<{
+const COMMAND_MAPPING: {
   legacy: string;
   current: string;
   status: string;
-}> = [
+}[] = [
   { legacy: "orgs *", current: "removed", status: "not in public API scope" },
   {
     legacy: "workspaces *",
