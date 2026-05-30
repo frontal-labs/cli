@@ -17,7 +17,7 @@ jobs:
     
     steps:
       - name: Checkout CLI repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           
@@ -57,7 +57,7 @@ jobs:
           git push
           
       - name: Update Homebrew Tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: frontal-labs/homebrew-cli
           token: ${{ secrets.HOMEBREW_TOKEN }}
