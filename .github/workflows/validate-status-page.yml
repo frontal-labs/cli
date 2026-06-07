@@ -7,6 +7,7 @@ on:
       - '.github/workflows/incident-manager.yml'
       - '.github/workflows/status-page-sync.yml'
       - '.github/workflows/flap-state-cleanup.yml'
+      - '.github/workflows/validate-status-page.yml'
       - '.github/scripts/**'
       - '.github/incident/**'
   workflow_dispatch:
@@ -153,9 +154,7 @@ jobs:
           .github/scripts/flap-state.sh init
 
           # Simulate 2 failures (below threshold of 3)
-          cat > run-fail.json << 'EOF'
-          {"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}
-EOF
+          echo '{"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}' > run-fail.json
           export FAIL_THRESHOLD=3 RECOVER_THRESHOLD=2
           .github/scripts/flap-state.sh update run-fail.json
           ACTION1="$(grep '^action=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)"
@@ -176,9 +175,7 @@ EOF
       - name: Test 2 — Alert triggers at threshold
         run: |
           echo "Test 2: Third consecutive failure should trigger create"
-          cat > run-fail.json << 'EOF'
-          {"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}
-EOF
+          echo '{"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}' > run-fail.json
           export FAIL_THRESHOLD=3 RECOVER_THRESHOLD=2
           .github/scripts/flap-state.sh update run-fail.json
           ACTION="$(grep '^action=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)"
@@ -199,9 +196,7 @@ EOF
       - name: Test 3 — Recovery triggers resolve
         run: |
           echo "Test 3: Consecutive successes should trigger resolve"
-          cat > run-pass.json << 'EOF'
-          {"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}
-EOF
+          echo '{"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}' > run-pass.json
           export FAIL_THRESHOLD=3 RECOVER_THRESHOLD=2
 
           # First success (should still be alerting)
@@ -233,9 +228,7 @@ EOF
         run: |
           echo "Test 4: History should be trimmed to 96 entries"
           .github/scripts/flap-state.sh init
-          cat > run-pass.json << 'EOF'
-          {"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}
-EOF
+          echo '{"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}' > run-pass.json
           # Add 100 entries
           for i in $(seq 1 100); do
             .github/scripts/flap-state.sh update run-pass.json 2>/dev/null || true
@@ -253,9 +246,7 @@ EOF
           .github/scripts/flap-state.sh init
           export FAIL_THRESHOLD=3 RECOVER_THRESHOLD=2
 
-          cat > run-fail.json << 'EOF'
-          {"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}
-EOF
+          echo '{"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}' > run-fail.json
           # Two failures
           .github/scripts/flap-state.sh update run-fail.json
           .github/scripts/flap-state.sh update run-fail.json
@@ -267,9 +258,7 @@ EOF
           fi
 
           # One success
-          cat > run-pass.json << 'EOF'
-          {"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}
-EOF
+          echo '{"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}' > run-pass.json
           .github/scripts/flap-state.sh update run-pass.json
 
           CF="$(jq -r '.consecutive_failures' flap-state.json)"
@@ -325,6 +314,13 @@ EOF
 
     steps:
       - name: Check required secrets
+        env:
+          INCIDENT_IO_API_KEY: ${{ secrets.INCIDENT_IO_API_KEY }}
+          FRONTAL_TEST_API_KEY: ${{ secrets.FRONTAL_TEST_API_KEY }}
+          FRONTAL_TEST_API_URL: ${{ secrets.FRONTAL_TEST_API_URL }}
+          INCIDENT_IO_STATUS_PAGE_ID: ${{ vars.INCIDENT_IO_STATUS_PAGE_ID }}
+          INCIDENT_IO_SEVERITY_MINOR_ID: ${{ vars.INCIDENT_IO_SEVERITY_MINOR_ID }}
+          INCIDENT_IO_SEVERITY_MAJOR_ID: ${{ vars.INCIDENT_IO_SEVERITY_MAJOR_ID }}
         run: |
           missing=0
 
@@ -340,7 +336,6 @@ EOF
 
           check_var() {
             local name="$1"
-            # vars are accessed as vars.NAME in expressions, but in shell they're just env vars
             local val="${!name:-}"
             if [[ -z "$val" ]]; then
               echo "MISSING: $name"
@@ -358,6 +353,8 @@ EOF
           echo ""
           echo "=== Required Variables ==="
           check_var "INCIDENT_IO_STATUS_PAGE_ID"
+          check_var "INCIDENT_IO_SEVERITY_MINOR_ID"
+          check_var "INCIDENT_IO_SEVERITY_MAJOR_ID"
 
           echo ""
           echo "=== Optional Variables (with defaults) ==="
@@ -376,7 +373,7 @@ EOF
   gate:
     name: Validation Gate
     runs-on: ubuntu-latest
-    needs: [config-validation, dry-run-monitor, flap-logic-test, secret-check]
+    needs: [config-validation, dry-run-monitor, flap-logic-test, api-connectivity, secret-check]
     if: always()
 
     steps:
@@ -386,6 +383,7 @@ EOF
           echo "config-validation: ${{ needs.config-validation.result }}"
           echo "dry-run-monitor: ${{ needs.dry-run-monitor.result }}"
           echo "flap-logic-test: ${{ needs.flap-logic-test.result }}"
+          echo "api-connectivity: ${{ needs.api-connectivity.result }}"
           echo "secret-check: ${{ needs.secret-check.result }}"
           echo ""
 
@@ -394,6 +392,7 @@ EOF
             "config-validation ${{ needs.config-validation.result }}" \
             "dry-run-monitor ${{ needs.dry-run-monitor.result }}" \
             "flap-logic-test ${{ needs.flap-logic-test.result }}" \
+            "api-connectivity ${{ needs.api-connectivity.result }}" \
             "secret-check ${{ needs.secret-check.result }}"; do
             job="${name_result% *}"
             result="${name_result##* }"

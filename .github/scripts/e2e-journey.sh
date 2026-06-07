@@ -224,11 +224,13 @@ compute_summary() {
     local json_str="$1"
     # If it's an array, iterate; otherwise treat as single object
     if echo "$json_str" | jq -e 'type == "array"' >/dev/null 2>&1; then
-      local count
-      count=$(echo "$json_str" | jq -r '[.[] | select(.status == "pass")] | length')
-      passed=$((passed + count))
-      count=$(echo "$json_str" | jq -r '[.[] | select(.status != "pass")] | length')
-      failed=$((failed + count))
+      local any_fail
+      any_fail=$(echo "$json_str" | jq -r '[.[] | select(.status != "pass")] | length')
+      if [[ "$any_fail" -eq 0 ]]; then
+        passed=$((passed + 1))
+      else
+        failed=$((failed + 1))
+      fi
     else
       local status
       status=$(echo "$json_str" | jq -r '.status // "fail"')

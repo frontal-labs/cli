@@ -60,8 +60,14 @@ cmd_init() {
 EOF
   local now
   now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  jq --arg now "$now" '.updated_at = $now | .last_run_timestamp = $now' "$STATE_FILE" > "${STATE_FILE}.tmp"
-  mv "${STATE_FILE}.tmp" "$STATE_FILE"
+  if jq --arg now "$now" '.updated_at = $now | .last_run_timestamp = $now' "$STATE_FILE" > "${STATE_FILE}.tmp" && \
+     jq -e . "${STATE_FILE}.tmp" > /dev/null; then
+    mv "${STATE_FILE}.tmp" "$STATE_FILE"
+  else
+    echo "ERROR: failed to initialize flap state (jq error or invalid JSON)" >&2
+    rm -f "${STATE_FILE}.tmp"
+    exit 1
+  fi
   echo "Initialized fresh flap-state at $STATE_FILE"
   cat "$STATE_FILE"
 }
@@ -195,6 +201,12 @@ cmd_update() {
     .last_run_timestamp = $now |
     .history = ([($entry | fromjson)] + .history) | .history |= .[0:96]
     ' "$STATE_FILE" > "${STATE_FILE}.tmp"
+
+  if ! jq -e . "${STATE_FILE}.tmp" > /dev/null; then
+    echo "ERROR: flap state update produced invalid JSON — keeping original state" >&2
+    rm -f "${STATE_FILE}.tmp"
+    exit 1
+  fi
   mv "${STATE_FILE}.tmp" "$STATE_FILE"
 
   # Output the determined action for workflow consumption
@@ -231,6 +243,12 @@ cmd_resolve() {
     .status_page_incident_id = null |
     .last_failure_details = null
     ' "$STATE_FILE" > "${STATE_FILE}.tmp"
+
+  if ! jq -e . "${STATE_FILE}.tmp" > /dev/null; then
+    echo "ERROR: flap state resolve produced invalid JSON — keeping original state" >&2
+    rm -f "${STATE_FILE}.tmp"
+    exit 1
+  fi
   mv "${STATE_FILE}.tmp" "$STATE_FILE"
 
   echo "Flap state resolved: alerting=false, counters reset, incident IDs cleared"

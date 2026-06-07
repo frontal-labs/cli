@@ -11,6 +11,6 @@
   },
   "timeouts": {
     "single_journey_seconds": 120,
-    "total_run_seconds": 600
+    "total_run_seconds": 1200
   }
 }

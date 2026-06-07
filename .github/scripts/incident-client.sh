@@ -76,6 +76,14 @@ api_request() {
     local response_body
     response_body="$(echo "$response" | sed '$d')"
 
+    # Transport / DNS / TLS / timeout failures produce no HTTP status
+    if [[ -z "${http_code:-}" || "$http_code" == "000" ]]; then
+      local wait_time="$((RETRY_BASE_SECS * 2 ** (attempt - 1)))"
+      echo "Transport error (no HTTP status) — retrying in ${wait_time}s (attempt $attempt/$MAX_RETRIES)" >&2
+      sleep "$wait_time"
+      continue
+    fi
+
     if [[ "$http_code" -eq 429 ]]; then
       local retry_after
       retry_after="$((RETRY_BASE_SECS * 2 ** (attempt - 1)))"
@@ -380,12 +388,59 @@ cmd_get_status_page_structure() {
 
 cmd_derive_severity() {
   local failed_journeys="${1:-0}"
-  if [[ "$failed_journeys" -le 1 ]]; then
+  local thresholds_file="${GITHUB_WORKSPACE:-.}/.github/incident/thresholds.json"
+
+  local minor_max=1 major_max=2
+  if [[ -f "$thresholds_file" ]]; then
+    minor_max="$(jq -r '.severity.minor.max_failed_journeys // 1' "$thresholds_file")"
+    major_max="$(jq -r '.severity.major.max_failed_journeys // 2' "$thresholds_file")"
+  fi
+
+  if [[ "$failed_journeys" -le "$minor_max" ]]; then
     echo "${INCIDENT_IO_SEVERITY_MINOR_ID:-minor}"
-  elif [[ "$failed_journeys" -le 2 ]]; then
+  elif [[ "$failed_journeys" -le "$major_max" ]]; then
     echo "${INCIDENT_IO_SEVERITY_MAJOR_ID:-major}"
   else
-    echo "${INCIDENT_IO_SEVERITY_MAJOR_ID:-major}"
+    echo "${INCIDENT_IO_SEVERITY_CRITICAL_ID:-critical}"
+  fi
+}
+
+cmd_resolve_internal() {
+  local incident_id="${1:-}"
+  local message="${2:-All synthetic checks passing. CLI is fully operational.}"
+
+  if [[ -z "$incident_id" ]]; then
+    echo "FATAL: incident_id is required for resolve-internal" >&2
+    exit 1
+  fi
+
+  require_api_key
+
+  local body
+  body="$(jq -c -n '{
+    status: "resolved",
+    summary: $msg
+  }' --arg msg "$message")"
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    echo "DRY RUN: Would PATCH /v2/incidents/$incident_id (resolve)"
+    echo "$body" | jq .
+    return 0
+  fi
+
+  echo "Resolving internal incident: $incident_id"
+  local result
+  result="$(api_request PATCH "/v2/incidents/$incident_id" "$body")"
+  local status
+  status="$(echo "$result" | parse_status)"
+
+  if [[ "$status" == "200" ]]; then
+    echo "Internal incident resolved successfully"
+    echo "$result" | parse_body | jq .
+  else
+    echo "Failed to resolve internal incident (HTTP $status)"
+    echo "$result" | parse_body
+    return 1
   fi
 }
 
@@ -409,6 +464,9 @@ case "${1:-}" in
   resolve)
     cmd_resolve "${2:-}" "${3:-}"
     ;;
+  resolve-internal)
+    cmd_resolve_internal "${2:-}" "${3:-}"
+    ;;
   list-active-incidents)
     cmd_list_active_incidents
     ;;
@@ -419,7 +477,7 @@ case "${1:-}" in
     cmd_derive_severity "${2:-}"
     ;;
   *)
-    echo "Usage: $0 {test-auth|create-internal|create-status-page|post-update|resolve|list-active-incidents|get-status-page-structure|derive-severity}" >&2
+    echo "Usage: $0 {test-auth|create-internal|create-status-page|post-update|resolve|resolve-internal|list-active-incidents|get-status-page-structure|derive-severity}" >&2
     exit 1
     ;;
 esac

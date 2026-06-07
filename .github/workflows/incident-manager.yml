@@ -82,8 +82,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: flap-state.json
-          key: flap-state-prod
-          restore-keys: flap-state-prod
+          key: flap-state-prod-${{ github.run_id }}
+          restore-keys: flap-state-prod-
 
       - name: Initialize flap state (if missing)
         if: inputs.action != 'status-check'
@@ -98,6 +98,7 @@ jobs:
         id: force-resolve
         env:
           INCIDENT_IO_API_KEY: ${{ secrets.INCIDENT_IO_API_KEY }}
+          INCIDENT_MESSAGE: ${{ inputs.incident_message || 'Incident manually resolved by operator.' }}
         run: |
           set -euo pipefail
           source .github/scripts/incident-client.sh
@@ -107,10 +108,22 @@ jobs:
           if [[ -n "$SP_ID" && "$SP_ID" != "null" ]]; then
             echo "Resolving status page incident: $SP_ID"
             if [[ "${{ inputs.dry_run }}" != "true" ]]; then
-              cmd_resolve "$SP_ID" \
-                "${{ inputs.incident_message || 'Incident manually resolved by operator.' }}"
+              cmd_resolve "$SP_ID" "$INCIDENT_MESSAGE"
             else
               echo "DRY RUN: would resolve $SP_ID"
+            fi
+
+            # Also resolve the internal incident
+            INTERNAL_ID="$(jq -r '.internal_incident_id // ""' flap-state.json)"
+            if [[ -n "$INTERNAL_ID" && "$INTERNAL_ID" != "null" ]]; then
+              echo "Resolving internal incident: $INTERNAL_ID"
+              if [[ "${{ inputs.dry_run }}" != "true" ]]; then
+                cmd_resolve_internal "$INTERNAL_ID" "$INCIDENT_MESSAGE"
+              else
+                echo "DRY RUN: would resolve internal $INTERNAL_ID"
+              fi
+            else
+              echo "No internal incident ID found — skipping internal resolve"
             fi
           else
             echo "No open status page incident found in flap state"
@@ -126,12 +139,11 @@ jobs:
         env:
           INCIDENT_IO_API_KEY: ${{ secrets.INCIDENT_IO_API_KEY }}
           INCIDENT_IO_STATUS_PAGE_ID: ${{ vars.INCIDENT_IO_STATUS_PAGE_ID }}
+          INCIDENT_NAME: ${{ inputs.incident_name || 'CLI Synthetic Monitoring — Manual Alert' }}
+          INCIDENT_MESSAGE: ${{ inputs.incident_message || 'Manually triggered incident from GitHub Actions.' }}
         run: |
           set -euo pipefail
           source .github/scripts/incident-client.sh
-
-          NAME="${{ inputs.incident_name || 'CLI Synthetic Monitoring — Manual Alert' }}"
-          MESSAGE="${{ inputs.incident_message || 'Manually triggered incident from GitHub Actions.' }}"
 
           SEVERITY="${{ inputs.severity }}"
           if [[ "$SEVERITY" == "minor" ]]; then
@@ -149,8 +161,8 @@ jobs:
             '[ $ids[] | {component_id: ., component_status: $status} ]')"
 
           if [[ "${{ inputs.dry_run }}" != "true" ]]; then
-            cmd_create_internal "$NAME" "$MESSAGE" "$SEVERITY_ID"
-            cmd_create_status_page "$NAME" "$MESSAGE" "investigating" "$COMPONENT_STATUSES"
+            cmd_create_internal "$INCIDENT_NAME" "$INCIDENT_MESSAGE" "$SEVERITY_ID"
+            cmd_create_status_page "$INCIDENT_NAME" "$INCIDENT_MESSAGE" "investigating" "$COMPONENT_STATUSES"
 
             # Patch incident IDs back into flap-state.json so subsequent
             # force-update / force-resolve runs can find them.
@@ -172,7 +184,7 @@ jobs:
 
             echo "Patched incident IDs and alerting flag into flap state"
           else
-            echo "DRY RUN: would create incident '$NAME'"
+            echo "DRY RUN: would create incident '$INCIDENT_NAME'"
           fi
 
       - name: Force update
@@ -180,6 +192,7 @@ jobs:
         id: force-update
         env:
           INCIDENT_IO_API_KEY: ${{ secrets.INCIDENT_IO_API_KEY }}
+          INCIDENT_MESSAGE: ${{ inputs.incident_message || 'Manual update from operator.' }}
         run: |
           set -euo pipefail
           source .github/scripts/incident-client.sh
@@ -191,10 +204,8 @@ jobs:
             exit 1
           fi
 
-          MESSAGE="${{ inputs.incident_message || 'Manual update from operator.' }}"
-
           if [[ "${{ inputs.dry_run }}" != "true" ]]; then
-            cmd_post_update "$SP_ID" "$MESSAGE"
+            cmd_post_update "$SP_ID" "$INCIDENT_MESSAGE"
           else
             echo "DRY RUN: would update $SP_ID"
           fi
@@ -209,9 +220,8 @@ jobs:
           # In auto mode, evaluate the flap state and act accordingly
           # This is used when called from external automation
           echo "Auto mode — evaluating flap state"
-          .github/scripts/flap-state.sh evaluate
-
-          ACTION="$(grep '^action=' "$GITHUB_OUTPUT" 2>/dev/null | cut -d= -f2 || echo 'no-op')"
+          ACTION="$(.github/scripts/flap-state.sh evaluate | grep '^action=' | cut -d= -f2)"
+          ACTION="${ACTION:-no-op}"
           echo "Recommended action: $ACTION"
 
           case "$ACTION" in
@@ -259,4 +269,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: flap-state.json
-          key: flap-state-prod
+          key: flap-state-prod-${{ github.run_id }}

@@ -31,8 +31,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: flap-state.json
-          key: flap-state-prod
-          restore-keys: flap-state-prod
+          key: flap-state-prod-${{ github.run_id }}
+          restore-keys: flap-state-prod-
 
       - name: Clean state
         id: clean
@@ -95,4 +95,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: flap-state.json
-          key: flap-state-prod
+          key: flap-state-prod-${{ github.run_id }}

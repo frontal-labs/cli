@@ -46,11 +46,8 @@ jobs:
 
       - name: Install Frontal CLI
         run: |
-          if [[ "${{ inputs.cli_version }}" == "latest" ]]; then
-            npm install -g frontal-cli@latest
-          else
-            npm install -g "frontal-cli@${{ inputs.cli_version }}"
-          fi
+          VERSION="${{ inputs.cli_version || 'latest' }}"
+          npm install -g "frontal-cli@${VERSION}"
           frontal --version
 
       - name: Run E2E journeys
@@ -101,15 +98,15 @@ jobs:
           if [[ ! -f run-result.json ]]; then
             echo "No run result found — writing default healthy result"
             cat > run-result.json << 'EOF'
-{
-  "run_id": "${{ github.run_id }}",
-  "summary": {
-    "journeys_passed": 6,
-    "journeys_failed": 0,
-    "overall_status": "pass"
-  }
-}
-EOF
+            {
+              "run_id": "${{ github.run_id }}",
+              "summary": {
+                "journeys_passed": 6,
+                "journeys_failed": 0,
+                "overall_status": "pass"
+              }
+            }
+            EOF
           fi
 
       - name: Restore flap state
@@ -117,8 +114,8 @@ EOF
         uses: actions/cache/restore@v4
         with:
           path: flap-state.json
-          key: flap-state-prod
-          restore-keys: flap-state-prod
+          key: flap-state-prod-${{ github.run_id }}
+          restore-keys: flap-state-prod-
 
       - name: Update flap state
         id: flap
@@ -285,6 +282,15 @@ EOF
           cmd_resolve "$SP_ID" \
             "All synthetic checks passing for ${SUCCESSES} consecutive runs. CLI is fully operational."
 
+          # Also resolve the internal incident
+          INTERNAL_ID="$(jq -r '.internal_incident_id // ""' flap-state.json)"
+          if [[ -n "$INTERNAL_ID" && "$INTERNAL_ID" != "null" ]]; then
+            cmd_resolve_internal "$INTERNAL_ID" \
+              "All synthetic checks passing for ${SUCCESSES} consecutive runs."
+          else
+            echo "No internal incident ID found — skipping internal resolve"
+          fi
+
           # Clear incident IDs from flap state so the resolved incident
           # isn't referenced by later runs.
           jq '.internal_incident_id = null | .status_page_incident_id = null' \
@@ -320,7 +326,7 @@ EOF
         uses: actions/cache/save@v4
         with:
           path: flap-state.json
-          key: flap-state-prod
+          key: flap-state-prod-${{ github.run_id }}
 
       - name: Upload metrics artifact
         if: always()
