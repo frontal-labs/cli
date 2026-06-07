@@ -17,11 +17,12 @@
   "files": [
     "dist"
   ],
+  "sideEffects": false,
   "scripts": {
     "dev": "bun run bin/frontal.ts",
     "generate:openapi-ops": "node ./scripts/generate-openapi-operations.mjs",
     "validate:bindings": "node ./scripts/validate-command-bindings.mjs",
-    "build": "bun run generate:openapi-ops && bun run validate:bindings && tsup && node -e \"const fs=require('fs');const f='dist/bin/frontal.js';let c=fs.readFileSync(f,'utf8');c=c.replace(/^#!.*\\n/,'#!/usr/bin/env node\\n');fs.writeFileSync(f,c)\"",
+    "build": "bun run generate:openapi-ops && bun run validate:bindings && tsup && node -e \"const fs=require('fs');const f='dist/bin/frontal.js';let c=fs.readFileSync(f,'utf8');c=c.startsWith('#!')?c.replace(/^#!.*\\n/,'#!/usr/bin/env node\\n'):'#!/usr/bin/env node\\n'+c;fs.writeFileSync(f,c)\"",
     "type-check": "tsc --noEmit",
     "lint": "biome lint src/ tests/",
     "format": "biome format --write src/ tests/",
