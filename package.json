@@ -1,7 +1,15 @@
 {
   "name": "frontal-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Frontal CLI",
+  "homepage": "https://github.com/frontal-labs/cli",
+  "bugs": "https://github.com/frontal-labs/cli/issues",
+  "license": "MIT",
+  "author": "Frontal Labs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/frontal-labs/cli.git"
+  },
   "type": "module",
   "bin": {
     "frontal": "dist/bin/frontal.js"
