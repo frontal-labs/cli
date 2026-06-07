@@ -9,6 +9,7 @@
     "rootDir": ".",
     "declaration": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "isolatedModules": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {

@@ -1,5 +1,16 @@
 import { vi } from "vitest";
 
+// Hoisted mock factories for Vitest v4 compat
+const { mockFsFactory, mockPromptsFactory } = vi.hoisted(() => {
+  const mockFsFactory = vi.fn();
+  const mockPromptsFactory = vi.fn();
+  return { mockFsFactory, mockPromptsFactory };
+});
+
+vi.mock("fs", () => mockFsFactory());
+vi.mock("fs/promises", () => mockFsFactory());
+vi.mock("@clack/prompts", () => mockPromptsFactory());
+
 // Mock fetch globally
 export function mockFetchGlobal() {
   const mockFetch = vi.fn() as unknown as typeof global.fetch;
@@ -23,7 +34,10 @@ export function mockAbortController() {
 
   vi.stubGlobal(
     "AbortController",
-    vi.fn(() => mockController)
+    class {
+      signal = mockSignal;
+      abort = mockAbort;
+    }
   );
 
   return { mockController, mockAbort, mockSignal };
@@ -141,8 +155,7 @@ export function mockFileSystem() {
     }),
   };
 
-  vi.mock("fs", () => mockFs);
-  vi.mock("fs/promises", () => mockFs);
+  mockFsFactory.mockReturnValue(mockFs);
 
   return mockFs;
 }
@@ -205,7 +218,7 @@ export function mockNetwork() {
 
 // Mock CLI prompts
 export function mockPrompts() {
-  const mockPrompts = {
+  const prompts = {
     text: vi.fn(),
     password: vi.fn(),
     confirm: vi.fn(),
@@ -214,7 +227,7 @@ export function mockPrompts() {
     group: vi.fn(),
   };
 
-  vi.mock("@clack/prompts", () => mockPrompts);
+  mockPromptsFactory.mockReturnValue(prompts);
 
-  return mockPrompts;
+  return prompts;
 }

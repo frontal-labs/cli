@@ -22,13 +22,13 @@ const configSchema = z.object({
     .object({
       enabled: z.boolean().default(false),
     })
-    .default({}),
+    .default({ enabled: false }),
   defaults: z
     .object({
       outputFormat: z.enum(["table", "json", "yaml"]).default("table"),
       paginationLimit: z.number().int().positive().default(25),
     })
-    .default({}),
+    .default({ outputFormat: "table", paginationLimit: 25 }),
 });
 
 export type FrontalConfig = z.infer<typeof configSchema>;

@@ -92,7 +92,7 @@ export const functionConfigSchema = z.object({
   memory: z
     .enum(MEMORY_SIZES.map(String) as [string, ...string[]])
     .transform(Number)
-    .default(String(DEFAULTS.MEMORY)),
+    .default(DEFAULTS.MEMORY),
 });
 
 export const buildConfigSchema = z.object({

@@ -8,8 +8,8 @@ import type {
 // Mock ConfigManager class
 export const createMockConfigManager = (
   overrides: Partial<ConfigManager> = {}
-) => {
-  return {
+) =>
+  ({
     load: vi.fn(),
     save: vi.fn(),
     exists: vi.fn(),
@@ -24,8 +24,7 @@ export const createMockConfigManager = (
     configPath: "/test/.frontal/config.json",
     configDir: "/test/.frontal",
     ...overrides,
-  } as any;
-};
+  }) as any;
 
 // Mock config data
 export const mockFrontalConfig = (
@@ -101,8 +100,8 @@ export const mockMultiProfileConfig = (): FrontalConfig => ({
 });
 
 // Mock config manager with preset data
-export const createConfigManagerWithData = (config: FrontalConfig) => {
-  return createMockConfigManager({
+export const createConfigManagerWithData = (config: FrontalConfig) =>
+  createMockConfigManager({
     load: vi.fn().mockReturnValue(config),
     save: vi.fn(),
     exists: vi.fn().mockReturnValue(true),
@@ -129,7 +128,6 @@ export const createConfigManagerWithData = (config: FrontalConfig) => {
     setDefault: vi.fn(),
     getDefault: vi.fn(),
   });
-};
 
 // Mock file system operations for config
 export const mockConfigFileSystem = (config: FrontalConfig) => {
@@ -157,8 +155,8 @@ export const mockConfigParseError = new Error("Invalid config format");
 mockConfigParseError.name = "ConfigParseError";
 
 // Mock config manager with errors
-export const createConfigManagerWithError = (error: Error) => {
-  return createMockConfigManager({
+export const createConfigManagerWithError = (error: Error) =>
+  createMockConfigManager({
     load: vi.fn().mockImplementation(() => {
       throw error;
     }),
@@ -166,4 +164,3 @@ export const createConfigManagerWithError = (error: Error) => {
       throw error;
     }),
   });
-};

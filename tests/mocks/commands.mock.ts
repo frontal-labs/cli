@@ -2,8 +2,8 @@ import { Command } from "commander";
 import { vi } from "vitest";
 
 // Mock Command class and utilities
-export const createMockCommand = (overrides: Partial<Command> = {}) => {
-  return {
+export const createMockCommand = (overrides: Partial<Command> = {}) =>
+  ({
     name: vi.fn().mockReturnValue("test-command"),
     description: vi.fn().mockReturnValue("Test command"),
     option: vi.fn().mockReturnThis(),
@@ -15,8 +15,7 @@ export const createMockCommand = (overrides: Partial<Command> = {}) => {
     options: [],
     args: [],
     ...overrides,
-  } as any;
-};
+  }) as any;
 
 // Mock command registration
 export const mockRegisterCommand = (
@@ -118,27 +117,25 @@ export const createMockProgram = () => {
 };
 
 // Mock CLI execution context
-export const createMockExecutionContext = (overrides: any = {}) => {
-  return {
-    program: createMockProgram().program,
-    config: {
-      apiKey: "test-key",
-      baseUrl: "https://api.test.com",
-      orgId: "org_123",
-      workspaceId: "ws_123",
-    },
-    options: {
-      json: false,
-      yaml: false,
-      quiet: false,
-      verbose: false,
-      debug: false,
-      ...overrides.options,
-    },
-    args: [],
-    ...overrides,
-  };
-};
+export const createMockExecutionContext = (overrides: any = {}) => ({
+  program: createMockProgram().program,
+  config: {
+    apiKey: "test-key",
+    baseUrl: "https://api.test.com",
+    orgId: "org_123",
+    workspaceId: "ws_123",
+  },
+  options: {
+    json: false,
+    yaml: false,
+    quiet: false,
+    verbose: false,
+    debug: false,
+    ...overrides.options,
+  },
+  args: [],
+  ...overrides,
+});
 
 // Mock CLI error handling
 export const createMockErrorHandler = () => {
@@ -161,12 +158,12 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Mock CLI validation
 export const createMockValidator = () => ({
-  validateEmail: vi.fn((email: string) => {
-    return EMAIL_REGEX.test(email) ? true : "Invalid email format";
-  }),
-  validateApiKey: vi.fn((key: string) => {
-    return key.startsWith("fr_") ? true : "Invalid API key format";
-  }),
+  validateEmail: vi.fn((email: string) =>
+    EMAIL_REGEX.test(email) ? true : "Invalid email format"
+  ),
+  validateApiKey: vi.fn((key: string) =>
+    key.startsWith("fr_") ? true : "Invalid API key format"
+  ),
   validateUrl: vi.fn((url: string) => {
     try {
       new URL(url);
@@ -175,9 +172,9 @@ export const createMockValidator = () => ({
       return "Invalid URL format";
     }
   }),
-  validateRequired: vi.fn((value: any, fieldName: string) => {
-    return value ? true : `${fieldName} is required`;
-  }),
+  validateRequired: vi.fn((value: any, fieldName: string) =>
+    value ? true : `${fieldName} is required`
+  ),
 });
 
 // Mock CLI formatting utilities

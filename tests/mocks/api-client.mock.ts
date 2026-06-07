@@ -2,8 +2,8 @@ import { vi } from "vitest";
 import type { ApiClient } from "../../src/http/client.js";
 
 // Mock ApiClient class
-export const createMockApiClient = (overrides: Partial<ApiClient> = {}) => {
-  return {
+export const createMockApiClient = (overrides: Partial<ApiClient> = {}) =>
+  ({
     get: vi.fn(),
     post: vi.fn(),
     put: vi.fn(),
@@ -15,8 +15,7 @@ export const createMockApiClient = (overrides: Partial<ApiClient> = {}) => {
     postStream: vi.fn(),
     postFormData: vi.fn(),
     ...overrides,
-  } as any;
-};
+  }) as any;
 
 // Mock API responses
 export const mockApiSuccess = (data: any) => ({
