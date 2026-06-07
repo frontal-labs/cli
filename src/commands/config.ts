@@ -209,7 +209,7 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
       current === undefined ||
       typeof current !== "object"
     ) {
-      return undefined;
+      return;
     }
     current = (current as Record<string, unknown>)[part];
   }

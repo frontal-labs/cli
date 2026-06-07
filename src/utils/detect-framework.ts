@@ -118,5 +118,5 @@ export function detectFramework(dir: string): Framework | undefined {
     }
   }
 
-  return undefined;
+  return;
 }

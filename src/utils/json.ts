@@ -3,7 +3,7 @@ export function parseJsonInput(
   label: string
 ): unknown {
   if (!value) {
-    return undefined;
+    return;
   }
 
   try {
