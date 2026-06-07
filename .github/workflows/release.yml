@@ -11,7 +11,6 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
-  id-token: write
 
 jobs:
   release:
@@ -34,46 +33,13 @@ jobs:
       - name: Run tests
         run: bun run test
 
-      - name: Create Release Pull Request or Publish
+      - name: Create Release Pull Request or Publish to NPM
         id: changesets
         uses: changesets/action@v1
         with:
           version: bun run version-packages
-          publish: bun run release
+          publish: bun run build && changeset tag
           commit: "chore: release packages"
           title: "chore: release packages"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
-        if: steps.changesets.outputs.published == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ fromJSON(steps.changesets.outputs.publishedPackages)[0].version }}
-          name: v${{ fromJSON(steps.changesets.outputs.publishedPackages)[0].version }}
-          body: |
-            See [CHANGELOG.md](./CHANGELOG.md) for release notes.
-
-            ## Installation
-
-            ### NPM
-            ```bash
-            npm install -g frontal-cli@latest
-            ```
-
-            ### Homebrew
-            ```bash
-            brew tap frontal-labs/cli
-            brew install frontal-cli
-            ```
-
-            ### Docker
-            ```bash
-            docker pull ghcr.io/frontal-labs/cli:latest
-            ```
-          draft: false
-          prerelease: ${{ contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'alpha') || contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'beta') || contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'rc') }}
-          files: dist/bin/frontal.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

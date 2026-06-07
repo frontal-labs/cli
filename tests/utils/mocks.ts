@@ -23,7 +23,10 @@ export function mockAbortController() {
 
   vi.stubGlobal(
     "AbortController",
-    vi.fn(() => mockController)
+    class {
+      signal = mockSignal;
+      abort = mockAbort;
+    }
   );
 
   return { mockController, mockAbort, mockSignal };
