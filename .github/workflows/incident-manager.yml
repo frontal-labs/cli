@@ -151,6 +151,26 @@ jobs:
           if [[ "${{ inputs.dry_run }}" != "true" ]]; then
             cmd_create_internal "$NAME" "$MESSAGE" "$SEVERITY_ID"
             cmd_create_status_page "$NAME" "$MESSAGE" "investigating" "$COMPONENT_STATUSES"
+
+            # Patch incident IDs back into flap-state.json so subsequent
+            # force-update / force-resolve runs can find them.
+            INTERNAL_ID="$(grep '^incident_id=' "$GITHUB_OUTPUT" 2>/dev/null | tail -1 | sed 's/^incident_id=//' || true)"
+            SP_ID="$(grep '^status_page_incident_id=' "$GITHUB_OUTPUT" 2>/dev/null | tail -1 | sed 's/^status_page_incident_id=//' || true)"
+            if [[ -n "${INTERNAL_ID:-}" && "${INTERNAL_ID:-}" != "null" ]]; then
+              jq --arg id "$INTERNAL_ID" '.internal_incident_id = $id' flap-state.json > flap-state.json.tmp
+              mv flap-state.json.tmp flap-state.json
+            fi
+            if [[ -n "${SP_ID:-}" && "${SP_ID:-}" != "null" ]]; then
+              jq --arg id "$SP_ID" '.status_page_incident_id = $id' flap-state.json > flap-state.json.tmp
+              mv flap-state.json.tmp flap-state.json
+            fi
+
+            # Also mark alerting=true so the automated monitor sees the
+            # open incident and won't create a duplicate.
+            jq '.alerting = true' flap-state.json > flap-state.json.tmp
+            mv flap-state.json.tmp flap-state.json
+
+            echo "Patched incident IDs and alerting flag into flap state"
           else
             echo "DRY RUN: would create incident '$NAME'"
           fi

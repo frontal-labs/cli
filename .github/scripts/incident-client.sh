@@ -258,8 +258,8 @@ cmd_post_update() {
   body="$(jq -c -n '{
     status_page_incident_id: $id,
     message: $msg,
-    notify_subscribers: $notify
-  }' --arg id "$sp_incident_id" --arg msg "$message" --argjson notify "${notify_subscribers:-false}")"
+    notify_subscribers: true
+  }' --arg id "$sp_incident_id" --arg msg "$message")"
 
   # Add optional fields
   if [[ -n "$incident_status" ]]; then

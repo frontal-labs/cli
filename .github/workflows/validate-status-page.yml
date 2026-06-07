@@ -390,8 +390,13 @@ EOF
           echo ""
 
           FAILED=0
-          for job in config-validation dry-run-monitor flap-logic-test secret-check; do
-            result="${{ needs[format('{0}', job)].result }}"
+          for name_result in \
+            "config-validation ${{ needs.config-validation.result }}" \
+            "dry-run-monitor ${{ needs.dry-run-monitor.result }}" \
+            "flap-logic-test ${{ needs.flap-logic-test.result }}" \
+            "secret-check ${{ needs.secret-check.result }}"; do
+            job="${name_result% *}"
+            result="${name_result##* }"
             if [[ "$result" != "success" && "$result" != "skipped" ]]; then
               echo "FAIL: $job => $result"
               FAILED=1

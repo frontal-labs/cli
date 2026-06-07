@@ -21,6 +21,7 @@ concurrency:
 
 permissions:
   contents: read
+  issues: write
 
 env:
   NODE_VERSION: '20'
@@ -126,12 +127,6 @@ EOF
           export RECOVER_THRESHOLD="${{ vars.MONITOR_RECOVER_THRESHOLD || '2' }}"
           .github/scripts/flap-state.sh update run-result.json
 
-      - name: Save flap state
-        uses: actions/cache/save@v4
-        with:
-          path: flap-state.json
-          key: flap-state-prod
-
       - name: Determine severity
         id: severity
         if: steps.flap.outputs.action != 'no-op'
@@ -172,13 +167,15 @@ EOF
 
           echo "sp_name=$SP_NAME" >> "$GITHUB_OUTPUT"
           echo "component_status=$COMPONENT_STATUS" >> "$GITHUB_OUTPUT"
+          echo "failed_journeys=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
 
           # Build summary message
           cat > incident-message.md << INNER_MSG
           ## Synthetic Monitoring Alert
 
           **${FAILED}/${TOTAL}** journeys failed after reaching the alert threshold
-          (${INFRA_CON_FAILURES} consecutive failures).
+          (${{ steps.flap.outputs.consecutive_failures }} consecutive failures).
 
           ### Failed Journeys
           ${FAILURE_LIST}
@@ -227,6 +224,20 @@ EOF
             "investigating" \
             "$COMPONENT_STATUSES"
 
+          # Patch incident IDs back into flap-state.json so the next
+          # workflow run can find them for update/resolve steps.
+          INTERNAL_ID="$(grep '^incident_id=' "$GITHUB_OUTPUT" 2>/dev/null | tail -1 | sed 's/^incident_id=//' || true)"
+          SP_ID="$(grep '^status_page_incident_id=' "$GITHUB_OUTPUT" 2>/dev/null | tail -1 | sed 's/^status_page_incident_id=//' || true)"
+          if [[ -n "${INTERNAL_ID:-}" && "${INTERNAL_ID:-}" != "null" ]]; then
+            jq --arg id "$INTERNAL_ID" '.internal_incident_id = $id' flap-state.json > flap-state.json.tmp
+            mv flap-state.json.tmp flap-state.json
+          fi
+          if [[ -n "${SP_ID:-}" && "${SP_ID:-}" != "null" ]]; then
+            jq --arg id "$SP_ID" '.status_page_incident_id = $id' flap-state.json > flap-state.json.tmp
+            mv flap-state.json.tmp flap-state.json
+          fi
+          echo "Patched incident IDs into flap state"
+
       - name: Update incident
         id: update
         if: steps.flap.outputs.action == 'update' && inputs.dry_run != true
@@ -274,6 +285,13 @@ EOF
           cmd_resolve "$SP_ID" \
             "All synthetic checks passing for ${SUCCESSES} consecutive runs. CLI is fully operational."
 
+          # Clear incident IDs from flap state so the resolved incident
+          # isn't referenced by later runs.
+          jq '.internal_incident_id = null | .status_page_incident_id = null' \
+            flap-state.json > flap-state.json.tmp
+          mv flap-state.json.tmp flap-state.json
+          echo "Cleared incident IDs from flap state"
+
       - name: Create GitHub Issue (critical only)
         if: steps.flap.outputs.action == 'create' && steps.message.outputs.failed_journeys >= '3' && inputs.dry_run != true
         uses: actions/github-script@v7
@@ -296,6 +314,13 @@ EOF
           echo "  Consecutive failures: ${{ steps.flap.outputs.consecutive_failures }} (threshold: ${{ vars.MONITOR_FAIL_THRESHOLD || '3' }})"
           echo "  Consecutive successes: ${{ steps.flap.outputs.consecutive_successes }} (threshold: ${{ vars.MONITOR_RECOVER_THRESHOLD || '2' }})"
           echo "  Alerting: ${{ steps.flap.outputs.alerting }}"
+
+      - name: Save flap state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: flap-state.json
+          key: flap-state-prod
 
       - name: Upload metrics artifact
         if: always()
