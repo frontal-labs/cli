@@ -91,7 +91,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 
 ### Development
 
-- Available via `npm install frontal-cli@next`
+- Available via `npm install frontal@next`
 - Tags: `next`, pre-release versions
 
 ## Post-Release Tasks

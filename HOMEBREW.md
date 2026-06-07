@@ -7,7 +7,7 @@ This document explains how to set up Homebrew installation for the Frontal CLI.
 The Frontal CLI can be installed via Homebrew using a custom tap. This provides:
 
 - Automatic dependency management (Node.js/Bun)
-- Easy updates with `brew upgrade frontal-cli`
+- Easy updates with `brew upgrade frontal`
 - Clean installation and removal
 - Integration with system package management
 
@@ -15,7 +15,7 @@ The Frontal CLI can be installed via Homebrew using a custom tap. This provides:
 
 ### 1. Homebrew Formula
 
-The formula is defined in `frontal-cli.rb` in this repository. It:
+The formula is defined in `frontal.rb` in this repository. It:
 
 - Downloads the source from GitHub
 - Installs Bun as a dependency
@@ -48,9 +48,9 @@ The formula is automatically updated when new releases are published via the `.g
 
 To manually update the formula for testing:
 
-1. Update the version in `frontal-cli.rb`
+1. Update the version in `frontal.rb`
 2. Commit and push changes
-3. Test with `brew install --build-from-source frontal-cli.rb`
+3. Test with `brew install --build-from-source frontal.rb`
 
 ## Testing
 
@@ -58,7 +58,7 @@ To test the formula locally:
 
 ```bash
 # Install from local formula
-brew install --build-from-source ./frontal-cli.rb
+brew install --build-from-source ./frontal.rb
 
 # Test installation
 frontal --version
@@ -89,7 +89,7 @@ When a new release is published:
 Enable verbose output:
 
 ```bash
-brew install --verbose --debug frontal-cli
+brew install --verbose --debug frontal
 ```
 
 ## Formula Structure

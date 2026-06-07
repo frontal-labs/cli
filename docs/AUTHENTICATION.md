@@ -4,7 +4,7 @@ This guide covers authentication methods and credential management for the Front
 
 ## Overview
 
-The Frontal CLI uses API key-based authentication to secure access to the Frontal platform. Each authentication session is stored in a profile, allowing you to manage multiple sets of credentials.
+The Frontal CLI uses API key-based authentication to secure access to Frontal. Each authentication session is stored in a profile, allowing you to manage multiple sets of credentials.
 
 ## Authentication Methods
 

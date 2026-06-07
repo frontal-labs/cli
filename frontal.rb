@@ -2,8 +2,8 @@
 #                https://rubydoc.brew.sh/Formula
 # PLEASE REMOVE ALL GENERATED COMMENTS BEFORE SUBMITTING YOUR PULL REQUEST!
 
-class FrontalCli < Formula
-  desc "Frontal platform CLI"
+class Frontal < Formula
+  desc "Frontal CLI"
   homepage "https://github.com/frontal-labs/cli"
   url "https://github.com/frontal-labs/cli.git",
     tag:      "v0.1.0",
@@ -24,16 +24,16 @@ class FrontalCli < Formula
       system "npm", "install"
       system "npm", "run", "build"
     end
-    
+
     # Install the binary with proper shebang
     bin.install "dist/bin/frontal.js" => "frontal"
-    
+
     # Ensure executable permissions
     chmod 0755, bin/"frontal"
   end
 
   test do
-    assert_match "Frontal platform CLI", shell_output("#{bin}/frontal --version")
-    assert_match "Frontal platform CLI", shell_output("#{bin}/frontal --help")
+    assert_match "Frontal CLI", shell_output("#{bin}/frontal --version")
+    assert_match "Frontal CLI", shell_output("#{bin}/frontal --help")
   end
 end

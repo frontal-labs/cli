@@ -1,10 +1,10 @@
 # Frontal CLI
 
-The official command-line interface for the Frontal platform, providing comprehensive management capabilities for organizations, workspaces, teams, services, and more.
+The official command-line interface for Frontal, providing comprehensive management capabilities.
 
 ## Overview
 
-Frontal CLI is a powerful tool that allows you to interact with the Frontal platform directly from your terminal. It provides commands for managing authentication, configuration, organizations, workspaces, teams, deployments, monitoring, and various platform services.
+Frontal CLI is a powerful tool that allows you to interact with Frontal directly from your terminal.
 
 ## Features
 
@@ -117,4 +117,4 @@ For any command, you can use:
 
 ## License
 
-This project is part of the Frontal platform ecosystem.
+This project is part of the Frontal ecosystem.
