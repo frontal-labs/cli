@@ -15,8 +15,8 @@ This guide is for developers who want to contribute to the Frontal CLI or build 
 
 ```bash
 # Clone the repository
-git clone https://github.com/frontal-labs/frontal-cli.git
-cd frontal-cli
+git clone https://github.com/frontal-labs/cli.git
+cd cli
 
 # Install dependencies
 bun install
@@ -118,7 +118,7 @@ Create `.vscode/tasks.json`:
 ### Directory Structure
 
 ```
-frontal-cli/
+cli/
 ├── bin/                    # Executable scripts
 │   └── frontal.ts         # Main CLI entry point
 ├── src/                   # Source code
@@ -171,7 +171,7 @@ import { VERSION } from "./version.js";
 export async function run(argv: string[]): Promise<void> {
   const program = new Command()
     .name("frontal")
-    .description("Frontal platform CLI")
+    .description("Frontal CLI")
     .version(VERSION);
   
   // Register commands

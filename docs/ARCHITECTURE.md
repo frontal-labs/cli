@@ -4,7 +4,7 @@ This document describes the architectural design, patterns, and principles of th
 
 ## Overview
 
-The Frontal CLI is a modern command-line interface built with TypeScript, designed to provide comprehensive access to the Frontal platform. The architecture emphasizes modularity, extensibility, and maintainability.
+The Frontal CLI is a modern command-line interface built with TypeScript, designed to provide comprehensive access to Frontal. The architecture emphasizes modularity, extensibility, and maintainability.
 
 ## Architectural Principles
 
@@ -108,7 +108,7 @@ Uses Commander.js to parse command-line arguments and route to appropriate handl
 export async function run(argv: string[]): Promise<void> {
   const program = new Command()
     .name("frontal")
-    .description("Frontal platform CLI")
+    .description("Frontal CLI")
     .version(VERSION)
     .option("-p, --profile <name>", "Config profile", "default")
     .option("-o, --org <id>", "Organization context")
@@ -721,7 +721,7 @@ export class Builder {
 ### Package Structure
 
 ```
-frontal-cli-0.1.0.tgz
+frontal-0.1.0.tgz
 ├── package.json
 ├── README.md
 ├── LICENSE
@@ -759,6 +759,6 @@ frontal-cli-0.1.0.tgz
 
 ## Conclusion
 
-The Frontal CLI architecture is designed to be modular, extensible, and maintainable. The separation of concerns, use of design patterns, and comprehensive testing strategy ensure a robust and reliable tool for Frontal platform users.
+The Frontal CLI architecture is designed to be modular, extensible, and maintainable. The separation of concerns, use of design patterns, and comprehensive testing strategy ensure a robust and reliable tool for Frontal users.
 
 The architecture supports future growth and evolution while maintaining backward compatibility and providing a consistent user experience.

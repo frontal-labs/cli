@@ -26,13 +26,13 @@ Thank you for your interest in contributing to Frontal CLI! This guide will help
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/your-username/frontal-cli.git
-   cd frontal-cli
+   git clone https://github.com/your-username/cli.git
+   cd cli
    ```
 
 3. Add the upstream remote:
    ```bash
-   git remote add upstream https://github.com/frontal-labs/frontal-cli.git
+   git remote add upstream https://github.com/frontal-labs/cli.git
    ```
 
 ## Development Setup

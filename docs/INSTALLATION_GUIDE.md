@@ -82,7 +82,7 @@ frontal --help
 
 ### 1. Authentication
 
-After installing, you need to authenticate with the Frontal platform:
+After installing, you need to authenticate with the Frontal:
 
 ```bash
 frontal auth login
@@ -115,8 +115,8 @@ If you want to contribute to the CLI or run from source:
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/frontal-labs/frontal-cli.git
-cd frontal-cli
+git clone https://github.com/frontal-labs/cli.git
+cd cli
 ```
 
 ### Install Dependencies

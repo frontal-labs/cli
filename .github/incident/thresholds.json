@@ -1,0 +1,16 @@
+{
+  "default": {
+    "fail_threshold": 3,
+    "recover_threshold": 2,
+    "min_runs_before_alert": 3
+  },
+  "severity": {
+    "minor": { "max_failed_journeys": 1 },
+    "major": { "max_failed_journeys": 2 },
+    "critical": { "max_failed_journeys": 99 }
+  },
+  "timeouts": {
+    "single_journey_seconds": 120,
+    "total_run_seconds": 1200
+  }
+}

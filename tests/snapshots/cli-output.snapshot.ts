@@ -226,7 +226,7 @@ Updated: 2024-01-01T00:00:00Z`,
 
   // Help snapshots
   help: {
-    mainHelp: `Frontal CLI - Frontal platform command-line interface
+    mainHelp: `Frontal CLI - command-line interface for Frontal
 
 Usage: frontal [options] [command]
 

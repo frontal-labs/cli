@@ -1,19 +1,28 @@
 {
   "name": "frontal-cli",
-  "version": "0.1.0",
-  "description": "Frontal platform CLI",
+  "version": "0.1.2",
+  "description": "Frontal CLI",
+  "homepage": "https://github.com/frontal-labs/cli",
+  "bugs": "https://github.com/frontal-labs/cli/issues",
+  "license": "MIT",
+  "author": "Frontal Labs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frontal-labs/cli.git"
+  },
   "type": "module",
   "bin": {
-    "frontal": "./dist/bin/frontal.js"
+    "frontal": "dist/bin/frontal.js"
   },
   "files": [
     "dist"
   ],
+  "sideEffects": false,
   "scripts": {
     "dev": "bun run bin/frontal.ts",
     "generate:openapi-ops": "node ./scripts/generate-openapi-operations.mjs",
     "validate:bindings": "node ./scripts/validate-command-bindings.mjs",
-    "build": "bun run generate:openapi-ops && bun run validate:bindings && tsup && node -e \"const fs=require('fs');const f='dist/bin/frontal.js';const c=fs.readFileSync(f,'utf8');if(!c.startsWith('#!'))fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c)\"",
+    "build": "bun run generate:openapi-ops && bun run validate:bindings && tsup && node -e \"const fs=require('fs');const f='dist/bin/frontal.js';let c=fs.readFileSync(f,'utf8');c=c.startsWith('#!')?c.replace(/^#!.*\\n/,'#!/usr/bin/env node\\n'):'#!/usr/bin/env node\\n'+c;fs.writeFileSync(f,c)\"",
     "type-check": "tsc --noEmit",
     "lint": "biome lint src/ tests/",
     "format": "biome format --write src/ tests/",
