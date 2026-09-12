@@ -246,7 +246,7 @@ describe("API Client Performance Tests", () => {
             break; // Test with subset for performance
           }
         }
-      } catch (_error) {
+      } catch {
         // Stream parsing might not be fully implemented in test
         console.log("Stream test skipped - implementation needed");
       }
