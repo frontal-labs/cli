@@ -12,7 +12,7 @@ cd my-app && frontal dev          # local server, no API key needed
 frontal deploy --preview          # shareable preview URL
 ```
 
-`init` and `dev` work today; `deploy` lands in a following release.
+`init`, `dev`, `types`, `env`, `logs` and `policy check` work today; `deploy` lands next.
 
 > The `bash` blocks in this README are executed in CI (`bun run test:readme`).
 > Blocks tagged `skip` need a real account or an interactive terminal.
@@ -90,6 +90,32 @@ live `logs/stream` fed by the server's own request log), `governance` (policies,
 `access/check`, compliance score). `GET /health` is always local and unauthenticated;
 every response carries an `X-Request-Id`. Ctrl+C shuts down cleanly.
 
+## Environment, logs and policies
+
+`env pull` writes `.env.local` from `frontal.jsonc` (`vars`, `secrets.required`, `apiUrl`)
+and your active credential — never overwriting an existing file without `--force`, and
+never printing secret values. `logs` and `policy check` work against the local dev server
+too, so the whole loop runs without an account:
+
+```bash
+cd my-app
+frontal dev --port 8789 --no-watch > dev.log 2>&1 &
+DEV_PID=$!
+sleep 1
+frontal env pull
+frontal logs --since 5m --api-url http://localhost:8789/v1
+frontal policy check --api-url http://localhost:8789/v1
+kill $DEV_PID
+```
+
+```bash skip
+frontal env pull --env staging --force     # merge staging vars, keep existing secrets
+frontal env push                           # upload vars to the current deployment
+frontal logs --follow --level error        # tail (SSE), reconnects on drops
+frontal logs --follow --json | jq -r .requestId
+frontal policy check --strict --env prod   # warnings become errors; exit 1 on deny
+```
+
 ## Project configuration: `frontal.jsonc`
 
 ```jsonc
@@ -139,6 +165,9 @@ Set `FRONTAL_CONFIG_DIR` to relocate the profile store (CI, tests).
 | `frontal init [--name <dir>] [--force]` | Create `frontal.jsonc`, `.env.example`, `.gitignore` entries, `src/` |
 | `frontal dev [--port] [--scenario] [--remote] [--persist-to]` | Local Frontal API backed by `.frontal/state` |
 | `frontal types [--out <file>]` | Generate `FrontalEnv` / `FrontalServices` / `FrontalProject` typings |
+| `frontal env pull [file] [--force]` / `frontal env push [file]` | `.env.local` from `frontal.jsonc` + credentials / upload vars to the current deployment |
+| `frontal logs [--follow] [--filter <q>] [--since 15m] [--level <l>]` | Query or tail platform logs (SSE) |
+| `frontal policy check [--strict] [--user] [--role]` | Dry-run governance: policy files, deploy access per service, compliance |
 | `frontal auth <login\|password-login\|signup\|logout\|whoami\|token\|refresh\|mfa>` | Sessions, API keys, MFA |
 | `frontal config <set\|get\|list\|reset\|profiles\|use\|telemetry>` | Profiles in `~/.frontal` |
 | `frontal workflows <list\|create\|search\|batch\|run get\|run summary\|run timeline>` | Workflows and executions (SSE timeline) |
@@ -148,8 +177,8 @@ Set `FRONTAL_CONFIG_DIR` to relocate the profile store (CI, tests).
 | `frontal completion <bash\|zsh\|fish>` | Shell completions |
 | `frontal migrate-legacy` | v1 → current command mapping |
 
-`env`, `deploy`, `promote`, `rollback`, `logs` and `policy` are being added
-incrementally; see [llms.txt](./llms.txt) for the current surface.
+`deploy`, `promote` and `rollback` are being added next; see [llms.txt](./llms.txt) for
+the current surface.
 
 Every command has an `Examples:` section in `--help`:
 
