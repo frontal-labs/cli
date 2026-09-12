@@ -7,7 +7,9 @@ import {
   type ProfileConfig,
 } from "@/config/schema.js";
 
-const CONFIG_DIR = join(homedir(), ".frontal");
+// FRONTAL_CONFIG_DIR lets tests and CI isolate the CLI from ~/.frontal.
+const CONFIG_DIR =
+  process.env.FRONTAL_CONFIG_DIR ?? join(homedir(), ".frontal");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
 export class ConfigManager {

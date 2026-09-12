@@ -1,9 +1,8 @@
 import type { Command } from "commander";
-import { resolveConfig } from "@/config/resolve.js";
 import { assertOperationSupported } from "@/contract/operations.js";
-import { handleError } from "@/errors/handler.js";
-import { ApiClient } from "@/http/client.js";
-import { Formatter } from "@/output/formatter.js";
+import { paginationParams, runAction } from "@/lib/command.js";
+import { emitJsonLine, withExamples } from "@/lib/output.js";
+import { renderSSEStream } from "@/output/stream.js";
 import { parseJsonInput } from "@/utils/json.js";
 
 export function registerWorkflowsCommands(program: Command): void {
@@ -11,162 +10,149 @@ export function registerWorkflowsCommands(program: Command): void {
     .command("workflows")
     .description("Manage workflow resources from public API");
 
-  workflows
-    .command("list")
-    .description("List workflows")
-    .option("--limit <n>", "Limit")
-    .option("--cursor <cursor>", "Cursor")
-    .action(async (opts, cmd) => {
-      try {
-        assertOperationSupported("GET", "/workflows");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const params: Record<string, string> = {};
-        if (opts.limit) {
-          params.limit = String(opts.limit);
-        }
-        if (opts.cursor) {
-          params.cursor = opts.cursor;
-        }
-        const result = await api.get<Record<string, unknown>>(
-          "/workflows",
-          params
-        );
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        fmt.raw(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+  withExamples(
+    workflows
+      .command("list")
+      .description("List workflows")
+      .option("--limit <n>", "Limit")
+      .option("--cursor <cursor>", "Cursor")
+      .action((opts, cmd) =>
+        runAction(cmd, async ({ fmt, sdk }) => {
+          assertOperationSupported("GET", "/workflows");
+          const { frontal } = await sdk();
+          const page = await frontal.workflows.list(paginationParams(opts));
+          fmt.raw({ data: page.data, pagination: page.pagination });
+        })
+      ),
+    ["frontal workflows list --limit 10", "frontal workflows list --json"]
+  );
 
-  workflows
-    .command("create")
-    .description("Create a workflow")
-    .requiredOption("--body <json>", "Workflow payload JSON")
-    .action(async (opts, cmd) => {
-      try {
-        assertOperationSupported("POST", "/workflows");
-        const body = parseJsonInput(opts.body, "--body");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const result = await api.post<Record<string, unknown>>(
-          "/workflows",
-          body
-        );
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+  withExamples(
+    workflows
+      .command("create")
+      .description("Create a workflow")
+      .requiredOption("--body <json>", "Workflow definition JSON")
+      .action((opts, cmd) =>
+        runAction(cmd, async ({ fmt, sdk }) => {
+          assertOperationSupported("POST", "/workflows");
+          const body = parseJsonInput(opts.body, "--body");
+          const { frontal } = await sdk();
+          // The SDK validates the definition against WorkflowDefinitionSchema.
+          const result = await frontal.workflows.create(
+            body as Parameters<typeof frontal.workflows.create>[0]
+          );
+          fmt.object(result as unknown as Record<string, unknown>);
+        })
+      ),
+    ['frontal workflows create --body \'{"name":"nightly","steps":[]}\'']
+  );
 
-  workflows
-    .command("search")
-    .description("Search workflows")
-    .requiredOption("--body <json>", "Search payload JSON")
-    .action(async (opts, cmd) => {
-      try {
-        assertOperationSupported("POST", "/workflows/search");
-        const body = parseJsonInput(opts.body, "--body");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const result = await api.post<Record<string, unknown>>(
-          "/workflows/search",
-          body
-        );
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        fmt.raw(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+  withExamples(
+    workflows
+      .command("search")
+      .description("Search workflows")
+      .requiredOption("--body <json>", "Search payload JSON")
+      .action((opts, cmd) =>
+        runAction(cmd, async ({ fmt, sdk }) => {
+          assertOperationSupported("POST", "/workflows/search");
+          const body = parseJsonInput(opts.body, "--body");
+          const { http } = await sdk();
+          const result = await http.post<Record<string, unknown>>(
+            "/workflows/search",
+            body
+          );
+          fmt.raw(result);
+        })
+      ),
+    ['frontal workflows search --body \'{"query":"nightly"}\'']
+  );
 
-  workflows
-    .command("batch")
-    .description("Batch workflow operation")
-    .requiredOption("--body <json>", "Batch payload JSON")
-    .action(async (opts, cmd) => {
-      try {
-        assertOperationSupported("POST", "/workflows/batch");
-        const body = parseJsonInput(opts.body, "--body");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const result = await api.post<Record<string, unknown>>(
-          "/workflows/batch",
-          body
-        );
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        fmt.raw(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+  withExamples(
+    workflows
+      .command("batch")
+      .description("Batch workflow operation")
+      .requiredOption("--body <json>", "Batch payload JSON")
+      .action((opts, cmd) =>
+        runAction(cmd, async ({ fmt, sdk }) => {
+          assertOperationSupported("POST", "/workflows/batch");
+          const body = parseJsonInput(opts.body, "--body");
+          const { http } = await sdk();
+          const result = await http.post<Record<string, unknown>>(
+            "/workflows/batch",
+            body
+          );
+          fmt.raw(result);
+        })
+      ),
+    ['frontal workflows batch --body \'{"ids":["wf_1"],"action":"pause"}\'']
+  );
 
   const run = workflows.command("run").description("Inspect workflow runs");
 
-  run
-    .command("get")
-    .description("Get workflow run")
-    .argument("<workflow-id>", "Workflow ID")
-    .argument("<run-id>", "Run ID")
-    .action(async (workflowId, runId, _opts, cmd) => {
-      try {
-        assertOperationSupported("GET", "/workflows/{workflow_id}/{run_id}");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const result = await api.get<Record<string, unknown>>(
-          `/workflows/${workflowId}/${runId}`
-        );
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        fmt.raw(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+  withExamples(
+    run
+      .command("get")
+      .description("Get workflow run")
+      .argument("<workflow-id>", "Workflow ID")
+      .argument("<run-id>", "Run ID")
+      .action((workflowId, runId, _opts, cmd) =>
+        runAction(cmd, async ({ fmt, sdk }) => {
+          assertOperationSupported("GET", "/workflows/{workflow_id}/{run_id}");
+          const { frontal } = await sdk();
+          const result = await frontal.workflows
+            .use(workflowId)
+            .execution(runId);
+          fmt.raw(result);
+        })
+      ),
+    ["frontal workflows run get wf_123 run_456"]
+  );
 
-  run
-    .command("summary")
-    .description("Get workflow run summary")
-    .argument("<workflow-id>", "Workflow ID")
-    .argument("<run-id>", "Run ID")
-    .action(async (workflowId, runId, _opts, cmd) => {
-      try {
-        assertOperationSupported(
-          "GET",
-          "/workflows/{workflow_id}/{run_id}/summary"
-        );
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const result = await api.get<Record<string, unknown>>(
-          `/workflows/${workflowId}/${runId}/summary`
-        );
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        fmt.raw(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+  withExamples(
+    run
+      .command("summary")
+      .description("Get workflow run summary")
+      .argument("<workflow-id>", "Workflow ID")
+      .argument("<run-id>", "Run ID")
+      .action((workflowId, runId, _opts, cmd) =>
+        runAction(cmd, async ({ fmt, sdk }) => {
+          assertOperationSupported(
+            "GET",
+            "/workflows/{workflow_id}/{run_id}/summary"
+          );
+          const { frontal } = await sdk();
+          const result = await frontal.workflows
+            .use(workflowId)
+            .executionSummary(runId);
+          fmt.raw(result);
+        })
+      ),
+    ["frontal workflows run summary wf_123 run_456"]
+  );
 
-  run
-    .command("timeline")
-    .description("Get workflow run timeline")
-    .argument("<workflow-id>", "Workflow ID")
-    .argument("<run-id>", "Run ID")
-    .action(async (workflowId, runId, _opts, cmd) => {
-      try {
-        assertOperationSupported(
-          "GET",
-          "/workflows/{workflow_id}/{run_id}/timeline"
-        );
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const result = await api.get<Record<string, unknown>>(
-          `/workflows/${workflowId}/${runId}/timeline`
-        );
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        fmt.raw(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+  withExamples(
+    run
+      .command("timeline")
+      .description("Stream workflow run timeline events (SSE)")
+      .argument("<workflow-id>", "Workflow ID")
+      .argument("<run-id>", "Run ID")
+      .action((workflowId, runId, _opts, cmd) =>
+        runAction(cmd, async ({ globalOpts, sdk }) => {
+          assertOperationSupported(
+            "GET",
+            "/workflows/{workflow_id}/{run_id}/timeline"
+          );
+          const { frontal } = await sdk();
+          const events = frontal.workflows.use(workflowId).watch(runId);
+          if (globalOpts.json) {
+            for await (const event of events) {
+              emitJsonLine(event);
+            }
+            return;
+          }
+          await renderSSEStream(events, { quiet: globalOpts.quiet });
+        })
+      ),
+    ["frontal workflows run timeline wf_123 run_456 --json | jq .data"]
+  );
 }
