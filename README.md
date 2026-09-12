@@ -138,7 +138,7 @@ cat dist/frontal/manifest.json
 frontal deploy --preview                          # prints https://api.frontal.dev/v1/workers/my-app-preview
 frontal promote https://api.frontal.dev/v1/workers/my-app-preview
 frontal deploy --prod --yes
-frontal rollback                                  # previous production artifact
+frontal rollback                                  # previous production artifact (+ agents listed in frontal.jsonc)
 ```
 
 ## Project configuration: `frontal.jsonc`

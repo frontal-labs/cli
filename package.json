@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "description": "Frontal CLI",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/frontal-labs/cli.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "frontal": "./dist/index.js"

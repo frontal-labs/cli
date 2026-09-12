@@ -69,6 +69,8 @@ export function buildProjectConfigSchema(
       entry: z.string().min(1).default("src/index.ts"),
       apiUrl: clientConfigSchema.shape.baseUrl,
       services: servicesSchema.default({}),
+      /** Agent ids owned by this project; `frontal rollback` reverts them too. */
+      agents: z.array(z.string().min(1)).default([]),
       vars: z
         .record(
           z

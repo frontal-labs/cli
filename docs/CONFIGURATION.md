@@ -43,6 +43,7 @@ For the API key and base URL:
 | `entry` | File bundled by `frontal deploy` (default `src/index.ts`) |
 | `apiUrl` | API base URL (http/https) |
 | `services` | Map of service → `{ remote }`. Unknown keys are rejected with the list of valid services |
+| `agents` | Agent ids owned by the project; `frontal rollback` reverts them to their previous version |
 | `vars` | Non-secret configuration written to `.env.local` by `frontal env pull` |
 | `secrets.required` | Environment variables that must be set (values never live in this file) |
 | `sdk` | Optional `timeout`, `maxRetries`, `retryDelay`, `headers` forwarded to the SDK client |

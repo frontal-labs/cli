@@ -134,7 +134,9 @@ Nothing is rebuilt, so what goes to production is byte-for-byte the promoted pre
 ### `frontal rollback [url|id]`
 
 Re-deploys the previous production record (or the given one). Needs at least two
-production deploys unless a reference is passed (`NO_ROLLBACK_TARGET`).
+production deploys unless a reference is passed (`NO_ROLLBACK_TARGET`). Every agent id
+listed under `agents` in `frontal.jsonc` is rolled back as well (`POST /agents/{id}/rollback`);
+per-agent failures are printed but do not fail the command.
 
 ### `frontal env pull [file] [--force]`
 

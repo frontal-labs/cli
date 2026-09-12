@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import type { Command } from "commander";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
+import { classifyError } from "@/errors/handler.js";
 import {
   bundleProject,
   type DeployManifest,
@@ -228,11 +229,43 @@ export async function runPromote(
   });
 }
 
+export interface AgentRollback {
+  agentId: string;
+  error?: string;
+  version?: number;
+}
+
+/**
+ * Rolls back every agent listed under `agents` in frontal.jsonc to its
+ * previous version (`POST /agents/{id}/rollback`). Failures are reported
+ * per agent rather than aborting the worker rollback.
+ */
+export async function rollbackAgents(
+  handle: SdkHandle,
+  agentIds: string[]
+): Promise<AgentRollback[]> {
+  const results: AgentRollback[] = [];
+  for (const agentId of agentIds) {
+    try {
+      const agent = await handle.frontal.agents.use(agentId).rollback();
+      results.push({ agentId, version: agent.version });
+    } catch (err) {
+      const report = classifyError(err);
+      results.push({ agentId, error: `${report.code}: ${report.message}` });
+    }
+  }
+  return results;
+}
+
+export interface RollbackResult extends DeployRecord {
+  agents: AgentRollback[];
+}
+
 /** Re-deploys the previous production artifact (or the one at `ref`). */
 export async function runRollback(
   ctx: CommandContext,
   ref?: string
-): Promise<DeployRecord> {
+): Promise<RollbackResult> {
   const { config, root } = await loadProjectConfig({ env: ctx.globalOpts.env });
   const current = readCurrentDeploy(root, config.env, "prod");
   let source: DeployRecord | undefined;
@@ -262,11 +295,13 @@ export async function runRollback(
   }
   requireArtifact(source);
   const handle = await ctx.sdk();
-  return await publish(handle, root, config, {
+  const record = await publish(handle, root, config, {
     artifactDir: source.artifactDir,
     sha: source.sha,
     target: "prod",
   });
+  const agents = await rollbackAgents(handle, config.agents);
+  return { ...record, agents };
 }
 
 function printRecord(verb: string, record: DeployRecord): void {
@@ -361,6 +396,13 @@ export function registerDeployCommands(program: Command): void {
             return;
           }
           printRecord("rolled back", record);
+          for (const agent of record.agents) {
+            console.log(
+              agent.error
+                ? `  ${theme.error("✗")} agent ${agent.agentId}: ${agent.error}`
+                : `  ${theme.success("✓")} agent ${agent.agentId} → v${agent.version}`
+            );
+          }
         })
       ),
     ["frontal rollback", "frontal rollback dep_1a2b3c4d5e6f"]
