@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, type FSWatcher, watch } from "node:fs";
+import {
+  existsSync,
+  type FSWatcher,
+  unwatchFile,
+  watch,
+  watchFile,
+} from "node:fs";
 import {
   createServer,
   type IncomingMessage,
@@ -63,6 +69,7 @@ interface DevEvent {
 }
 
 const RELOAD_DEBOUNCE_MS = 100;
+const POLL_INTERVAL_MS = 300;
 
 function levelForStatus(status: number): "error" | "info" | "warn" {
   if (status >= 500) {
@@ -157,6 +164,7 @@ export class DevServer {
   private readonly proxy: RemoteProxy;
   private server?: Server;
   private watchers: FSWatcher[] = [];
+  private polledFiles: string[] = [];
   private reloadTimer?: ReturnType<typeof setTimeout>;
   private readonly subscribers = new Set<(event: DevEvent) => void>();
   private readonly scenarioName?: string;
@@ -278,6 +286,10 @@ export class DevServer {
       watcher.close();
     }
     this.watchers = [];
+    for (const file of this.polledFiles) {
+      unwatchFile(file);
+    }
+    this.polledFiles = [];
     if (this.reloadTimer) {
       clearTimeout(this.reloadTimer);
     }
@@ -315,6 +327,40 @@ export class DevServer {
 
   private startWatchers(): void {
     const { root } = this.options;
+
+    // fs.watch is fast but not reliable everywhere (coalesced or nameless
+    // events on macOS, missing on some filesystems). Poll the handful of
+    // files that matter as a deterministic fallback.
+    const polled = [
+      join(root, PROJECT_CONFIG_FILE),
+      join(root, ".env.local"),
+      ...(this.options.env
+        ? [join(root, `frontal.${this.options.env}.jsonc`)]
+        : []),
+      ...(this.scenarioName
+        ? [
+            join(
+              root,
+              PROJECT_STATE_DIR,
+              "scenarios",
+              `${this.scenarioName}.json`
+            ),
+          ]
+        : []),
+    ];
+    for (const file of polled) {
+      watchFile(
+        file,
+        { interval: POLL_INTERVAL_MS, persistent: false },
+        (curr, prev) => {
+          if (curr.mtimeMs !== prev.mtimeMs) {
+            this.scheduleReload(file.split("/").pop() ?? file);
+          }
+        }
+      );
+      this.polledFiles.push(file);
+    }
+
     const targets = [root, join(root, PROJECT_STATE_DIR, "scenarios")].filter(
       (dir) => existsSync(dir)
     );
@@ -323,13 +369,15 @@ export class DevServer {
       try {
         const watcher = watch(dir, (_event, filename) => {
           const name = String(filename ?? "");
+          // Some platforms (macOS FSEvents) omit the filename; reload anyway.
           const relevant =
+            name === "" ||
             name === PROJECT_CONFIG_FILE ||
             (name.startsWith("frontal.") && name.endsWith(".jsonc")) ||
             name === ".env.local" ||
             (dir.endsWith("scenarios") && name.endsWith(".json"));
           if (relevant) {
-            this.scheduleReload(name);
+            this.scheduleReload(name || "watch");
           }
         });
         watcher.unref?.();
