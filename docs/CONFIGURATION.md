@@ -65,7 +65,9 @@ FRONTAL_API_KEY=frt_...
 FRONTAL_API_URL=https://api.frontal.dev/v1
 ```
 
-`frontal init` writes `.env.example` as a template.
+`frontal init` writes `.env.example` as a template; `frontal env pull` writes `.env.local`
+from `frontal.jsonc` and your credential, and `frontal env push` uploads the variables
+(except the connection settings) to the current deployment.
 
 ## Environment variables
 

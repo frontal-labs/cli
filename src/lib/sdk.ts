@@ -45,6 +45,8 @@ export interface SdkHandle {
 export interface GetSdkOptions {
   /** Build a client without credentials (signup, password login). */
   anonymous?: boolean;
+  /** Aborts every request (including open SSE streams) when triggered. */
+  signal?: AbortSignal;
 }
 
 type SdkModule = typeof import("@frontal-labs/sdk");
@@ -153,6 +155,26 @@ interface AuthFetchHooks {
   /** Transport to use for the actual request (defaults to global fetch). */
   fetch?: typeof fetch;
   onRequestId?: (requestId: string) => void;
+  /** External abort signal merged into every request. */
+  signal?: AbortSignal;
+}
+
+/** Combines the SDK's per-request signal with an external one. */
+function mergeSignals(
+  init: RequestInit | undefined,
+  external: AbortSignal | undefined
+): AbortSignal | undefined {
+  if (!external) {
+    return init?.signal ?? undefined;
+  }
+  const controller = new AbortController();
+  const abort = (): void => controller.abort();
+  if (external.aborted || init?.signal?.aborted) {
+    controller.abort();
+  }
+  external.addEventListener("abort", abort, { once: true });
+  init?.signal?.addEventListener("abort", abort, { once: true });
+  return controller.signal;
 }
 
 /**
@@ -217,7 +239,7 @@ export function createAuthFetch(
     } else if (credential.kind === "anonymous") {
       headers.delete("Authorization");
     }
-    return { ...init, headers };
+    return { ...init, headers, signal: mergeSignals(init, hooks.signal) };
   };
 
   return async (input, init) => {
@@ -288,6 +310,7 @@ export async function getSdk(
     environment: mapEnvironment(globalOpts.env ?? process.env.FRONTAL_ENV),
     debug: config.debug,
     verbose: Boolean(globalOpts.verbose || process.env.FRONTAL_DEBUG === "1"),
+    signal: options.signal,
   });
 }
 
@@ -298,6 +321,7 @@ export interface CreateSdkHandleInput {
   environment?: string;
   fetch?: typeof fetch;
   maxRetries?: number;
+  signal?: AbortSignal;
   timeout?: number;
   verbose?: boolean;
 }
@@ -314,6 +338,7 @@ export async function createSdkHandle(
 
   const authFetch = createAuthFetch(input.credential, {
     fetch: input.fetch,
+    signal: input.signal,
     onRequestId: (id) => {
       handle.lastRequestId = id;
     },

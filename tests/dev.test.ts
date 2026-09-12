@@ -165,11 +165,11 @@ describe("frontal dev server", () => {
       statusCode: 404,
     });
 
-    const res = await fetch(`${url}/v1/workers/x`);
+    const res = await fetch(`${url}/v1/pipelines/x`);
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({
       code: "NOT_FOUND",
-      fix: expect.stringContaining("--remote workers"),
+      fix: expect.stringContaining("--remote pipelines"),
     });
   });
 

@@ -110,6 +110,63 @@ frontal types --out types/frontal.d.ts
 frontal types --env staging --json
 ```
 
+### `frontal env pull [file] [--force]`
+
+Writes `.env.local` (or `file`) from the project config:
+
+- `FRONTAL_API_URL` from `apiUrl` (respecting `--env` overlays)
+- one line per `secrets.required` entry — the existing value is kept, `FRONTAL_API_KEY` is
+  seeded from the active credential (flag, shell or profile), otherwise an empty placeholder
+- every `vars` entry
+
+Existing files are never touched without `--force`; with it the file is merged and existing
+values win. Secret values are never printed (`--json` reports key names only). Exit `1`
+`ENV_FILE_EXISTS`.
+
+### `frontal env push [file]`
+
+Uploads variables to the current deployment of the selected environment:
+
+1. `secrets.required` must all be set in the file (`MISSING_SECRETS`, exit 2)
+2. the credential is verified with `GET /auth/account/profile`
+3. the deployment recorded by `frontal deploy` is redeployed with `env_vars` = `vars` +
+   every file entry except `FRONTAL_API_KEY` / `FRONTAL_API_URL` (`NO_DEPLOYMENT`, exit 6,
+   when nothing was deployed yet)
+
+Only key names are printed.
+
+### `frontal logs [--follow] [--filter <query>] [--since <15m>] [--level <l>] [--limit <100>]`
+
+Queries `POST /observability/logs/query` for the project (`project:<name>` unless
+`--filter` is given) over the `--since` window (`15m`, `2h`, `1d` or an ISO timestamp).
+Human output: `timestamp level service message (requestId)`; `--json`: one entry per line.
+
+`--follow` tails `GET /observability/logs/stream` over SSE until Ctrl+C. Transport errors
+reconnect with exponential backoff (0.5 s → 10 s); `401`/`403` stop immediately. `--filter`
+is sent to the server and also applied client-side as a substring match.
+
+```bash
+frontal logs --since 1h --level error
+frontal logs --follow --json | jq -r .requestId
+frontal logs --api-url http://localhost:8787/v1     # the dev server's request log
+```
+
+### `frontal policy check [--strict] [--user <id>] [--role <name>]...`
+
+Dry-run governance evaluation for the project:
+
+| Rule | Source | Result |
+|---|---|---|
+| `policy-file:<path>` | each `.frontal/policies/*.{json,rego,cel}` → `POST /policies/validate` | deny when invalid |
+| `policies:active` | `GET /policies?status=active` | warn when none |
+| `access:deploy:<service>` | `POST /access/check` for every service in `frontal.jsonc` | deny when not allowed |
+| `compliance:score` | `GET /compliance/score` | warn below 70 |
+
+The identity comes from `GET /auth/account/profile` (id + roles) unless `--user`/`--role`
+are given. Output is `✓` / `!` / `✗ rule — reason` with a `fix:` line for anything that is
+not a pass. Exit code `1` when any rule is denied; `--strict` treats warnings as denials.
+`--json` prints `{ passed, policyId, userId, strict, summary, ruleResults[] }`.
+
 ---
 
 ## Authentication

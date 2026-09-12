@@ -37,6 +37,7 @@ export interface LocalContext {
 }
 
 export const DOCS_URL = "https://frontal.dev/docs/cli/dev";
+const SAFE_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
 export function json(body: unknown, status = 200, headers: Obj = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -959,16 +960,12 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
   const filterLogs = (input: Obj): Obj[] => {
     const query = typeof input.query === "string" ? input.query.trim() : "";
     const level = typeof input.level === "string" ? input.level : undefined;
+    const tokens = query === "" || query === "*" ? [] : query.split(WHITESPACE);
     return ctx.logs.filter((entry) => {
       if (level && entry.level !== level) {
         return false;
       }
-      if (query && query !== "*") {
-        return JSON.stringify(entry)
-          .toLowerCase()
-          .includes(query.toLowerCase());
-      }
-      return true;
+      return tokens.every((token) => matchesLogToken(entry, token));
     });
   };
 
@@ -1140,6 +1137,30 @@ function matchesFilter(actual: unknown, expected: unknown): boolean {
         return false;
     }
   });
+}
+
+const WHITESPACE = /\s+/;
+
+/**
+ * Minimal log query language for local dev: `key:value` matches a top-level
+ * or metadata field (`project:` always matches — dev serves one project),
+ * anything else is a case-insensitive substring match.
+ */
+function matchesLogToken(entry: Obj, token: string): boolean {
+  const colon = token.indexOf(":");
+  if (colon > 0) {
+    const key = token.slice(0, colon);
+    const value = token.slice(colon + 1);
+    if (key === "project") {
+      return true;
+    }
+    const metadata = (entry.metadata as Obj | undefined) ?? {};
+    const actual = entry[key] ?? metadata[key];
+    if (actual !== undefined) {
+      return String(actual) === value;
+    }
+  }
+  return JSON.stringify(entry).toLowerCase().includes(token.toLowerCase());
 }
 
 function countBy(items: Obj[], key: string): Obj {
@@ -1331,10 +1352,135 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
   ];
 }
 
+function workerRoutes(ctx: LocalContext): RouteDefinition[] {
+  const { state } = ctx;
+
+  return [
+    {
+      method: "GET",
+      path: "/workers",
+      service: "workers",
+      handler: (req) =>
+        json(page(state.list<Obj>("workers"), pageOptions(req))),
+    },
+    {
+      method: "POST",
+      path: "/workers",
+      service: "workers",
+      handler: (req) => {
+        const body = bodyObject(req);
+        const name = String(body.name ?? "");
+        if (!SAFE_NAME.test(name)) {
+          return apiError(
+            400,
+            "VALIDATION_ERROR",
+            "name must be lowercase letters, digits and dashes",
+            req.requestId,
+            { fields: [{ field: "name", message: "Invalid worker name" }] }
+          );
+        }
+        if (typeof body.code !== "string" || body.code.length === 0) {
+          return apiError(
+            400,
+            "VALIDATION_ERROR",
+            "code is required",
+            req.requestId,
+            {
+              fields: [{ field: "code", message: "Required" }],
+            }
+          );
+        }
+        const previous = state.read<Obj>("workers", name);
+        const version = Number(previous?.version ?? 0) + 1;
+        const origin = new URL(req.raw.url).origin;
+        const worker = {
+          name,
+          version,
+          entrypoint: body.entrypoint ?? "index.js",
+          env_vars: (body.env_vars as Obj) ?? {},
+          code_size: body.code.length,
+          url: `${origin}/v1/workers/${name}`,
+          deployed_at: nowIso(),
+          environment: ctx.env,
+        };
+        state.write("workers", name, { ...worker, code: body.code });
+        return json(worker, 201);
+      },
+    },
+    {
+      method: "GET",
+      path: "/workers/{name}",
+      service: "workers",
+      handler: (req) => {
+        const worker = state.read<Obj>("workers", req.params.name as string);
+        if (!worker) {
+          return notFound(req, `Worker ${req.params.name}`);
+        }
+        const { code: _code, env_vars: _env, ...visible } = worker;
+        return json({ ...visible, invoked: true });
+      },
+    },
+    {
+      method: "POST",
+      path: "/workers/{name}",
+      service: "workers",
+      handler: (req) => {
+        const worker = state.read<Obj>("workers", req.params.name as string);
+        if (!worker) {
+          return notFound(req, `Worker ${req.params.name}`);
+        }
+        return json({
+          name: worker.name,
+          version: worker.version,
+          invoked: true,
+          input: req.body ?? null,
+        });
+      },
+    },
+    {
+      method: "DELETE",
+      path: "/workers/{name}",
+      service: "workers",
+      handler: (req) =>
+        state.remove("workers", req.params.name as string)
+          ? new Response(null, { status: 204 })
+          : notFound(req, `Worker ${req.params.name}`),
+    },
+  ];
+}
+
+function authRoutes(ctx: LocalContext): RouteDefinition[] {
+  const profile = (): Obj => ({
+    id: "usr_local_dev",
+    email: "dev@localhost",
+    name: "Local developer",
+    roles: ["developer"],
+    role_names: ["developer"],
+    environment: ctx.env,
+    created_at: new Date(ctx.startedAt).toISOString(),
+  });
+  return [
+    {
+      method: "GET",
+      path: "/auth/account/profile",
+      service: "auth",
+      handler: () => json(profile()),
+    },
+    {
+      method: "GET",
+      path: "/auth/mfa/status",
+      service: "auth",
+      handler: () => json({ enabled: false, methods: [] }),
+    },
+  ];
+}
+
 /** Every built-in local route. Order matters: specific paths before `{id}`. */
 export function createLocalRoutes(ctx: LocalContext): RouteDefinition[] {
   return [
     ...healthRoutes(ctx),
+    ...authRoutes(ctx),
+    ...workerRoutes(ctx),
     ...agentRoutes(ctx),
     ...graphRoutes(ctx),
     ...datasetRoutes(ctx),

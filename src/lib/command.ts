@@ -7,7 +7,10 @@ import { Formatter } from "@/output/formatter.js";
 export interface CommandContext {
   fmt: Formatter;
   globalOpts: GlobalOptions & Record<string, unknown>;
-  /** Lazily creates the SDK handle; reused across calls within the action. */
+  /**
+   * Creates the SDK handle. Calls without options share one handle; calls
+   * with options (anonymous, abort signal) get a dedicated client.
+   */
   sdk: (options?: GetSdkOptions) => Promise<SdkHandle>;
 }
 
@@ -26,7 +29,12 @@ export async function runAction(
     globalOpts,
     fmt: Formatter.from(globalOpts),
     sdk: async (options) => {
-      handle ??= await getSdk(globalOpts, options);
+      if (options) {
+        const dedicated = await getSdk(globalOpts, options);
+        handle ??= dedicated;
+        return dedicated;
+      }
+      handle ??= await getSdk(globalOpts);
       return handle;
     },
   };

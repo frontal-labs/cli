@@ -19,6 +19,7 @@ export const STATE_NAMESPACES = [
   "datasets",
   "blob",
   "policies",
+  "workers",
   "deploys",
 ] as const;
 export type StateNamespace = (typeof STATE_NAMESPACES)[number];

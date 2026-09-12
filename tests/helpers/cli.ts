@@ -21,6 +21,7 @@ export async function mockApi(routes: MockRoute[] = []): Promise<MockApi> {
       baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
       fetch: mock.fetch,
       maxRetries: 0,
+      signal: options?.signal,
     })
   );
   return mock;
