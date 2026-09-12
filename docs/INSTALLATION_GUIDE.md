@@ -139,7 +139,13 @@ bun run dev
 bun run build
 ```
 
-The built binary will be available in `dist/bin/frontal.js`.
+The npm bundle is written to `dist/index.js` (runs on Node ≥ 18). For a
+self-contained executable:
+
+```bash
+bun run build:binary      # dist/frontal for the current platform
+bun run build:binaries    # dist/binaries/frontal-<os>-<arch> for all platforms
+```
 
 ## Environment Variables
 

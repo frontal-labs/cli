@@ -31,23 +31,41 @@ export interface ResolvedConfig {
   workspaceId?: string;
 }
 
+export interface ProjectOverlay {
+  /** Values from the project's `.env.local` (below shell env, above profile). */
+  dotenv?: Record<string, string>;
+  /** `apiUrl` from `frontal.jsonc` (below `.env.local`, above profile). */
+  projectApiUrl?: string;
+}
+
 /**
- * Resolves effective settings with precedence flag > env var > profile > default.
+ * Resolves effective settings with precedence
+ * flag > shell env > .env.local > frontal.jsonc > profile > default.
  * Credentials are returned raw here; `getSdk()` turns them into an SDK client.
  */
-export function resolveConfig(opts: GlobalOptions): ResolvedConfig {
+export function resolveConfig(
+  opts: GlobalOptions,
+  overlay: ProjectOverlay = {}
+): ResolvedConfig {
   const profileName =
     opts.profile ??
     process.env.FRONTAL_PROFILE ??
     configManager.getActiveProfileName();
   const profile = configManager.getProfile(profileName);
+  const dotenv = overlay.dotenv ?? {};
 
   const apiKey =
-    opts.apiKey ?? process.env.FRONTAL_API_KEY ?? profile.apiKey ?? "";
+    opts.apiKey ??
+    process.env.FRONTAL_API_KEY ??
+    dotenv.FRONTAL_API_KEY ??
+    profile.apiKey ??
+    "";
 
   const baseUrl =
     opts.apiUrl ??
     process.env.FRONTAL_API_URL ??
+    dotenv.FRONTAL_API_URL ??
+    overlay.projectApiUrl ??
     profile.baseUrl ??
     DEFAULT_BASE_URL;
 

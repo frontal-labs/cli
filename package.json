@@ -4,7 +4,7 @@
   "description": "Frontal platform CLI",
   "type": "module",
   "bin": {
-    "frontal": "./dist/bin/frontal.js"
+    "frontal": "./dist/index.js"
   },
   "files": [
     "dist"
@@ -13,7 +13,11 @@
     "dev": "bun run bin/frontal.ts",
     "generate:openapi-ops": "node ./scripts/generate-openapi-operations.mjs",
     "validate:bindings": "node ./scripts/validate-command-bindings.mjs",
-    "build": "bun run generate:openapi-ops && bun run validate:bindings && tsup && node -e \"const fs=require('fs');const f='dist/bin/frontal.js';const c=fs.readFileSync(f,'utf8');if(!c.startsWith('#!'))fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c)\"",
+    "build": "bun run generate:openapi-ops && bun run validate:bindings && tsup && chmod +x dist/index.js",
+    "build:binary": "bun build --compile --minify ./bin/frontal.ts --outfile dist/frontal",
+    "build:binaries": "bun scripts/build-binaries.ts",
+    "build:all": "bun run build && bun run build:binary",
+    "test:readme": "bun run build && bun scripts/run-readme-blocks.ts",
     "type-check": "tsc --noEmit",
     "lint": "biome lint src/ tests/",
     "format": "biome format --write src/ tests/",

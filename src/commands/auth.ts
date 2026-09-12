@@ -43,7 +43,9 @@ export function registerAuthCommands(program: Command): void {
     .action(async (opts, cmd) => {
       try {
         const profileName =
-          opts.profile ?? cmd.optsWithGlobals().profile ?? "default";
+          opts.profile ??
+          cmd.optsWithGlobals().profile ??
+          configManager.getActiveProfileName();
         const method = opts.method ?? "browser";
 
         if (method === "api-key" || !isInteractive()) {
@@ -73,7 +75,10 @@ export function registerAuthCommands(program: Command): void {
           password: opts.password,
         });
 
-        const profileName = opts.profile ?? globalOpts.profile ?? "default";
+        const profileName =
+          opts.profile ??
+          globalOpts.profile ??
+          configManager.getActiveProfileName();
 
         const token = result.accessToken;
         const refreshToken = result.refreshToken;
@@ -116,7 +121,9 @@ export function registerAuthCommands(program: Command): void {
     .action((opts, cmd) => {
       try {
         const profileName =
-          opts.profile ?? cmd.optsWithGlobals().profile ?? "default";
+          opts.profile ??
+          cmd.optsWithGlobals().profile ??
+          configManager.getActiveProfileName();
         configManager.setProfile(profileName, {
           apiKey: undefined,
           accessToken: undefined,

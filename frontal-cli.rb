@@ -25,15 +25,15 @@ class FrontalCli < Formula
       system "npm", "run", "build"
     end
     
-    # Install the binary with proper shebang
-    bin.install "dist/bin/frontal.js" => "frontal"
-    
-    # Ensure executable permissions
-    chmod 0755, bin/"frontal"
+    # The bundle imports its runtime dependencies from node_modules, so keep
+    # the whole tree in libexec and expose the entrypoint as `frontal`.
+    libexec.install "dist", "node_modules", "package.json"
+    bin.install_symlink libexec/"dist/index.js" => "frontal"
+    chmod 0755, libexec/"dist/index.js"
   end
 
   test do
-    assert_match "Frontal platform CLI", shell_output("#{bin}/frontal --version")
-    assert_match "Frontal platform CLI", shell_output("#{bin}/frontal --help")
+    assert_match version.to_s, shell_output("#{bin}/frontal --version")
+    assert_match "frontal init", shell_output("#{bin}/frontal --help")
   end
 end
