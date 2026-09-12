@@ -12,6 +12,7 @@ tests/
   errors/              error classification, exit codes, redaction
   commands/            one file per command family (auth, workflows, ...)
   unit/config/         ~/.frontal profile store
+  live/                real API smoke; runs only with FRONTAL_LIVE=1 + TEST_API_KEY
 ```
 
 ## Writing a command test
