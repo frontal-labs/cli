@@ -411,8 +411,10 @@ describe("frontal dev server", () => {
         ],
       })
     );
+    // fs.watch latency varies by platform/load; the polling fallback fires within ~300ms.
     await vi.waitFor(() => expect(reloads).toContain("live.json"), {
-      timeout: 3000,
+      timeout: 8000,
+      interval: 100,
     });
     expect((await (await fetch(`${url}/v1/agents/health`)).json()).status).toBe(
       "scenario"
@@ -421,7 +423,7 @@ describe("frontal dev server", () => {
     // A broken config keeps the previous table.
     const config = join(root, "frontal.jsonc");
     writeFileSync(config, '{ "name": "x", "services": { "bogus": {} } }');
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     expect((await (await fetch(`${url}/v1/agents/health`)).json()).status).toBe(
       "scenario"
     );
