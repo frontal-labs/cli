@@ -1,8 +1,4 @@
-<picture>
- <source srcset="./banner-dark.png" media="(prefers-color-scheme: dark)">
- <source srcset="./banner.png" media="(prefers-color-scheme: light)">
- <img src="./banner-dark.png" alt="Frontal Banner">
-</picture>
+![Frontal Banner](./banner.png)
 
 # Frontal CLI
 
@@ -423,7 +419,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+Apache License 2.0 - see [LICENSE.md](LICENSE.md) and [NOTICE.md](NOTICE.md).
 
 ## Support
 

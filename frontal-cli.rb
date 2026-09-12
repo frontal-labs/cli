@@ -8,7 +8,7 @@ class FrontalCli < Formula
   url "https://github.com/frontal-labs/cli.git",
     tag:      "v0.1.0",
     revision: "HEAD"
-  license "MIT"
+  license "Apache-2.0"
   head "https://github.com/frontal-labs/cli.git", branch: "main"
 
   depends_on "node" => :recommended
