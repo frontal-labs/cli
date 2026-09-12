@@ -1,4 +1,5 @@
 import YAML from "yaml";
+import { redact } from "@/output/redact.js";
 import { suppressSpinner } from "@/output/spinner.js";
 import { type Column, renderTable } from "@/output/table.js";
 import { theme } from "@/output/theme.js";
@@ -27,7 +28,8 @@ export class Formatter {
     });
   }
 
-  table(data: Record<string, unknown>[], columns: Column[]): void {
+  table(rows: Record<string, unknown>[], columns: Column[]): void {
+    const data = redact(rows);
     if (this.opts.json) {
       console.log(JSON.stringify(data, null, 2));
       return;
@@ -43,7 +45,8 @@ export class Formatter {
     console.log(renderTable(data, columns));
   }
 
-  object(data: Record<string, unknown>): void {
+  object(input: Record<string, unknown>): void {
+    const data = redact(input);
     if (this.opts.json) {
       console.log(JSON.stringify(data, null, 2));
       return;
@@ -65,7 +68,8 @@ export class Formatter {
     }
   }
 
-  raw(data: unknown): void {
+  raw(input: unknown): void {
+    const data = redact(input);
     if (this.opts.json) {
       console.log(JSON.stringify(data, null, 2));
       return;
@@ -74,7 +78,11 @@ export class Formatter {
       console.log(YAML.stringify(data));
       return;
     }
-    console.log(data);
+    if (typeof data === "string") {
+      console.log(data);
+      return;
+    }
+    console.log(JSON.stringify(data, null, 2));
   }
 
   success(msg: string): void {

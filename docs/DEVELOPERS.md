@@ -244,142 +244,27 @@ export class ConfigManager {
 }
 ```
 
-#### HTTP Client
+#### SDK access
 
-The HTTP client handles API communication:
-
-```typescript
-// src/http/client.ts
-export class ApiClient {
-  private baseUrl: string;
-  private apiKey: string;
-  
-  constructor(config: Config) {
-    this.baseUrl = config.baseUrl;
-    this.apiKey = config.apiKey;
-  }
-  
-  async request<T>(
-    method: string,
-    path: string,
-    data?: unknown
-  ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${path}`;
-    const response = await fetch(url, {
-      method,
-      headers: {
-        "Authorization": `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: data ? JSON.stringify(data) : undefined,
-    });
-    
-    if (!response.ok) {
-      throw new ApiError(response.status, await response.text());
-    }
-    
-    return response.json();
-  }
-}
-```
-
-## Development Workflow
-
-### Making Changes
-
-1. **Create a feature branch**:
-   ```bash
-   git checkout -b feature/new-command
-   ```
-
-2. **Make your changes** following the coding standards
-
-3. **Run tests and linting**:
-   ```bash
-   bun run test
-   bun run lint
-   bun run type-check
-   ```
-
-4. **Build the project**:
-   ```bash
-   bun run build
-   ```
-
-5. **Test your changes**:
-   ```bash
-   # Run CLI from source
-   bun run dev --help
-   
-   # Test specific command
-   bun run dev new-command --debug
-   ```
-
-### Adding New Commands
-
-1. **Create command file** in `src/commands/`:
+All API calls go through `@frontal-labs/sdk` via the single factory in
+`src/lib/sdk.ts`:
 
 ```typescript
-// src/commands/new-feature.ts
-import type { Command } from "commander";
-import { handleError } from "../errors/handler.js";
-import { ApiClient } from "../http/client.js";
-import { outputResult } from "../output/formatter.js";
+import { runAction } from "@/lib/command.js";
 
-export function registerNewFeatureCommands(program: Command): void {
-  const command = program
-    .command("new-feature")
-    .description("New feature commands");
-    
-  command
-    .command("list")
-    .description("List new features")
-    .option("--format <format>", "Output format", "table")
-    .action(async (opts, cmd) => {
-      try {
-        const config = cmd.optsWithGlobals();
-        const client = new ApiClient(config);
-        const result = await client.get("/new-features");
-        outputResult(result, opts.format);
-      } catch (err) {
-        handleError(err, config);
-      }
-    });
-}
+.action((opts, cmd) =>
+  runAction(cmd, async ({ fmt, sdk }) => {
+    const { frontal, http } = await sdk();
+    const page = await frontal.workflows.list({ limit: 10 }); // typed SDK call
+    const raw = await http.get("/events", { limit: 10 });    // endpoint the SDK does not model
+    fmt.raw(page.data);
+  })
+);
 ```
 
-2. **Register the command** in `src/index.ts`:
-
-```typescript
-import { registerNewFeatureCommands } from "./commands/new-feature.js";
-
-export async function run(argv: string[]): Promise<void> {
-  // ... existing code
-  
-  registerNewFeatureCommands(program);
-  
-  await program.parseAsync(argv);
-}
-```
-
-3. **Add tests** in `tests/unit/`:
-
-```typescript
-// tests/unit/commands/new-feature.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { registerNewFeatureCommands } from "../../../src/commands/new-feature.js";
-
-describe("New Feature Commands", () => {
-  it("should register commands", () => {
-    const program = { command: vi.fn().mockReturnSelf() };
-    registerNewFeatureCommands(program);
-    
-    expect(program.command).toHaveBeenCalledWith("new-feature");
-  });
-});
-```
-
-### Testing
+`runAction` wires `--json`/`--yaml`/`--quiet` into `fmt`, lazily creates the
+SDK handle and routes any error through `handleError`, which prints
+`code`, `fix`, `docs` and the request id.
 
 #### Unit Tests
 
@@ -629,21 +514,8 @@ export interface ApiOptions {
   headers?: Record<string, string>;
 }
 
-export interface ApiResponse<T> {
-  data: T;
-  status: number;
-  headers: Record<string, string>;
-}
-
-export class ApiClient {
-  async request<T>(
-    method: string,
-    path: string,
-    options?: ApiOptions
-  ): Promise<ApiResponse<T>> {
-    // Implementation
-  }
-}
+// Errors thrown by the SDK (FrontalError subclasses) carry
+// code, statusCode, requestId and docs; the CLI adds fix hints.
 ```
 
 ### Plugin Architecture

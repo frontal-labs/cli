@@ -120,13 +120,20 @@ export function installWatchMiddleware(program: Command): void {
     const commandName = thisCommand.name();
     if (
       [
-        "deploy",
-        "init",
-        "validate",
-        "use",
         "auth",
-        "config",
         "completion",
+        "config",
+        "deploy",
+        "dev",
+        "env",
+        "init",
+        "logs",
+        "policy",
+        "promote",
+        "rollback",
+        "types",
+        "use",
+        "validate",
       ].includes(commandName)
     ) {
       return;

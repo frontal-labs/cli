@@ -1,9 +1,7 @@
 import type { Command } from "commander";
-import { resolveConfig } from "@/config/resolve.js";
 import { assertOperationSupported } from "@/contract/operations.js";
-import { handleError } from "@/errors/handler.js";
-import { ApiClient } from "@/http/client.js";
-import { Formatter } from "@/output/formatter.js";
+import { runAction } from "@/lib/command.js";
+import { withExamples } from "@/lib/output.js";
 import { parseJsonInput } from "@/utils/json.js";
 
 export function registerInvocationsCommands(program: Command): void {
@@ -11,24 +9,23 @@ export function registerInvocationsCommands(program: Command): void {
     .command("invocations")
     .description("Submit runtime invocations");
 
-  invocations
-    .command("create")
-    .description("Create an invocation")
-    .requiredOption("--body <json>", "Invocation payload JSON")
-    .action(async (opts, cmd) => {
-      try {
-        assertOperationSupported("POST", "/invocations");
-        const body = parseJsonInput(opts.body, "--body");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const result = await api.post<Record<string, unknown>>(
-          "/invocations",
-          body
-        );
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        fmt.raw(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+  withExamples(
+    invocations
+      .command("create")
+      .description("Create an invocation")
+      .requiredOption("--body <json>", "Invocation payload JSON")
+      .action((opts, cmd) =>
+        runAction(cmd, async ({ fmt, sdk }) => {
+          assertOperationSupported("POST", "/invocations");
+          const body = parseJsonInput(opts.body, "--body");
+          const { http } = await sdk();
+          const result = await http.post<Record<string, unknown>>(
+            "/invocations",
+            body
+          );
+          fmt.raw(result);
+        })
+      ),
+    ['frontal invocations create --body \'{"target":"agent_123","input":{}}\'']
+  );
 }
