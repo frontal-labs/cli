@@ -44,8 +44,8 @@ export class ProjectState {
   private file(namespace: StateNamespace, id: string): string {
     if (!SAFE_ID.test(id)) {
       throw new CliError("INVALID_STATE_ID", `Invalid state id "${id}".`, {
-        fix: "Ids may only contain letters, digits, dots, dashes and underscores.",
         exitCode: EXIT_CODES.VALIDATION_ERROR,
+        fix: "Ids may only contain letters, digits, dots, dashes and underscores.",
       });
     }
     return join(this.dir(namespace), `${id}.json`);
@@ -98,19 +98,19 @@ export class ProjectState {
 
   clear(namespace?: StateNamespace): void {
     const target = namespace ? this.dir(namespace) : this.baseDir;
-    rmSync(target, { recursive: true, force: true });
+    rmSync(target, { force: true, recursive: true });
   }
 }
 
 /** Scenario route shape — mirrors `MockRoute` from `@frontal-labs/testing`. */
 export const scenarioRouteSchema = z
   .object({
+    body: z.unknown().optional(),
+    headers: z.record(z.string(), z.string()).optional(),
     method: z.string().min(1),
     /** Path suffix to match, or a regular expression when it starts with `^`. */
     path: z.string().min(1),
     status: z.number().int().min(100).max(599).optional(),
-    body: z.unknown().optional(),
-    headers: z.record(z.string(), z.string()).optional(),
     /** Number of times this route may match before it is skipped. */
     times: z.number().int().positive().optional(),
   })
@@ -118,8 +118,8 @@ export const scenarioRouteSchema = z
 
 export const scenarioSchema = z
   .object({
-    name: z.string().optional(),
     description: z.string().optional(),
+    name: z.string().optional(),
     routes: z.array(scenarioRouteSchema),
   })
   .strict();
@@ -135,25 +135,26 @@ export function scenarioPath(root: string, name: string): string {
 export function loadScenario(root: string, name: string): Scenario {
   if (!SAFE_ID.test(name)) {
     throw new CliError("INVALID_SCENARIO", `Invalid scenario name "${name}".`, {
-      fix: "Scenario names may only contain letters, digits, dots, dashes and underscores.",
       exitCode: EXIT_CODES.VALIDATION_ERROR,
+      fix: "Scenario names may only contain letters, digits, dots, dashes and underscores.",
     });
   }
   const file = scenarioPath(root, name);
   if (!existsSync(file)) {
     throw new CliError("SCENARIO_NOT_FOUND", `Scenario not found: ${file}`, {
-      fix: `Create ${file} with { "routes": [{ "method": "GET", "path": "/agents", "body": {...} }] }.`,
       exitCode: EXIT_CODES.NOT_FOUND,
+      fix: `Create ${file} with { "routes": [{ "method": "GET", "path": "/agents", "body": {...} }] }.`,
     });
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(file, "utf-8"));
   } catch (err) {
+    // biome-ignore lint/style/useErrorCause: cause is forwarded through CliError options
     throw new CliError(
       "SCENARIO_INVALID",
       `Could not parse ${file}: ${err instanceof Error ? err.message : String(err)}`,
-      { exitCode: EXIT_CODES.CONFIG_ERROR, cause: err }
+      { cause: err, exitCode: EXIT_CODES.CONFIG_ERROR }
     );
   }
   const result = scenarioSchema.safeParse(parsed);
@@ -164,9 +165,9 @@ export function loadScenario(root: string, name: string): Scenario {
         .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
         .join("\n")}`,
       {
-        fix: "Each route needs { method, path } and optional status/body/headers/times.",
-        exitCode: EXIT_CODES.CONFIG_ERROR,
         cause: result.error,
+        exitCode: EXIT_CODES.CONFIG_ERROR,
+        fix: "Each route needs { method, path } and optional status/body/headers/times.",
       }
     );
   }

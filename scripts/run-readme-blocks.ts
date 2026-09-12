@@ -67,13 +67,13 @@ symlinkSync(join(repoRoot, "dist", "index.js"), join(binDir, "frontal"));
 const DEV_PORT = 8787;
 const env = {
   ...process.env,
-  PATH: `${binDir}:${process.env.PATH ?? ""}`,
-  FRONTAL_CONFIG_DIR: join(work, "config"),
+  CI: "1",
   FRONTAL_API_KEY: process.env.FRONTAL_API_KEY ?? "frt_readme_example_key_000",
   FRONTAL_API_URL:
     process.env.FRONTAL_API_URL ?? `http://127.0.0.1:${DEV_PORT}/v1`,
+  FRONTAL_CONFIG_DIR: join(work, "config"),
   NO_COLOR: "1",
-  CI: "1",
+  PATH: `${binDir}:${process.env.PATH ?? ""}`,
 };
 
 let failed = 0;
@@ -85,8 +85,8 @@ let devServer: ChildProcess | undefined;
 if (!process.env.FRONTAL_API_URL) {
   const init = spawnSync("frontal", ["init", "--name", "readme-app"], {
     cwd,
-    env,
     encoding: "utf-8",
+    env,
   });
   if (init.status !== 0) {
     console.error(init.stdout, init.stderr);
@@ -116,6 +116,7 @@ async function waitForHealth(url: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
+      // biome-ignore lint/performance/noAwaitInLoops: polling until healthy
       const res = await fetch(url);
       if (res.ok) {
         return true;
@@ -123,7 +124,7 @@ async function waitForHealth(url: string, timeoutMs: number): Promise<boolean> {
     } catch {
       // not up yet
     }
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((wake) => setTimeout(wake, 200));
   }
   return false;
 }
@@ -132,8 +133,8 @@ for (const block of runnable) {
   const script = `set -euo pipefail\n${block.body}`;
   const proc = spawnSync("bash", ["-c", script], {
     cwd,
-    env,
     encoding: "utf-8",
+    env,
   });
   const ok = proc.status === 0;
   console.log(`${ok ? "PASS" : "FAIL"} README.md:${block.line}`);
@@ -146,7 +147,7 @@ for (const block of runnable) {
 }
 
 devServer?.kill();
-rmSync(work, { recursive: true, force: true });
+rmSync(work, { force: true, recursive: true });
 if (failed > 0) {
   console.error(`${failed} README block(s) failed`);
   process.exit(1);

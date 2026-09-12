@@ -35,7 +35,7 @@ export async function renderSSEStream(
     if (opts.json) {
       console.log(
         JSON.stringify(
-          redact({ type: event.type, data: event.data, id: event.id })
+          redact({ data: event.data, id: event.id, type: event.type })
         )
       );
     } else {

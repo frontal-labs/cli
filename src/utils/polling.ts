@@ -51,7 +51,8 @@ export async function* poll<T>(
   const interval = opts.interval ?? 2000;
   const maxAttempts = opts.maxAttempts ?? 150;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: polling is sequential by design
     const result = await fn();
     yield result;
 

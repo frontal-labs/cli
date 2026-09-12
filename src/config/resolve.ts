@@ -77,15 +77,15 @@ export function resolveConfig(
   const debug = opts.debug ?? profile.debug ?? false;
 
   return {
+    accessToken: profile.accessToken,
     apiKey,
+    authUrl: process.env.FRONTAL_AUTH_URL ?? profile.authUrl,
     baseUrl,
     debug,
     orgId,
     profileName,
-    workspaceId,
-    accessToken: profile.accessToken,
     refreshToken: profile.refreshToken,
     tokenExpiresAt: profile.tokenExpiresAt,
-    authUrl: process.env.FRONTAL_AUTH_URL ?? profile.authUrl,
+    workspaceId,
   };
 }

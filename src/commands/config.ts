@@ -50,10 +50,10 @@ export function registerConfigCommands(program: Command): void {
         const cfg = configManager.load();
         const fmt = Formatter.from(cmd.optsWithGlobals());
         fmt.object({
-          schemaVersion: cfg.schemaVersion,
           activeProfile: cfg.activeProfile,
-          telemetryEnabled: cfg.telemetry.enabled,
           profiles: Object.keys(cfg.profiles).join(", ") || "(none)",
+          schemaVersion: cfg.schemaVersion,
+          telemetryEnabled: cfg.telemetry.enabled,
           ...cfg.defaults,
           ...configManager.getProfile(),
         });
@@ -77,11 +77,11 @@ export function registerConfigCommands(program: Command): void {
         }
 
         configManager.save({
-          schemaVersion: 2,
           activeProfile: "default",
-          profiles: {},
-          telemetry: { enabled: false },
           defaults: { outputFormat: "table", paginationLimit: 25 },
+          profiles: {},
+          schemaVersion: 2,
+          telemetry: { enabled: false },
         });
         console.log(theme.success("Configuration reset to defaults."));
       } catch (err) {
@@ -97,18 +97,18 @@ export function registerConfigCommands(program: Command): void {
         const cfg = configManager.load();
         const fmt = Formatter.from(cmd.optsWithGlobals());
         const profiles = Object.keys(cfg.profiles).map((name) => ({
-          name,
           active: name === cfg.activeProfile ? "*" : "",
           apiKey: cfg.profiles[name].apiKey
             ? `${cfg.profiles[name].apiKey?.slice(0, 7)}...`
             : "(not set)",
           baseUrl: cfg.profiles[name].baseUrl ?? "(default)",
+          name,
         }));
         fmt.table(profiles, [
-          { key: "active", header: "" },
-          { key: "name", header: "PROFILE" },
-          { key: "apiKey", header: "API KEY" },
-          { key: "baseUrl", header: "BASE URL" },
+          { header: "", key: "active" },
+          { header: "PROFILE", key: "name" },
+          { header: "API KEY", key: "apiKey" },
+          { header: "BASE URL", key: "baseUrl" },
         ]);
       } catch (err) {
         handleError(err, cmd.optsWithGlobals());
@@ -183,7 +183,7 @@ function setNestedValue(
 ): void {
   const parts = path.split(".");
   let current: Record<string, unknown> = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
+  for (let i = 0; i < parts.length - 1; i += 1) {
     const part = parts[i];
     if (part === undefined) {
       continue;

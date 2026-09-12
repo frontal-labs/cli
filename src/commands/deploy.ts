@@ -66,8 +66,8 @@ async function confirmProd(
       "CONFIRMATION_REQUIRED",
       "Production deploys need confirmation.",
       {
-        fix: "Re-run with --yes to confirm non-interactively.",
         exitCode: EXIT_CODES.GENERAL_ERROR,
+        fix: "Re-run with --yes to confirm non-interactively.",
       }
     );
   }
@@ -91,10 +91,10 @@ async function publish(
   const name = workerName(config.name, input.target);
   const code = readBundle(input.artifactDir);
   const worker = await deployWorker(handle, {
-    name,
     code,
     entrypoint: BUNDLE_ENTRYPOINT,
     envVars: config.vars,
+    name,
   });
   // Keep an immutable copy per content hash so promote/rollback can re-send
   // exactly what was deployed even after later builds overwrite the outdir.
@@ -102,19 +102,19 @@ async function publish(
   mkdirSync(artifactDir, { recursive: true });
   writeFileSync(join(artifactDir, BUNDLE_ENTRYPOINT), code);
   const record: DeployRecord = {
+    artifactDir,
+    createdAt: new Date().toISOString(),
+    entrypoint: BUNDLE_ENTRYPOINT,
+    env: config.env,
     id: `dep_${randomBytes(6).toString("hex")}`,
     name,
-    env: config.env,
+    requestId: handle.lastRequestId,
+    sha: input.sha,
     target: input.target,
     url:
       typeof worker.url === "string"
         ? worker.url
         : workerUrl(handle.baseUrl, name),
-    entrypoint: BUNDLE_ENTRYPOINT,
-    artifactDir,
-    sha: input.sha,
-    createdAt: new Date().toISOString(),
-    requestId: handle.lastRequestId,
   };
   writeCurrentDeploy(root, record);
   return record;
@@ -146,31 +146,31 @@ export async function runDeploy(
   }
 
   const bundle = await bundleProject({
-    root,
     entry: config.entry,
     outdir: opts.outdir ?? defaultOutdir(target),
+    root,
   });
   const manifest: DeployManifest = {
-    name: workerName(config.name, target),
-    env: config.env,
-    target,
+    createdAt: new Date().toISOString(),
     entry: config.entry,
+    env: config.env,
+    name: workerName(config.name, target),
     sha: bundle.sha,
     size: bundle.size,
-    vars: Object.keys(config.vars).sort(),
     // Schema only — never row data — so previews carry no local records.
     stateSchema: snapshotStateSchema(root),
-    createdAt: new Date().toISOString(),
+    target,
+    vars: Object.keys(config.vars).sort(),
   };
   const manifestFile = writeManifest(bundle.outdir, manifest);
 
   if (opts.dryRun) {
     return {
       dryRun: true,
-      target,
+      manifest: manifestFile,
       sha: bundle.sha,
       size: bundle.size,
-      manifest: manifestFile,
+      target,
     };
   }
 
@@ -182,11 +182,11 @@ export async function runDeploy(
   });
   return {
     dryRun: false,
-    target,
-    sha: bundle.sha,
-    size: bundle.size,
     manifest: manifestFile,
     record,
+    sha: bundle.sha,
+    size: bundle.size,
+    target,
   };
 }
 
@@ -196,8 +196,8 @@ function requireArtifact(record: DeployRecord): void {
       "ARTIFACT_MISSING",
       `Artifact for ${record.name} (${record.sha.slice(0, 12)}) is no longer on disk.`,
       {
-        fix: `Re-run \`frontal deploy --${record.target}\` to rebuild it; promote/rollback never rebuild.`,
         exitCode: EXIT_CODES.NOT_FOUND,
+        fix: `Re-run \`frontal deploy --${record.target}\` to rebuild it; promote/rollback never rebuild.`,
       }
     );
   }
@@ -215,8 +215,8 @@ export async function runPromote(
       "DEPLOYMENT_NOT_FOUND",
       `No recorded deployment matches "${ref}".`,
       {
-        fix: "Pass the preview URL printed by `frontal deploy --preview`.",
         exitCode: EXIT_CODES.NOT_FOUND,
+        fix: "Pass the preview URL printed by `frontal deploy --preview`.",
       }
     );
   }
@@ -247,6 +247,7 @@ export async function rollbackAgents(
   const results: AgentRollback[] = [];
   for (const agentId of agentIds) {
     try {
+      // biome-ignore lint/performance/noAwaitInLoops: rollbacks are ordered
       const agent = await handle.frontal.agents.use(agentId).rollback();
       results.push({ agentId, version: agent.version });
     } catch (err) {
@@ -273,10 +274,10 @@ export async function runRollback(
     source = findDeploy(root, ref);
   } else {
     source = listDeploys(root).find(
-      (record) =>
-        record.target === "prod" &&
-        record.env === config.env &&
-        record.id !== current?.id
+      (candidate) =>
+        candidate.target === "prod" &&
+        candidate.env === config.env &&
+        candidate.id !== current?.id
     );
   }
   if (!source) {
@@ -286,10 +287,10 @@ export async function runRollback(
         ? `No recorded deployment matches "${ref}".`
         : "No previous production deployment to roll back to.",
       {
+        exitCode: EXIT_CODES.NOT_FOUND,
         fix: ref
           ? "Use a URL or id from `.frontal/state/deploys`."
           : "Roll back needs at least two production deploys, or pass an explicit URL.",
-        exitCode: EXIT_CODES.NOT_FOUND,
       }
     );
   }

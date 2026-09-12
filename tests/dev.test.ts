@@ -42,21 +42,21 @@ beforeEach(() => {
 afterEach(async () => {
   await server?.stop();
   server = undefined;
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { force: true, recursive: true });
 });
 
 async function startDev(
   options: Partial<ConstructorParameters<typeof DevServer>[0]> = {}
 ): Promise<{ sdk: Sdk; url: string }> {
   server = new DevServer({
-    root,
-    port: 0,
     globalOpts: {},
+    port: 0,
+    root,
     watch: false,
     ...options,
   });
   const info = await server.start();
-  return { url: info.url, sdk: await sdkFor(`${info.url}/v1`) };
+  return { sdk: await sdkFor(`${info.url}/v1`), url: info.url };
 }
 
 describe("router", () => {
@@ -68,8 +68,8 @@ describe("router", () => {
     expect(
       compilePath("/blob/object/{bucket}/*")("/blob/object/docs/a/b.txt")
     ).toEqual({
-      bucket: "docs",
       "*": "a/b.txt",
+      bucket: "docs",
     });
     expect(compilePath(NUMERIC_ID)("/x/42")).toEqual({ id: "42" });
   });
@@ -77,14 +77,14 @@ describe("router", () => {
   it("honours `times` and route order", () => {
     const router = new Router([
       {
+        handler: () => new Response("first"),
         method: "GET",
         path: "/a",
         times: 1,
-        handler: () => new Response("first"),
       },
-      { method: "GET", path: "/a", handler: () => new Response("second") },
+      { handler: () => new Response("second"), method: "GET", path: "/a" },
     ]);
-    expect(router.match("get", "/a")?.route.handler).toBeDefined();
+    expect(router.match("get", "/a")).toBeDefined();
     const again = router.match("GET", "/v1/a");
     expect(again).toBeDefined();
     expect(router.match("POST", "/a")).toBeUndefined();
@@ -107,7 +107,7 @@ describe("frontal dev server", () => {
     expect(res.headers.get("x-request-id")).toMatch(DEV_REQUEST_ID);
     expect(await res.json()).toMatchObject({
       ok: true,
-      services: { ai: "local", agents: "local", graph: "local" },
+      services: { agents: "local", ai: "local", graph: "local" },
     });
   });
 
@@ -181,8 +181,8 @@ describe("frontal dev server", () => {
       .create({ name: "ACME", tier: 3 });
     await sdk.graph.use("customer").create({ name: "Globex", tier: 1 });
     const byName = await sdk.graph.query({
-      entityType: "customer",
       conditions: { name: "ACME" },
+      entityType: "customer",
     });
     expect(byName.data.map((e) => e.id)).toEqual([acme.id]);
     const byTier = await sdk.graph
@@ -196,9 +196,9 @@ describe("frontal dev server", () => {
 
     await sdk.blob.upload({
       bucket: "docs",
-      key: "a/hello.txt",
-      data: Buffer.from("hello"),
       contentType: "text/plain",
+      data: Buffer.from("hello"),
+      key: "a/hello.txt",
     });
     expect(
       await (
@@ -212,10 +212,10 @@ describe("frontal dev server", () => {
     await sdk.blob.delete({ bucket: "docs", key: "a/hello.txt" });
 
     const logs = await sdk.observability.logs.query({
+      limit: 5,
       query: "blob",
       timeFrom: "-1h",
       timeTo: "now",
-      limit: 5,
     });
     expect(logs.data.length).toBeGreaterThan(0);
     expect((logs.data[0] as { message: string }).message).toContain(
@@ -252,20 +252,20 @@ describe("frontal dev server", () => {
       JSON.stringify({
         routes: [
           {
-            method: "GET",
-            path: "/agents",
-            times: 1,
-            status: 503,
             body: {
               code: "SERVICE_UNAVAILABLE",
               message: "down",
               requestId: "req_scn",
             },
+            method: "GET",
+            path: "/agents",
+            status: 503,
+            times: 1,
           },
           {
+            body: { allowed: false, reason: "frozen" },
             method: "POST",
             path: "/access/check",
-            body: { allowed: false, reason: "frozen" },
           },
         ],
       })
@@ -277,30 +277,30 @@ describe("frontal dev server", () => {
     expect((await sdk.agents.list()).data).toEqual([]);
     expect(
       await sdk.governance.access.check({
-        userId: "u",
-        roleNames: ["dev"],
         action: "deploy",
+        roleNames: ["dev"],
+        userId: "u",
       })
     ).toMatchObject({ allowed: false, reason: "frozen" });
   });
 
   it("rejects unknown scenarios and services with fix hints", async () => {
     server = new DevServer({
-      root,
-      port: 0,
       globalOpts: {},
-      watch: false,
+      port: 0,
+      root,
       scenario: "missing",
+      watch: false,
     });
     await expect(server.start()).rejects.toMatchObject({
       code: "SCENARIO_NOT_FOUND",
     });
     server = new DevServer({
-      root,
-      port: 0,
       globalOpts: {},
-      watch: false,
+      port: 0,
       remote: ["nope"],
+      root,
+      watch: false,
     });
     await expect(server.start()).rejects.toThrow(UNKNOWN_SERVICE);
   });
@@ -308,28 +308,28 @@ describe("frontal dev server", () => {
   it("proxies --remote services through the SDK and keeps the rest local", async () => {
     const upstream = createMockFetch([
       {
-        method: "GET",
-        path: "/workflows",
         body: {
           data: [{ id: "wf_1", name: "remote" }],
           pagination: { cursor: "c", has_more: false },
         },
         headers: { "x-request-id": "req_upstream" },
+        method: "GET",
+        path: "/workflows",
       },
-      { method: "POST", path: "/workflows/search", body: { results: ["r"] } },
+      { body: { results: ["r"] }, method: "POST", path: "/workflows/search" },
       { method: "DELETE", path: "/workflows/wf_1", status: 204 },
       {
+        body: { code: "NOT_FOUND", message: "gone", requestId: "req_404" },
         method: "GET",
         path: "/workflows/missing",
         status: 404,
-        body: { code: "NOT_FOUND", message: "gone", requestId: "req_404" },
       },
     ] satisfies MockRoute[]);
     const sdkModule = await import("@/lib/sdk.js");
     vi.spyOn(sdkModule, "getSdk").mockImplementation(() =>
       sdkModule.createSdkHandle({
-        credential: { kind: "api-key", apiKey: "frt_remote_key_000000" },
         baseUrl: "https://api.test.frontal.dev/v1",
+        credential: { apiKey: "frt_remote_key_000000", kind: "api-key" },
         fetch: upstream.fetch,
         maxRetries: 0,
       })
@@ -337,8 +337,8 @@ describe("frontal dev server", () => {
 
     const { sdk, url } = await startDev({ remote: ["workflows"] });
     expect(server?.services).toMatchObject({
-      workflows: "remote",
       agents: "local",
+      workflows: "remote",
     });
 
     const page = await sdk.workflows.list();
@@ -391,9 +391,9 @@ describe("frontal dev server", () => {
     writeFileSync(file, JSON.stringify({ routes: [] }));
     const reloads: string[] = [];
     const { url } = await startDev({
+      onReload: (info) => reloads.push(info.reason),
       scenario: "live",
       watch: true,
-      onReload: (info) => reloads.push(info.reason),
     });
     expect((await (await fetch(`${url}/v1/agents/health`)).json()).status).toBe(
       "ok"
@@ -404,17 +404,17 @@ describe("frontal dev server", () => {
       JSON.stringify({
         routes: [
           {
+            body: { status: "scenario" },
             method: "GET",
             path: "/agents/health",
-            body: { status: "scenario" },
           },
         ],
       })
     );
     // fs.watch latency varies by platform/load; the polling fallback fires within ~300ms.
     await vi.waitFor(() => expect(reloads).toContain("live.json"), {
-      timeout: 8000,
       interval: 100,
+      timeout: 8000,
     });
     expect((await (await fetch(`${url}/v1/agents/health`)).json()).status).toBe(
       "scenario"

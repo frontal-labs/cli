@@ -123,11 +123,11 @@ export async function generateTypes(options: {
   }
 
   return {
-    out,
     changed,
+    out,
+    secrets: [...config.secrets.required].sort(),
     services: Object.keys(config.services).sort(),
     vars: Object.keys(config.vars).sort(),
-    secrets: [...config.secrets.required].sort(),
   };
 }
 

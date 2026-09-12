@@ -24,19 +24,19 @@ beforeEach(() => {
   writeFileSync(
     join(root, "frontal.jsonc"),
     JSON.stringify({
-      name: "envapp",
-      env: "dev",
       apiUrl: "https://api.test.frontal.dev/v1",
+      env: "dev",
+      name: "envapp",
+      secrets: { required: ["FRONTAL_API_KEY", "OPENAI_API_KEY"] },
       services: { agents: {} },
       vars: { LOG_LEVEL: "info", REGION: "eu" },
-      secrets: { required: ["FRONTAL_API_KEY", "OPENAI_API_KEY"] },
     })
   );
   vi.spyOn(process, "cwd").mockReturnValue(root);
 });
 
 afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { force: true, recursive: true });
 });
 
 describe("buildEnvFile", () => {
@@ -46,17 +46,17 @@ describe("buildEnvFile", () => {
     );
     const built = buildEnvFile({
       config,
-      existing: { OPENAI_API_KEY: "sk-keep", EXTRA: "x", LOG_LEVEL: "debug" },
       defaults: { FRONTAL_API_KEY: TEST_API_KEY },
+      existing: { EXTRA: "x", LOG_LEVEL: "debug", OPENAI_API_KEY: "sk-keep" },
     });
     const parsed = parseDotenv(built.content);
     expect(parsed).toEqual({
-      FRONTAL_API_URL: "https://api.test.frontal.dev/v1",
-      FRONTAL_API_KEY: TEST_API_KEY,
-      OPENAI_API_KEY: "sk-keep",
-      LOG_LEVEL: "info",
-      REGION: "eu",
       EXTRA: "x",
+      FRONTAL_API_KEY: TEST_API_KEY,
+      FRONTAL_API_URL: "https://api.test.frontal.dev/v1",
+      LOG_LEVEL: "info",
+      OPENAI_API_KEY: "sk-keep",
+      REGION: "eu",
     });
     expect(built.written).toEqual([
       "FRONTAL_API_URL",
@@ -67,7 +67,7 @@ describe("buildEnvFile", () => {
     expect(built.preserved).toEqual(["OPENAI_API_KEY", "EXTRA"]);
     expect(built.missing).toEqual([]);
 
-    const empty = buildEnvFile({ config, existing: {}, defaults: {} });
+    const empty = buildEnvFile({ config, defaults: {}, existing: {} });
     expect(empty.missing).toEqual(["FRONTAL_API_KEY", "OPENAI_API_KEY"]);
     expect(empty.content).toContain("FRONTAL_API_KEY=\n");
   });
@@ -92,8 +92,8 @@ describe("frontal env pull", () => {
       OPENAI_API_KEY: "",
     });
     expect(lastJson(result.stdout)).toMatchObject({
-      written: expect.arrayContaining(["FRONTAL_API_KEY", "LOG_LEVEL"]),
       missing: ["OPENAI_API_KEY"],
+      written: expect.arrayContaining(["FRONTAL_API_KEY", "LOG_LEVEL"]),
     });
     expect(result.stdout.join("\n")).not.toContain(TEST_API_KEY);
   });
@@ -114,9 +114,9 @@ describe("frontal env pull", () => {
     const forced = await runCli(["env", "pull", "--force", "--json"]);
     expect(forced.exitCode).toBe(0);
     expect(parseDotenv(readFileSync(file, "utf-8"))).toMatchObject({
-      OPENAI_API_KEY: "sk-mine",
       CUSTOM: "1",
       LOG_LEVEL: "info",
+      OPENAI_API_KEY: "sk-mine",
     });
     expect(lastJson(forced.stdout)).toMatchObject({
       preserved: expect.arrayContaining(["OPENAI_API_KEY", "CUSTOM"]),
@@ -178,27 +178,27 @@ describe("frontal env push", () => {
     mkdirSync(artifactDir, { recursive: true });
     writeFileSync(join(artifactDir, "index.js"), "export default () => 'hi';");
     writeCurrentDeploy(root, {
+      artifactDir,
+      createdAt: new Date().toISOString(),
+      entrypoint: "index.js",
+      env: "dev",
       id: "dep_1",
       name: "envapp-preview",
-      env: "dev",
+      sha: "abc",
       target: "preview",
       url: "https://api.test.frontal.dev/v1/workers/envapp-preview",
-      entrypoint: "index.js",
-      artifactDir,
-      sha: "abc",
-      createdAt: new Date().toISOString(),
     });
     writeFileSync(
       join(root, ".env.local"),
       `FRONTAL_API_KEY=${TEST_API_KEY}\nFRONTAL_API_URL=https://api.test.frontal.dev/v1\nOPENAI_API_KEY=sk-secret-value\nLOG_LEVEL=debug\n`
     );
     const mock = await mockApi([
-      { method: "GET", path: "/auth/account/profile", body: { id: "usr_1" } },
+      { body: { id: "usr_1" }, method: "GET", path: "/auth/account/profile" },
       {
+        body: { name: "envapp-preview" },
         method: "POST",
         path: "/workers",
         status: 201,
-        body: { name: "envapp-preview" },
       },
     ]);
 
@@ -211,14 +211,14 @@ describe("frontal env push", () => {
     // top-level keys back, but leaves the exact env var names alone).
     const body = deploy.body as { envVars: Record<string, string> };
     expect(deploy.body).toMatchObject({
-      name: "envapp-preview",
-      entrypoint: "index.js",
       code: "export default () => 'hi';",
+      entrypoint: "index.js",
+      name: "envapp-preview",
     });
     expect(body.envVars).toEqual({
       LOG_LEVEL: "debug",
-      REGION: "eu",
       OPENAI_API_KEY: "sk-secret-value",
+      REGION: "eu",
     });
     expect(body.envVars.FRONTAL_API_KEY).toBeUndefined();
     expect(lastJson(result.stdout)).toMatchObject({

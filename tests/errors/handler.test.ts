@@ -87,14 +87,14 @@ describe("classifyError", () => {
 
   it("maps CliError with its own exit code and fix", () => {
     const err = new CliError("NO_CREDENTIALS", "none", {
-      fix: "login",
       exitCode: EXIT_CODES.AUTH_ERROR,
+      fix: "login",
     });
     expect(classifyError(err)).toMatchObject({
       code: "NO_CREDENTIALS",
-      fix: "login",
-      exitCode: EXIT_CODES.AUTH_ERROR,
       docs: "https://frontal.dev/docs/cli/errors#no-credentials",
+      exitCode: EXIT_CODES.AUTH_ERROR,
+      fix: "login",
     });
   });
 

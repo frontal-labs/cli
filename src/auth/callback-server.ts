@@ -7,9 +7,9 @@ interface CallbackResult {
 }
 
 interface CallbackServer {
-  close(): void;
+  close: () => void;
   port: number;
-  waitForCode(): Promise<CallbackResult>;
+  waitForCode: () => Promise<CallbackResult>;
 }
 
 const SUCCESS_HTML = `<!DOCTYPE html>
@@ -103,9 +103,9 @@ export function startCallbackServer(opts?: {
       }, timeout);
 
       resolveStart({
+        close: () => cleanup(),
         port: addr.port,
         waitForCode: () => codePromise,
-        close: () => cleanup(),
       });
     });
 

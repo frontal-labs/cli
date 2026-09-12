@@ -22,11 +22,11 @@ let root: string;
 let server: DevServer | undefined;
 
 const workersRoute = {
+  body: { name: "x" },
+  headers: { "x-request-id": "req_deploy" },
   method: "POST",
   path: "/workers",
   status: 201,
-  body: { name: "x" },
-  headers: { "x-request-id": "req_deploy" },
 };
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ beforeEach(() => {
 afterEach(async () => {
   await server?.stop();
   server = undefined;
-  rmSync(join(root, ".."), { recursive: true, force: true });
+  rmSync(join(root, ".."), { force: true, recursive: true });
 });
 
 describe("helpers", () => {
@@ -68,7 +68,7 @@ describe("helpers", () => {
     });
     const snapshot = snapshotStateSchema(root);
     expect(snapshot).toEqual({
-      agents: { records: 1, fields: ["id", "name", "tags"] },
+      agents: { fields: ["id", "name", "tags"], records: 1 },
     });
     expect(JSON.stringify(snapshot)).not.toContain("secret-name");
   });
@@ -110,21 +110,19 @@ describe("frontal deploy", () => {
     expect(result.exitCode).toBe(0);
     const request = mock.expectCalled("POST", "/workers");
     expect(request.body).toMatchObject({
-      name: "app-preview",
       entrypoint: "index.js",
       envVars: {},
+      name: "app-preview",
     });
     expect(String((request.body as { code: string }).code)).toContain("hi");
-    const record = (
-      lastJson(result.stdout) as {
-        record: {
-          url: string;
-          sha: string;
-          artifactDir: string;
-          requestId: string;
-        };
-      }
-    ).record;
+    const { record } = lastJson(result.stdout) as {
+      record: {
+        url: string;
+        sha: string;
+        artifactDir: string;
+        requestId: string;
+      };
+    };
     expect(record.url).toBe(
       "https://api.test.frontal.dev/v1/workers/app-preview"
     );
@@ -172,9 +170,9 @@ describe("frontal promote / rollback", () => {
   it("promote re-sends the preview artifact under the prod name without rebuilding", async () => {
     const mock = await mockApi([workersRoute]);
     const preview = await runCli(["deploy", "--preview", "--json"]);
-    const record = (
-      lastJson(preview.stdout) as { record: { url: string; sha: string } }
-    ).record;
+    const { record } = lastJson(preview.stdout) as {
+      record: { url: string; sha: string };
+    };
     // Change the source afterwards: promote must ship the recorded artifact, not a new build.
     writeFileSync(
       join(root, "src", "lib.ts"),
@@ -186,18 +184,17 @@ describe("frontal promote / rollback", () => {
     expect(promoted.exitCode).toBe(0);
     const calls = mock.requests.filter((r) => r.path.endsWith("/workers"));
     expect(calls).toHaveLength(2);
-    expect(calls[1]?.body).toMatchObject({ name: "app" });
-    expect(String((calls[1]?.body as { code: string }).code)).not.toContain(
-      "changed"
-    );
+    const promoteCall = calls[1] as { body: { code: string; name: string } };
+    expect(promoteCall.body).toMatchObject({ name: "app" });
+    expect(promoteCall.body.code).not.toContain("changed");
     const prod = lastJson(promoted.stdout) as {
       target: string;
       sha: string;
       url: string;
     };
     expect(prod).toMatchObject({
-      target: "prod",
       sha: record.sha,
+      target: "prod",
       url: "https://api.test.frontal.dev/v1/workers/app",
     });
   });
@@ -222,7 +219,9 @@ describe("frontal promote / rollback", () => {
     const last = mock.requests
       .filter((r) => r.path.endsWith("/workers"))
       .at(-1);
-    expect(String((last?.body as { code: string }).code)).not.toContain("v2");
+    expect(
+      String((last as { body: { code: string } }).body.code)
+    ).not.toContain("v2");
   });
 
   it("also rolls back agents listed in frontal.jsonc", async () => {
@@ -236,15 +235,15 @@ describe("frontal promote / rollback", () => {
     const mock = await mockApi([
       workersRoute,
       {
+        body: { id: "agt_ok", version: 3 },
         method: "POST",
         path: "/agents/agt_ok/rollback",
-        body: { id: "agt_ok", version: 3 },
       },
       {
+        body: { code: "NOT_FOUND", message: "no agent", requestId: "req_a" },
         method: "POST",
         path: "/agents/agt_missing/rollback",
         status: 404,
-        body: { code: "NOT_FOUND", message: "no agent", requestId: "req_a" },
       },
     ]);
     await runCli(["deploy", "--prod", "--yes", "--json"]);
@@ -269,12 +268,10 @@ describe("frontal promote / rollback", () => {
     });
 
     const preview = await runCli(["deploy", "--preview", "--json"]);
-    const record = (
-      lastJson(preview.stdout) as {
-        record: { url: string; artifactDir: string };
-      }
-    ).record;
-    rmSync(record.artifactDir, { recursive: true, force: true });
+    const { record } = lastJson(preview.stdout) as {
+      record: { url: string; artifactDir: string };
+    };
+    rmSync(record.artifactDir, { force: true, recursive: true });
     const gone = await runCli(["promote", record.url, "--json"]);
     expect(gone.exitCode).toBe(5);
     expect(lastJson(gone.stderr).error).toMatchObject({
@@ -289,7 +286,7 @@ describe("frontal promote / rollback", () => {
 
   it("runs the whole loop against frontal dev", async () => {
     mkdirSync(join(root, ".frontal"), { recursive: true });
-    server = new DevServer({ root, port: 0, globalOpts: {}, watch: false });
+    server = new DevServer({ globalOpts: {}, port: 0, root, watch: false });
     const info = await server.start();
     const flags = [
       "--api-key",
@@ -301,8 +298,9 @@ describe("frontal promote / rollback", () => {
 
     const preview = await runCli(["deploy", "--preview", ...flags]);
     expect(preview.exitCode).toBe(0);
-    const url = (lastJson(preview.stdout) as { record: { url: string } }).record
-      .url;
+    const {
+      record: { url },
+    } = lastJson(preview.stdout) as { record: { url: string } };
     expect(url).toBe(`${info.url}/v1/workers/app-preview`);
     expect((await fetch(url)).status).toBe(200);
 

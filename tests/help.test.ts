@@ -39,6 +39,7 @@ describe("--help", () => {
     expect(leaves.length).toBeGreaterThan(20);
 
     for (const path of leaves) {
+      // biome-ignore lint/performance/noAwaitInLoops: runCli shares process state
       const result = await runCli([...path, "--help"]);
       expect(result.exitCode, path.join(" ")).toBe(0);
       expect(result.stdout.join("\n"), path.join(" ")).toContain("Examples:");

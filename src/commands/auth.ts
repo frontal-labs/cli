@@ -81,8 +81,7 @@ export function registerAuthCommands(program: Command): void {
           configManager.getActiveProfileName();
 
         const token = result.accessToken;
-        const refreshToken = result.refreshToken;
-        const expiresAt = result.expiresAt;
+        const { refreshToken, expiresAt } = result;
 
         configManager.setProfile(profileName, {
           ...(typeof token === "string" ? { accessToken: token } : {}),
@@ -125,11 +124,11 @@ export function registerAuthCommands(program: Command): void {
           cmd.optsWithGlobals().profile ??
           configManager.getActiveProfileName();
         configManager.setProfile(profileName, {
-          apiKey: undefined,
           accessToken: undefined,
+          apiKey: undefined,
+          authUrl: undefined,
           refreshToken: undefined,
           tokenExpiresAt: undefined,
-          authUrl: undefined,
         });
 
         if (!(cmd.optsWithGlobals().json as boolean)) {
@@ -159,18 +158,18 @@ export function registerAuthCommands(program: Command): void {
           }
 
           const status: Record<string, unknown> = {
-            profile: config.profileName,
             authMethod,
-            hasApiKey: Boolean(config.apiKey),
+            authUrl: config.authUrl,
+            baseUrl: config.baseUrl,
             hasAccessToken: Boolean(config.accessToken),
+            hasApiKey: Boolean(config.apiKey),
+            profile: config.profileName,
             tokenExpired: config.tokenExpiresAt
               ? isTokenExpired(config.tokenExpiresAt, 0)
               : undefined,
             tokenExpiry: config.tokenExpiresAt
               ? new Date(config.tokenExpiresAt * 1000).toISOString()
               : undefined,
-            authUrl: config.authUrl,
-            baseUrl: config.baseUrl,
           };
 
           if (authMethod !== "none" && !opts.local) {
@@ -198,8 +197,8 @@ export function registerAuthCommands(program: Command): void {
 
         if (!config.apiKey) {
           throw new CliError("NO_CREDENTIALS", "No credentials configured.", {
-            fix: "Run `frontal auth login` or set FRONTAL_API_KEY.",
             exitCode: EXIT_CODES.AUTH_ERROR,
+            fix: "Run `frontal auth login` or set FRONTAL_API_KEY.",
           });
         }
 
@@ -221,8 +220,8 @@ export function registerAuthCommands(program: Command): void {
             "NO_REFRESH_TOKEN",
             "No OAuth tokens to refresh.",
             {
-              fix: "Run `frontal auth login` to start a browser session.",
               exitCode: EXIT_CODES.AUTH_ERROR,
+              fix: "Run `frontal auth login` to start a browser session.",
             }
           );
         }
@@ -239,8 +238,8 @@ export function registerAuthCommands(program: Command): void {
         });
 
         fmt.object({
-          refreshed: true,
           expiresAt: new Date(tokens.expiresAt * 1000).toISOString(),
+          refreshed: true,
         });
       })
     );
@@ -350,19 +349,20 @@ async function loginWithApiKey(
 
   // Validate the key against the account endpoint before persisting it.
   const { frontal } = await createSdkHandle({
-    credential: { kind: "api-key", apiKey },
     baseUrl,
+    credential: { apiKey, kind: "api-key" },
     maxRetries: 0,
   });
   try {
     await frontal.auth.account.getProfile();
   } catch (err) {
     if (err instanceof Error && err.name === "UnauthorizedError") {
+      // biome-ignore lint/style/useErrorCause: cause is forwarded through CliError options
       throw new CliError("INVALID_API_KEY", "The API key was rejected.", {
-        fix: "Create a key in the Frontal dashboard and make sure it starts with frt_.",
-        exitCode: EXIT_CODES.AUTH_ERROR,
-        requestId: (err as { requestId?: string }).requestId,
         cause: err,
+        exitCode: EXIT_CODES.AUTH_ERROR,
+        fix: "Create a key in the Frontal dashboard and make sure it starts with frt_.",
+        requestId: (err as { requestId?: string }).requestId,
       });
     }
     // Any other failure (network, missing scope) should not block saving.
@@ -429,17 +429,17 @@ async function loginWithBrowser(
     const tokens = await exchangeCode({
       authUrl,
       code: result.code,
-      redirectUri,
       codeVerifier,
+      redirectUri,
     });
 
     const expiry = decodeTokenExpiry(tokens.accessToken);
 
     configManager.setProfile(profileName, {
       accessToken: tokens.accessToken,
+      authUrl,
       refreshToken: tokens.refreshToken,
       tokenExpiresAt: expiry ?? tokens.expiresAt,
-      authUrl,
     });
     configManager.setActiveProfile(profileName);
 

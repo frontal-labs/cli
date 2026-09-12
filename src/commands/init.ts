@@ -53,17 +53,17 @@ FRONTAL_API_URL=${DEFAULT_BASE_URL}
 function renderPackageJson(name: string): string {
   return `${JSON.stringify(
     {
-      name,
-      version: "0.1.0",
-      private: true,
-      type: "module",
-      scripts: {
-        dev: "frontal dev",
-        types: "frontal types",
-        deploy: "frontal deploy --preview",
-      },
       dependencies: { "@frontal-labs/sdk": "^1.0.4" },
       devDependencies: { "frontal-cli": `^${VERSION}` },
+      name,
+      private: true,
+      scripts: {
+        deploy: "frontal deploy --preview",
+        dev: "frontal dev",
+        types: "frontal types",
+      },
+      type: "module",
+      version: "0.1.0",
     },
     null,
     2
@@ -83,19 +83,19 @@ export function initProject(cwd: string, options: InitOptions): InitResult {
       "INVALID_PROJECT_NAME",
       `Invalid project name "${name}".`,
       {
-        fix: "Use lowercase letters, digits and dashes, e.g. --name my-app.",
         exitCode: EXIT_CODES.VALIDATION_ERROR,
+        fix: "Use lowercase letters, digits and dashes, e.g. --name my-app.",
       }
     );
   }
 
   const result: InitResult = {
-    dir,
-    name,
     created: [],
-    updated: [],
-    skipped: [],
+    dir,
     kept: [],
+    name,
+    skipped: [],
+    updated: [],
   };
   mkdirSync(dir, { recursive: true });
 
@@ -125,13 +125,13 @@ export function initProject(cwd: string, options: InitOptions): InitResult {
   });
   writeFile(".env.example", renderEnvExample(), { overwrite: force });
   writeFile(join("src", ".gitkeep"), "", {
-    overwrite: false,
     forceable: false,
+    overwrite: false,
   });
   // package.json is only ever created, never replaced (even with --force).
   writeFile("package.json", renderPackageJson(name), {
-    overwrite: false,
     forceable: false,
+    overwrite: false,
   });
 
   const gitignore = join(dir, ".gitignore");

@@ -4,11 +4,11 @@ import { lastJson, mockApi, runCli } from "../helpers/cli.js";
 describe("frontal events", () => {
   it("list/get/query/usage/reprocess hit the public /events endpoints", async () => {
     const mock = await mockApi([
-      { method: "GET", path: "/events/evt_1", body: { id: "evt_1" } },
-      { method: "GET", path: "/events", body: { data: [], pagination: {} } },
-      { method: "POST", path: "/events/query", body: { data: [] } },
-      { method: "POST", path: "/events/usage", body: { accepted: true } },
-      { method: "POST", path: "/events/reprocess", body: { queued: 1 } },
+      { body: { id: "evt_1" }, method: "GET", path: "/events/evt_1" },
+      { body: { data: [], pagination: {} }, method: "GET", path: "/events" },
+      { body: { data: [] }, method: "POST", path: "/events/query" },
+      { body: { accepted: true }, method: "POST", path: "/events/usage" },
+      { body: { queued: 1 }, method: "POST", path: "/events/reprocess" },
     ]);
 
     const list = await runCli(["events", "list", "--limit", "3", "--json"]);
@@ -54,8 +54,8 @@ describe("frontal events", () => {
 describe("frontal runs / invocations", () => {
   it("runs list and create", async () => {
     const mock = await mockApi([
-      { method: "GET", path: "/runs", body: { data: [] } },
-      { method: "POST", path: "/runs", status: 201, body: { id: "run_1" } },
+      { body: { data: [] }, method: "GET", path: "/runs" },
+      { body: { id: "run_1" }, method: "POST", path: "/runs", status: 201 },
     ]);
 
     const list = await runCli(["runs", "list", "--cursor", "c1", "--json"]);
@@ -78,10 +78,10 @@ describe("frontal runs / invocations", () => {
   it("invocations create posts to /invocations", async () => {
     const mock = await mockApi([
       {
+        body: { id: "inv_1" },
         method: "POST",
         path: "/invocations",
         status: 202,
-        body: { id: "inv_1" },
       },
     ]);
 
@@ -95,8 +95,8 @@ describe("frontal runs / invocations", () => {
 
     expect(result.exitCode).toBe(0);
     mock.expectCalledWith("POST", "/invocations", {
-      target: "agent_1",
       input: {},
+      target: "agent_1",
     });
   });
 });
@@ -105,13 +105,13 @@ describe("secret redaction in command output", () => {
   it("masks API keys and tokens returned by the API", async () => {
     await mockApi([
       {
-        method: "GET",
-        path: "/events/evt_1",
         body: {
-          id: "evt_1",
           api_key: "frt_live_do_not_leak_me",
+          id: "evt_1",
           note: "created with frt_live_do_not_leak_me",
         },
+        method: "GET",
+        path: "/events/evt_1",
       },
     ]);
 

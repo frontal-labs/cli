@@ -15,19 +15,19 @@ describe("ConfigManager", () => {
   });
 
   afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
+    rmSync(tmpDir, { force: true, recursive: true });
   });
 
   describe("load", () => {
     it("should load existing config file", () => {
       const testConfig = {
-        schemaVersion: 2,
         activeProfile: "default",
+        defaults: { outputFormat: "table", paginationLimit: 25 },
         profiles: {
           default: { apiKey: "test-key" },
         },
+        schemaVersion: 2,
         telemetry: { enabled: false },
-        defaults: { outputFormat: "table", paginationLimit: 25 },
       };
       mkdirSync(tmpDir, { recursive: true });
       writeFileSync(configPath, JSON.stringify(testConfig));
@@ -46,11 +46,11 @@ describe("ConfigManager", () => {
   describe("save", () => {
     it("should save config to file", () => {
       const testConfig = {
-        schemaVersion: 2,
         activeProfile: "default",
-        profiles: {},
-        telemetry: { enabled: false },
         defaults: { outputFormat: "table", paginationLimit: 25 },
+        profiles: {},
+        schemaVersion: 2,
+        telemetry: { enabled: false },
       };
 
       configManager.save(testConfig);
@@ -63,13 +63,13 @@ describe("ConfigManager", () => {
   describe("getProfile", () => {
     it("should return existing profile", () => {
       configManager.save({
-        schemaVersion: 2,
         activeProfile: "custom",
+        defaults: {},
         profiles: {
           custom: { baseUrl: "https://api.test.com" },
         },
+        schemaVersion: 2,
         telemetry: { enabled: false },
-        defaults: {},
       });
 
       const profile = configManager.getProfile("custom");
@@ -78,11 +78,11 @@ describe("ConfigManager", () => {
 
     it("should return empty object when profile doesn't exist", () => {
       configManager.save({
-        schemaVersion: 2,
         activeProfile: "default",
-        profiles: {},
-        telemetry: { enabled: false },
         defaults: {},
+        profiles: {},
+        schemaVersion: 2,
+        telemetry: { enabled: false },
       });
 
       const profile = configManager.getProfile("nonexistent");
@@ -93,11 +93,11 @@ describe("ConfigManager", () => {
   describe("setProfile", () => {
     it("should update existing profile", () => {
       configManager.save({
-        schemaVersion: 2,
         activeProfile: "default",
-        profiles: { default: {} },
-        telemetry: { enabled: false },
         defaults: {},
+        profiles: { default: {} },
+        schemaVersion: 2,
+        telemetry: { enabled: false },
       });
 
       configManager.setProfile("default", { baseUrl: "https://new.api.com" });
@@ -110,11 +110,11 @@ describe("ConfigManager", () => {
   describe("deleteProfile", () => {
     it("should delete existing profile", () => {
       configManager.save({
-        schemaVersion: 2,
         activeProfile: "default",
-        profiles: { profile1: { apiKey: "key" }, default: {} },
-        telemetry: { enabled: false },
         defaults: {},
+        profiles: { default: {}, profile1: { apiKey: "key" } },
+        schemaVersion: 2,
+        telemetry: { enabled: false },
       });
 
       configManager.deleteProfile("profile1");
@@ -127,15 +127,18 @@ describe("ConfigManager", () => {
   describe("listProfiles", () => {
     it("should return list of profile names", () => {
       configManager.save({
-        schemaVersion: 2,
         activeProfile: "default",
-        profiles: { default: {}, staging: {} },
-        telemetry: { enabled: false },
         defaults: {},
+        profiles: { default: {}, staging: {} },
+        schemaVersion: 2,
+        telemetry: { enabled: false },
       });
 
       const profiles = configManager.listProfiles();
-      expect(profiles.sort()).toEqual(["default", "staging"]);
+      expect(profiles.sort((a, b) => a.localeCompare(b))).toEqual([
+        "default",
+        "staging",
+      ]);
     });
   });
 });

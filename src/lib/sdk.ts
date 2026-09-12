@@ -64,10 +64,10 @@ const DEBUG_VALUES = new Set(["true", "false", "1", "0"]);
 const ENV_TO_SDK_ENVIRONMENT: Record<string, string> = {
   dev: "development",
   development: "development",
-  test: "test",
-  staging: "staging",
   prod: "production",
   production: "production",
+  staging: "staging",
+  test: "test",
 };
 
 let sdkModulePromise: Promise<SdkModule> | undefined;
@@ -79,7 +79,7 @@ let coreModulePromise: Promise<CoreModule> | undefined;
  * so strip anything the SDK would reject before loading it.
  */
 export function sanitizeSdkEnv(): void {
-  const env = process.env;
+  const { env } = process;
   // Assigning `undefined` stores the string "undefined"; delete instead.
   const drop = (key: string) => Reflect.deleteProperty(env, key);
 
@@ -87,7 +87,7 @@ export function sanitizeSdkEnv(): void {
     drop("FRONTAL_ENV");
   }
   if (env.FRONTAL_API_KEY !== undefined) {
-    const key = env.FRONTAL_API_KEY;
+    const { FRONTAL_API_KEY: key } = env;
     if (key.length < 9 || key.length > 128 || !API_KEY_PATTERN.test(key)) {
       drop("FRONTAL_API_KEY");
     }
@@ -102,8 +102,7 @@ export function sanitizeSdkEnv(): void {
 
 function isUrl(value: string): boolean {
   try {
-    new URL(value);
-    return true;
+    return Boolean(new URL(value));
   } catch {
     return false;
   }
@@ -129,19 +128,18 @@ export function resolveCredential(
   config: ResolvedConfig
 ): Credential | undefined {
   if (config.apiKey) {
-    return { kind: "api-key", apiKey: config.apiKey };
+    return { apiKey: config.apiKey, kind: "api-key" };
   }
   if (config.accessToken) {
     return {
-      kind: "oauth",
       accessToken: config.accessToken,
-      refreshToken: config.refreshToken,
-      expiresAt: config.tokenExpiresAt,
       authUrl: config.authUrl,
+      expiresAt: config.tokenExpiresAt,
+      kind: "oauth",
       profileName: config.profileName,
+      refreshToken: config.refreshToken,
     };
   }
-  return;
 }
 
 export function mapEnvironment(env: string | undefined): string {
@@ -200,8 +198,8 @@ export function createAuthFetch(
         "TOKEN_EXPIRED",
         "Your session has expired and cannot be refreshed.",
         {
-          fix: "Run `frontal auth login` to sign in again.",
           exitCode: EXIT_CODES.AUTH_ERROR,
+          fix: "Run `frontal auth login` to sign in again.",
         }
       );
     }
@@ -212,8 +210,8 @@ export function createAuthFetch(
     session = {
       ...session,
       accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken ?? session.refreshToken,
       expiresAt: tokens.expiresAt,
+      refreshToken: tokens.refreshToken ?? session.refreshToken,
     };
     configManager.setProfile(session.profileName, {
       accessToken: tokens.accessToken,
@@ -299,18 +297,18 @@ export async function getSdk(
 
   if (!credential) {
     throw new CliError("NO_CREDENTIALS", "No credentials configured.", {
-      fix: "Run `frontal auth login`, or set FRONTAL_API_KEY (or pass --api-key).",
       exitCode: EXIT_CODES.AUTH_ERROR,
+      fix: "Run `frontal auth login`, or set FRONTAL_API_KEY (or pass --api-key).",
     });
   }
 
   return await createSdkHandle({
-    credential,
     baseUrl: config.baseUrl,
-    environment: mapEnvironment(globalOpts.env ?? process.env.FRONTAL_ENV),
+    credential,
     debug: config.debug,
-    verbose: Boolean(globalOpts.verbose || process.env.FRONTAL_DEBUG === "1"),
+    environment: mapEnvironment(globalOpts.env ?? process.env.FRONTAL_ENV),
     signal: options.signal,
+    verbose: Boolean(globalOpts.verbose || process.env.FRONTAL_DEBUG === "1"),
   });
 }
 
@@ -338,10 +336,10 @@ export async function createSdkHandle(
 
   const authFetch = createAuthFetch(input.credential, {
     fetch: input.fetch,
-    signal: input.signal,
     onRequestId: (id) => {
       handle.lastRequestId = id;
     },
+    signal: input.signal,
   });
 
   const apiKey = apiKeyFor(input.credential);
@@ -350,28 +348,28 @@ export async function createSdkHandle(
   const parsed = core.clientConfigSchema.safeParse({
     apiKey,
     baseUrl: input.baseUrl,
-    environment: input.environment ?? "production",
     debug: input.debug ?? false,
-    headers: { "X-Frontal-Cli": VERSION },
+    environment: input.environment ?? "production",
     fetch: authFetch,
+    headers: { "X-Frontal-Cli": VERSION },
     ...(input.timeout === undefined ? {} : { timeout: input.timeout }),
     ...(input.maxRetries === undefined ? {} : { maxRetries: input.maxRetries }),
     ...(logger ? { logger } : {}),
   });
 
   if (!parsed.success) {
-    const issue = parsed.error.issues[0];
+    const [issue] = parsed.error.issues;
     const field = issue?.path.join(".") || "config";
     throw new CliError(
       "CONFIG_INVALID",
       `Invalid SDK configuration (${field}): ${issue?.message ?? "unknown"}`,
       {
+        cause: parsed.error,
+        exitCode: EXIT_CODES.CONFIG_ERROR,
         fix:
           field === "apiKey"
             ? "API keys must start with `frt_`. Check FRONTAL_API_KEY, --api-key or your profile."
             : "Check --api-url / FRONTAL_API_URL and your profile settings with `frontal config list`.",
-        exitCode: EXIT_CODES.CONFIG_ERROR,
-        cause: parsed.error,
       }
     );
   }
@@ -398,6 +396,10 @@ function apiKeyFor(credential: Credential): string {
 
 function createVerboseLogger() {
   return {
+    error: (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(theme.dim(`✗ ${redactString(message)}`));
+    },
     request: (method: unknown, url: unknown) => {
       console.error(theme.dim(`→ ${String(method)} ${String(url)}`));
     },
@@ -408,10 +410,6 @@ function createVerboseLogger() {
           theme.dim(`← ${res.status} ${res.url}${id ? ` (${id})` : ""}`)
         );
       }
-    },
-    error: (err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(theme.dim(`✗ ${redactString(message)}`));
     },
   };
 }

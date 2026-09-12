@@ -20,11 +20,11 @@ export interface LogsOptions {
 
 const DURATION = /^(\d+)(ms|s|m|h|d)$/;
 const UNIT_MS: Record<string, number> = {
+  d: 86_400_000,
+  h: 3_600_000,
+  m: 60_000,
   ms: 1,
   s: 1000,
-  m: 60_000,
-  h: 3_600_000,
-  d: 86_400_000,
 };
 const FRACTIONAL_SECONDS = /\.\d+Z$/;
 const DEFAULT_SINCE = "15m";
@@ -43,18 +43,18 @@ export function sinceToIso(since: string, now = Date.now()): string {
   const parsed = Date.parse(since);
   if (Number.isNaN(parsed)) {
     throw new CliError("INVALID_SINCE", `Invalid --since value "${since}".`, {
-      fix: "Use a duration like 15m, 2h, 1d or an ISO-8601 timestamp.",
       exitCode: EXIT_CODES.VALIDATION_ERROR,
+      fix: "Use a duration like 15m, 2h, 1d or an ISO-8601 timestamp.",
     });
   }
   return new Date(parsed).toISOString();
 }
 
 const LEVEL_COLORS: Record<string, (s: string) => string> = {
+  debug: theme.dim,
   error: theme.error,
   warn: theme.warn,
   warning: theme.warn,
-  debug: theme.dim,
 };
 
 export function formatLogLine(entry: Obj): string {
@@ -114,12 +114,12 @@ export async function queryLogs(
   const { frontal, lastRequestId } = await ctx.sdk();
   const query = opts.filter ?? (await defaultQuery(ctx));
   const page = await frontal.observability.logs.query({
-    query,
-    timeFrom: sinceToIso(opts.since ?? DEFAULT_SINCE),
-    timeTo: new Date().toISOString(),
     level: opts.level,
     limit: opts.limit ? Number(opts.limit) : DEFAULT_LIMIT,
     order: "asc",
+    query,
+    timeFrom: sinceToIso(opts.since ?? DEFAULT_SINCE),
+    timeTo: new Date().toISOString(),
   });
 
   const entries = (page.data as Obj[]).filter((entry) =>
@@ -177,7 +177,7 @@ async function consumeStream(
       state.timeFrom = entry.timestamp;
     }
     if (json) {
-      emitJsonLine({ type: event.type, id: event.id, ...entry });
+      emitJsonLine({ id: event.id, type: event.type, ...entry });
     } else {
       console.log(formatLogLine(redact(entry) as Obj));
     }
@@ -191,7 +191,7 @@ function reportReconnect(
   delay: number
 ): void {
   if (ctx.globalOpts.json) {
-    emitJsonLine({ type: "reconnect", attempt, delayMs: delay, code });
+    emitJsonLine({ attempt, code, delayMs: delay, type: "reconnect" });
   } else if (!ctx.globalOpts.quiet) {
     console.error(
       theme.warn(`stream error (${code}); reconnecting in ${delay}ms`)
@@ -230,6 +230,7 @@ export async function followLogs(
         ...(opts.level ? { level: opts.level } : {}),
       } as Parameters<typeof frontal.observability.logs.stream>[0]);
       state.attempt = 0;
+      // biome-ignore lint/performance/noAwaitInLoops: reconnect loop
       await consumeStream(ctx, stream, opts, state, signal);
       // Server closed the stream cleanly; reconnect immediately.
     } catch (err) {

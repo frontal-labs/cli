@@ -102,7 +102,7 @@ export class RemoteProxy {
         report.code,
         report.message,
         report.requestId ?? req.requestId,
-        { fix: report.fix, service, fields: report.fields }
+        { fields: report.fields, fix: report.fix, service }
       );
     }
   }
@@ -114,7 +114,7 @@ export class RemoteProxy {
     params: Record<string, string>
   ): Promise<Response> {
     const { http } = handle;
-    const path = req.path;
+    const { path } = req;
 
     switch (req.method) {
       case "GET": {
@@ -171,22 +171,22 @@ function passthrough(upstream: Response, requestId: string): Response {
   if (!headers.has("x-request-id")) {
     headers.set("x-request-id", requestId);
   }
-  return new Response(upstream.body, { status: upstream.status, headers });
+  return new Response(upstream.body, { headers, status: upstream.status });
 }
 
 function jsonResponse(result: unknown, requestId: string): Response {
   if (result === undefined) {
     return new Response(null, {
-      status: 204,
       headers: { "x-request-id": requestId },
+      status: 204,
     });
   }
   return new Response(JSON.stringify(result), {
-    status: 200,
     headers: {
       "content-type": "application/json",
       "x-request-id": requestId,
       [PROXY_HEADER]: "1",
     },
+    status: 200,
   });
 }

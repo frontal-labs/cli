@@ -61,8 +61,8 @@ function redactValue(value: unknown, seen: WeakSet<object>): unknown {
     const extra = redactValue({ ...value }, seen) as Record<string, unknown>;
     return {
       ...extra,
-      name: value.name,
       message: redactString(value.message),
+      name: value.name,
     };
   }
 

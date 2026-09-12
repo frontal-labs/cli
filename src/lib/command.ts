@@ -26,8 +26,8 @@ export async function runAction(
   let handle: SdkHandle | undefined;
 
   const ctx: CommandContext = {
-    globalOpts,
     fmt: Formatter.from(globalOpts),
+    globalOpts,
     sdk: async (options) => {
       if (options) {
         const dedicated = await getSdk(globalOpts, options);

@@ -44,7 +44,7 @@ function processSSELine(line: string, currentEvent: Partial<SSEEvent>): void {
 export async function* parseSSEStream(
   response: Response
 ): AsyncIterable<SSEEvent> {
-  const body = response.body;
+  const { body } = response;
   if (!body) {
     return;
   }
@@ -55,7 +55,8 @@ export async function* parseSSEStream(
   let currentEvent: Partial<SSEEvent> = {};
 
   try {
-    while (true) {
+    for (;;) {
+      // biome-ignore lint/performance/noAwaitInLoops: reading a stream is inherently sequential
       const { done, value } = await reader.read();
       if (done) {
         break;
@@ -69,9 +70,9 @@ export async function* parseSSEStream(
         if (line === "") {
           if (currentEvent.data !== undefined) {
             yield {
-              type: currentEvent.type ?? "message",
               data: currentEvent.data,
               id: currentEvent.id,
+              type: currentEvent.type ?? "message",
             };
           }
           currentEvent = {};
@@ -84,9 +85,9 @@ export async function* parseSSEStream(
 
     if (currentEvent.data !== undefined) {
       yield {
-        type: currentEvent.type ?? "message",
         data: currentEvent.data,
         id: currentEvent.id,
+        type: currentEvent.type ?? "message",
       };
     }
   } finally {

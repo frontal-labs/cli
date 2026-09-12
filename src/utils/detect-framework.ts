@@ -10,82 +10,82 @@ interface FrameworkDefaults {
 }
 
 export const FRAMEWORK_DEFAULTS: Record<Framework, FrameworkDefaults> = {
-  nextjs: {
-    build: "next build",
-    output: ".next",
-    dev: "next dev",
-    install: "npm install",
-  },
-  react: {
-    build: "react-scripts build",
-    output: "build",
-    dev: "react-scripts start",
-    install: "npm install",
-  },
-  vue: {
-    build: "vue-cli-service build",
-    output: "dist",
-    dev: "vue-cli-service serve",
-    install: "npm install",
-  },
-  svelte: {
-    build: "vite build",
-    output: "build",
-    dev: "vite dev",
-    install: "npm install",
-  },
   angular: {
     build: "ng build",
-    output: "dist",
     dev: "ng serve",
     install: "npm install",
+    output: "dist",
+  },
+  custom: { install: "npm install", output: "dist" },
+  gatsby: {
+    build: "gatsby build",
+    dev: "gatsby develop",
+    install: "npm install",
+    output: "public",
+  },
+  nextjs: {
+    build: "next build",
+    dev: "next dev",
+    install: "npm install",
+    output: ".next",
   },
   nuxt: {
     build: "nuxt build",
-    output: ".output",
     dev: "nuxt dev",
     install: "npm install",
+    output: ".output",
   },
-  gatsby: {
-    build: "gatsby build",
-    output: "public",
-    dev: "gatsby develop",
+  react: {
+    build: "react-scripts build",
+    dev: "react-scripts start",
     install: "npm install",
+    output: "build",
+  },
+  svelte: {
+    build: "vite build",
+    dev: "vite dev",
+    install: "npm install",
+    output: "build",
   },
   vite: {
     build: "vite build",
-    output: "dist",
     dev: "vite",
     install: "npm install",
+    output: "dist",
   },
-  custom: { output: "dist", install: "npm install" },
+  vue: {
+    build: "vue-cli-service build",
+    dev: "vue-cli-service serve",
+    install: "npm install",
+    output: "dist",
+  },
 };
 
 const CONFIG_FILE_MAP: { patterns: string[]; framework: Framework }[] = [
   {
-    patterns: ["next.config.js", "next.config.mjs", "next.config.ts"],
     framework: "nextjs",
+    patterns: ["next.config.js", "next.config.mjs", "next.config.ts"],
   },
-  { patterns: ["nuxt.config.ts", "nuxt.config.js"], framework: "nuxt" },
-  { patterns: ["angular.json"], framework: "angular" },
-  { patterns: ["svelte.config.js", "svelte.config.ts"], framework: "svelte" },
-  { patterns: ["gatsby-config.js", "gatsby-config.ts"], framework: "gatsby" },
-  { patterns: ["vue.config.js"], framework: "vue" },
+  { framework: "nuxt", patterns: ["nuxt.config.ts", "nuxt.config.js"] },
+  { framework: "angular", patterns: ["angular.json"] },
+  { framework: "svelte", patterns: ["svelte.config.js", "svelte.config.ts"] },
+  { framework: "gatsby", patterns: ["gatsby-config.js", "gatsby-config.ts"] },
+  { framework: "vue", patterns: ["vue.config.js"] },
   {
-    patterns: ["vite.config.ts", "vite.config.js", "vite.config.mjs"],
     framework: "vite",
+    patterns: ["vite.config.ts", "vite.config.js", "vite.config.mjs"],
   },
 ];
 
 const DEPENDENCY_MAP: { pkg: string; framework: Framework }[] = [
-  { pkg: "next", framework: "nextjs" },
-  { pkg: "react-scripts", framework: "react" },
-  { pkg: "@sveltejs/kit", framework: "svelte" },
-  { pkg: "@angular/core", framework: "angular" },
-  { pkg: "nuxt", framework: "nuxt" },
-  { pkg: "gatsby", framework: "gatsby" },
-  { pkg: "vue", framework: "vue" },
-  { pkg: "vite", framework: "vite" },
+  { framework: "nextjs", pkg: "next" },
+  { framework: "react", pkg: "react-scripts" },
+  { framework: "svelte", pkg: "@sveltejs/kit" },
+  { framework: "angular", pkg: "@angular/core" },
+  { framework: "nuxt", pkg: "nuxt" },
+  { framework: "gatsby", pkg: "gatsby" },
+  { framework: "vue", pkg: "vue" },
+  { framework: "vite", pkg: "vite" },
 ];
 
 export function detectFramework(dir: string): Framework | undefined {
@@ -117,6 +117,4 @@ export function detectFramework(dir: string): Framework | undefined {
       // Invalid package.json, skip
     }
   }
-
-  return;
 }

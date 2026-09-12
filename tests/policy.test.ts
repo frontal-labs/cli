@@ -11,27 +11,27 @@ let root: string;
 let server: DevServer | undefined;
 
 const profile: MockRoute = {
+  body: { id: "usr_1", roles: [{ name: "developer" }] },
   method: "GET",
   path: "/auth/account/profile",
-  body: { id: "usr_1", roles: [{ name: "developer" }] },
 };
 const activePolicies: MockRoute = {
-  method: "GET",
-  path: "/policies",
   body: {
     data: [{ id: "pol_1", name: "baseline" }],
     pagination: { cursor: "end", has_more: false },
   },
+  method: "GET",
+  path: "/policies",
 };
 const allow: MockRoute = {
+  body: { allowed: true },
   method: "POST",
   path: "/access/check",
-  body: { allowed: true },
 };
 const score = (value: number): MockRoute => ({
+  body: { score: value },
   method: "GET",
   path: "/compliance/score",
-  body: { score: value },
 });
 
 beforeEach(() => {
@@ -43,7 +43,7 @@ beforeEach(() => {
 afterEach(async () => {
   await server?.stop();
   server = undefined;
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { force: true, recursive: true });
 });
 
 describe("frontal policy check", () => {
@@ -69,10 +69,10 @@ describe("frontal policy check", () => {
     ]);
     expect(mock.callCount("POST", "/access/check")).toBe(3);
     mock.expectCalledWith("POST", "/access/check", {
-      userId: "usr_1",
-      roleNames: ["developer"],
       action: "deploy",
       resourceType: "agents",
+      roleNames: ["developer"],
+      userId: "usr_1",
     });
   });
 
@@ -81,9 +81,9 @@ describe("frontal policy check", () => {
       profile,
       activePolicies,
       {
+        body: { allowed: false, reason: "prod freeze" },
         method: "POST",
         path: "/access/check",
-        body: { allowed: false, reason: "prod freeze" },
       },
       score(95),
     ]);
@@ -102,9 +102,9 @@ describe("frontal policy check", () => {
     await mockApi([
       profile,
       {
+        body: { data: [], pagination: { cursor: "end", has_more: false } },
         method: "GET",
         path: "/policies",
-        body: { data: [], pagination: { cursor: "end", has_more: false } },
       },
       allow,
       score(40),
@@ -131,7 +131,7 @@ describe("frontal policy check", () => {
     writeFileSync(join(dir, "bad.rego"), "package x\n");
     writeFileSync(join(dir, "broken.json"), "{ nope");
     const mock = await mockApi([
-      { method: "POST", path: "/policies/validate", body: { valid: true } },
+      { body: { valid: true }, method: "POST", path: "/policies/validate" },
       activePolicies,
       allow,
       score(90),
@@ -159,8 +159,8 @@ describe("frontal policy check", () => {
       { definition: { deny: [] }, definitionFormat: "json_schema" },
     ]);
     mock.expectCalledWith("POST", "/access/check", {
-      userId: "usr_9",
       roleNames: ["admin", "ops"],
+      userId: "usr_9",
     });
     const report = lastJson(result.stdout) as {
       ruleResults: { ruleId: string; result: string; reason?: string }[];
@@ -173,8 +173,8 @@ describe("frontal policy check", () => {
       "pass"
     );
     expect(byId["policy-file:.frontal/policies/broken.json"]).toMatchObject({
-      result: "deny",
       reason: expect.stringContaining("not valid JSON"),
+      result: "deny",
     });
   });
 
@@ -186,19 +186,19 @@ describe("frontal policy check", () => {
       JSON.stringify({
         routes: [
           {
+            body: { allowed: false, reason: "frozen" },
             method: "POST",
             path: "/access/check",
-            body: { allowed: false, reason: "frozen" },
           },
         ],
       })
     );
     server = new DevServer({
-      root,
-      port: 0,
       globalOpts: {},
-      watch: false,
+      port: 0,
+      root,
       scenario: "deny",
+      watch: false,
     });
     const info = await server.start();
 

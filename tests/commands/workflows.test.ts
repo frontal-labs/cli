@@ -5,19 +5,19 @@ import { lastJson, mockApi, runCli, TEST_API_KEY } from "../helpers/cli.js";
 const HTTPS_URL = /^https:/;
 
 const workflow = {
+  created_at: "2026-01-01T00:00:00Z",
   id: "wf_1",
   name: "nightly",
   status: "active",
-  triggers: [{ type: "manual" }],
   steps: [],
-  created_at: "2026-01-01T00:00:00Z",
+  triggers: [{ type: "manual" }],
   updated_at: "2026-01-01T00:00:00Z",
 };
 
 describe("frontal workflows", () => {
   it("list calls GET /workflows through the SDK with pagination params", async () => {
     const mock = await mockApi([
-      { method: "GET", path: "/workflows", body: mockPageResponse([workflow]) },
+      { body: mockPageResponse([workflow]), method: "GET", path: "/workflows" },
     ]);
 
     const result = await runCli([
@@ -45,7 +45,7 @@ describe("frontal workflows", () => {
 
   it("create validates the definition with the SDK and posts it", async () => {
     const mock = await mockApi([
-      { method: "POST", path: "/workflows", status: 201, body: workflow },
+      { body: workflow, method: "POST", path: "/workflows", status: 201 },
     ]);
 
     const result = await runCli([
@@ -54,8 +54,8 @@ describe("frontal workflows", () => {
       "--body",
       JSON.stringify({
         name: "nightly",
+        steps: [{ config: {}, id: "s1", name: "run", type: "task" }],
         triggers: [{ type: "manual" }],
-        steps: [{ id: "s1", name: "run", type: "task", config: {} }],
       }),
       "--json",
     ]);
@@ -86,8 +86,8 @@ describe("frontal workflows", () => {
 
   it("search and batch post raw bodies", async () => {
     const mock = await mockApi([
-      { method: "POST", path: "/workflows/search", body: { results: [] } },
-      { method: "POST", path: "/workflows/batch", body: { ok: true } },
+      { body: { results: [] }, method: "POST", path: "/workflows/search" },
+      { body: { ok: true }, method: "POST", path: "/workflows/batch" },
     ]);
 
     await runCli(["workflows", "search", "--body", '{"query":"x"}', "--json"]);
@@ -105,8 +105,8 @@ describe("frontal workflows", () => {
 
   it("run get/summary use the workflow accessor paths", async () => {
     const mock = await mockApi([
-      { method: "GET", path: "/workflows/wf_1/run_9/summary", body: { s: 1 } },
-      { method: "GET", path: "/workflows/wf_1/run_9", body: { id: "run_9" } },
+      { body: { s: 1 }, method: "GET", path: "/workflows/wf_1/run_9/summary" },
+      { body: { id: "run_9" }, method: "GET", path: "/workflows/wf_1/run_9" },
     ]);
 
     const get = await runCli([
@@ -136,14 +136,14 @@ describe("frontal workflows", () => {
   it("surfaces API errors with code, fix, docs and request id", async () => {
     await mockApi([
       {
-        method: "GET",
-        path: "/workflows",
-        status: 401,
         body: {
           code: "UNAUTHORIZED",
           message: "bad key",
           requestId: "req_401",
         },
+        method: "GET",
+        path: "/workflows",
+        status: 401,
       },
     ]);
 
@@ -157,8 +157,9 @@ describe("frontal workflows", () => {
         statusCode: 401,
       },
     });
-    const error = (lastJson(result.stderr) as { error: Record<string, string> })
-      .error;
+    const { error } = lastJson(result.stderr) as {
+      error: Record<string, string>;
+    };
     expect(error.fix).toContain("auth login");
     expect(error.docs).toMatch(HTTPS_URL);
   });

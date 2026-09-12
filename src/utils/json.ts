@@ -8,7 +8,7 @@ export function parseJsonInput(
 
   try {
     return JSON.parse(value);
-  } catch {
-    throw new Error(`Invalid JSON for ${label}.`);
+  } catch (err) {
+    throw new Error(`Invalid JSON for ${label}.`, { cause: err });
   }
 }
