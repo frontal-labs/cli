@@ -228,7 +228,7 @@ class CLIHelper {
         if (result.stdout.includes(expectedOutput)) {
           return true;
         }
-      } catch (_error) {
+      } catch {
         // Command failed, continue waiting
       }
 
