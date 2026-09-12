@@ -1,7 +1,8 @@
 {
   "name": "frontal-cli",
   "version": "0.1.0",
-  "description": "Frontal platform CLI",
+  "description": "Frontal CLI",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "frontal": "./dist/bin/frontal.js"
