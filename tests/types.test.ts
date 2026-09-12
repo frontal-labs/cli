@@ -38,7 +38,7 @@ describe("renderTypes", () => {
     const config = await validateProjectConfig(parseJsonc(FIXTURE));
     const output = renderTypes(config, ["frontal.jsonc"]);
     expect(output.startsWith(GENERATED_HEADER)).toBe(true);
-    expect(output).toMatchFileSnapshot(
+    await expect(output).toMatchFileSnapshot(
       join(FIXTURE_DIR, "frontal-configuration.d.ts.snap")
     );
   });
