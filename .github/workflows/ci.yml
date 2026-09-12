@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # Run on every PR, including stacked PRs whose base is another branch.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
