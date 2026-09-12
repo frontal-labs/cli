@@ -57,6 +57,38 @@ frontal init --force
 frontal init --json      # {"dir","name","created","updated","skipped","kept"}
 ```
 
+### `frontal dev [--port <n>] [--host <h>] [--scenario <name>] [--remote <a,b>] [--persist-to <dir>] [--no-watch]`
+
+Runs a local Frontal API for the current project. No API key is needed.
+
+- Serves every service enabled in `frontal.jsonc` from SDK-compatible fixtures
+  persisted under `.frontal/state/<namespace>/<id>.json` (`agents`, `runs`,
+  `graph`, `datasets`, `blob`, `policies`). Responses use the wire format
+  (snake_case) and carry `X-Request-Id`.
+- `GET /health` → `{ ok, status, version, env, uptime_ms, services }`, always local.
+- `--scenario <name>` loads `.frontal/scenarios/<name>.json`:
+  `{ "routes": [{ "method": "GET", "path": "/agents", "status": 503, "body": {...}, "headers": {...}, "times": 1 }] }`.
+  `path` is a suffix match with `{param}` support, or a regular expression when it starts with `^`.
+  Scenario routes take precedence over built-ins; `times` limits how often a route matches.
+- `--remote ai,graph` proxies those services to the real API through the SDK
+  (credentials resolve as usual). Proxied requests carry `X-Frontal-Dev-Proxy: <service>`
+  and upstream errors are returned as SDK-shaped envelopes. `services.<name>.remote: true`
+  in `frontal.jsonc` has the same effect. Without credentials the proxy answers
+  `503 NO_CREDENTIALS`.
+- Unknown paths return `404 NOT_FOUND` with a `fix` naming the service to mark remote.
+- `frontal*.jsonc`, `.env.local` and scenario files are watched; a failed reload keeps
+  the previous route table. `GET /__dev/events` streams `reload`/`request` events (SSE).
+- `--json` prints NDJSON: `{"type":"ready",...}`, `{"type":"request","line":...}`, `{"type":"reload",...}`, `{"type":"stopped",...}`.
+
+Exit codes: `NO_PROJECT` (6) outside a project, `PORT_IN_USE` (1), `SCENARIO_NOT_FOUND` (5), `INVALID_PORT` (2).
+
+```bash
+frontal dev
+frontal dev --port 9000 --scenario deny
+frontal dev --remote ai,graph
+frontal dev --json | jq -c 'select(.type=="request")'
+```
+
 ### `frontal types [--out <file>]`
 
 Generates TypeScript typings from `frontal.jsonc` (default `src/frontal-configuration.d.ts`):

@@ -14,9 +14,11 @@ import { PROJECT_STATE_DIR } from "@/lib/project.js";
 
 export const STATE_NAMESPACES = [
   "agents",
+  "runs",
   "graph",
   "datasets",
   "blob",
+  "policies",
   "deploys",
 ] as const;
 export type StateNamespace = (typeof STATE_NAMESPACES)[number];

@@ -7,9 +7,10 @@
  * Usage: bun scripts/run-readme-blocks.ts [README.md] [--dry-run]
  *
  * Blocks run in a scratch project created by `frontal init`, with the CLI
- * from ./dist on PATH and FRONTAL_CONFIG_DIR isolated from ~/.frontal.
+ * from ./dist on PATH, FRONTAL_CONFIG_DIR isolated from ~/.frontal, and a
+ * `frontal dev` server on FRONTAL_API_URL so API examples work offline.
  */
-import { spawnSync } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -63,12 +64,14 @@ const binDir = join(work, "bin");
 mkdirSync(binDir);
 symlinkSync(join(repoRoot, "dist", "index.js"), join(binDir, "frontal"));
 
+const DEV_PORT = 8787;
 const env = {
   ...process.env,
   PATH: `${binDir}:${process.env.PATH ?? ""}`,
   FRONTAL_CONFIG_DIR: join(work, "config"),
   FRONTAL_API_KEY: process.env.FRONTAL_API_KEY ?? "frt_readme_example_key_000",
-  FRONTAL_API_URL: process.env.FRONTAL_API_URL ?? "http://127.0.0.1:8787/v1",
+  FRONTAL_API_URL:
+    process.env.FRONTAL_API_URL ?? `http://127.0.0.1:${DEV_PORT}/v1`,
   NO_COLOR: "1",
   CI: "1",
 };
@@ -76,6 +79,54 @@ const env = {
 let failed = 0;
 const cwd = join(work, "project");
 mkdirSync(cwd);
+
+// Boot a local API for the examples unless the caller points at a real one.
+let devServer: ChildProcess | undefined;
+if (!process.env.FRONTAL_API_URL) {
+  const init = spawnSync("frontal", ["init", "--name", "readme-app"], {
+    cwd,
+    env,
+    encoding: "utf-8",
+  });
+  if (init.status !== 0) {
+    console.error(init.stdout, init.stderr);
+    process.exit(1);
+  }
+  devServer = spawn(
+    "frontal",
+    ["dev", "--port", String(DEV_PORT), "--no-watch"],
+    {
+      cwd: join(cwd, "readme-app"),
+      env,
+      stdio: "ignore",
+    }
+  );
+  const healthy = await waitForHealth(
+    `http://127.0.0.1:${DEV_PORT}/health`,
+    10_000
+  );
+  if (!healthy) {
+    console.error("frontal dev did not become healthy");
+    devServer.kill();
+    process.exit(1);
+  }
+}
+
+async function waitForHealth(url: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        return true;
+      }
+    } catch {
+      // not up yet
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  return false;
+}
 
 for (const block of runnable) {
   const script = `set -euo pipefail\n${block.body}`;
@@ -94,6 +145,7 @@ for (const block of runnable) {
   }
 }
 
+devServer?.kill();
 rmSync(work, { recursive: true, force: true });
 if (failed > 0) {
   console.error(`${failed} README block(s) failed`);
