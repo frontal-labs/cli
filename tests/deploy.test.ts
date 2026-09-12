@@ -14,6 +14,7 @@ import { initProject } from "@/commands/init.js";
 import { snapshotStateSchema } from "@/lib/bundle.js";
 import { listDeploys, readCurrentDeploy } from "@/lib/deploys.js";
 import { DevServer } from "@/lib/dev/server.js";
+import { parseJsonc } from "@/lib/project.js";
 import { ProjectState } from "@/lib/state.js";
 import { lastJson, mockApi, runCli, TEST_API_KEY } from "./helpers/cli.js";
 
@@ -222,6 +223,41 @@ describe("frontal promote / rollback", () => {
       .filter((r) => r.path.endsWith("/workers"))
       .at(-1);
     expect(String((last?.body as { code: string }).code)).not.toContain("v2");
+  });
+
+  it("also rolls back agents listed in frontal.jsonc", async () => {
+    const config = parseJsonc(
+      readFileSync(join(root, "frontal.jsonc"), "utf-8")
+    ) as Record<string, unknown>;
+    writeFileSync(
+      join(root, "frontal.jsonc"),
+      JSON.stringify({ ...config, agents: ["agt_ok", "agt_missing"] })
+    );
+    const mock = await mockApi([
+      workersRoute,
+      {
+        method: "POST",
+        path: "/agents/agt_ok/rollback",
+        body: { id: "agt_ok", version: 3 },
+      },
+      {
+        method: "POST",
+        path: "/agents/agt_missing/rollback",
+        status: 404,
+        body: { code: "NOT_FOUND", message: "no agent", requestId: "req_a" },
+      },
+    ]);
+    await runCli(["deploy", "--prod", "--yes", "--json"]);
+    await runCli(["deploy", "--prod", "--yes", "--json"]);
+
+    const rolled = await runCli(["rollback", "--json"]);
+
+    expect(rolled.exitCode).toBe(0);
+    mock.expectCalled("POST", "/agents/agt_ok/rollback");
+    expect((lastJson(rolled.stdout) as { agents: unknown[] }).agents).toEqual([
+      { agentId: "agt_ok", version: 3 },
+      { agentId: "agt_missing", error: "NOT_FOUND: no agent" },
+    ]);
   });
 
   it("explains when there is nothing to roll back to or the artifact is gone", async () => {
