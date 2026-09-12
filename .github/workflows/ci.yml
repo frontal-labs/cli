@@ -188,9 +188,13 @@ jobs:
 
       - name: Live smoke (staging key)
         if: ${{ env.TEST_API_KEY != '' }}
-        run: ./dist/index.js auth whoami --json
+        run: |
+          ./dist/index.js auth whoami --json
+          bun run vitest run tests/live
         env:
           TEST_API_KEY: ${{ secrets.TEST_API_KEY }}
+          TEST_API_URL: ${{ secrets.TEST_API_URL }}
+          FRONTAL_LIVE: "1"
           FRONTAL_API_KEY: ${{ secrets.TEST_API_KEY }}
           FRONTAL_API_URL: ${{ secrets.TEST_API_URL }}
           FRONTAL_CONFIG_DIR: ${{ runner.temp }}/frontal-config
