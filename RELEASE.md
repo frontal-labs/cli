@@ -4,6 +4,7 @@ This document describes the release process for the Frontal CLI.
 
 ## Prerequisites
 
+- npm Trusted Publisher configured (see Automated Release section below)
 - Ensure all tests are passing: `bun run test`
 - Ensure code is properly formatted: `bun run format`
 - Ensure linting passes: `bun run lint`
@@ -68,11 +69,19 @@ git push origin main --follow-tags
 
 ## Automated Release
 
-The project also supports automated releases via GitHub Actions:
+The project uses two GitHub Actions workflows for automated releases:
 
-- When changesets are merged to `main`
-- CI will automatically version and publish
-- Releases are created automatically
+- **`release.yml`**: Runs on every push to `main`. Uses Changesets to version packages and create git tags. When pending changesets exist, it opens a "Release Packages" PR. When merged, it bumps versions and pushes a `v*` tag.
+- **`publish.yml`**: Triggers on `v*` tag pushes. Builds the project and publishes to both registries using OIDC, then creates the GitHub Release.
+
+### Trusted Publisher Setup
+
+Before the first release, configure the npm Trusted Publisher:
+
+1. Go to https://www.npmjs.com/package/frontal-cli/settings/trusted-publishers
+2. Add publisher: GitHub Actions
+   - Owner: `frontal-labs`, Repo: `cli`, Workflow: `publish.yml`
+3. Optionally: Settings → Publishing access → "Require two-factor authentication and disallow tokens"
 
 ## Version Format
 
@@ -84,10 +93,17 @@ This project follows [Semantic Versioning](https://semver.org/):
 
 ## Release Channels
 
-### Stable
+### npm Registry (npmjs.org)
 
-- Published to npm as `frontal-cli`
+- Published as `frontal-cli`
 - Tags: `latest`, version numbers (e.g., `1.0.0`)
+- Auth: OIDC Trusted Publisher (no automation tokens)
+
+### GitHub Packages
+
+- Published as `@frontal-labs/cli`
+- Install: `npm install -g @frontal-labs/cli --registry=https://npm.pkg.github.com`
+- Auth: GITHUB_TOKEN (auto-provisioned per workflow run)
 
 ### Development
 
@@ -172,7 +188,8 @@ bun run release
 
 ### Release
 
-- [ ] Package published to npm
+- [ ] Package published to npm (OIDC)
+- [ ] Package published to GitHub Packages
 - [ ] GitHub release created
 - [ ] Tags pushed
 - [ ] Release notes published
@@ -263,11 +280,10 @@ If a security vulnerability is discovered:
 
 ### CI/CD Integration
 
-The release process is integrated with GitHub Actions:
+The release process uses two workflows:
 
-- Automated testing on pull requests
-- Automated publishing on merge to main
-- Automated release note generation
+- **`release.yml`** (push to `main`): Changesets versioning and git tag creation
+- **`publish.yml`** (tag `v*`): Builds, publishes to npm (OIDC) + GitHub Packages, creates GitHub Release
 
 ### Scripts
 

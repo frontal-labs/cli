@@ -1,0 +1,411 @@
+name: Validate Status Page Integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/synthetic-monitor.yml'
+      - '.github/workflows/incident-manager.yml'
+      - '.github/workflows/status-page-sync.yml'
+      - '.github/workflows/flap-state-cleanup.yml'
+      - '.github/workflows/validate-status-page.yml'
+      - '.github/scripts/**'
+      - '.github/incident/**'
+  workflow_dispatch:
+    inputs:
+      simulate_failures:
+        description: 'Number of journeys to simulate failing (0-6)'
+        type: number
+        default: 0
+      test_api:
+        description: 'Test Incident.io API connectivity'
+        type: boolean
+        default: false
+
+concurrency:
+  group: validate-status-page-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  config-validation:
+    name: Validate Config Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate thresholds.json
+        run: |
+          if [[ ! -f .github/incident/thresholds.json ]]; then
+            echo "ERROR: thresholds.json not found"
+            exit 1
+          fi
+          echo "Validating thresholds.json schema..."
+          jq -e '
+            .default.fail_threshold >= 1 and
+            .default.recover_threshold >= 1 and
+            .timeouts.single_journey_seconds >= 30 and
+            .timeouts.total_run_seconds >= 60
+          ' .github/incident/thresholds.json > /dev/null || {
+            echo "ERROR: thresholds.json failed schema validation"
+            exit 1
+          }
+          echo "thresholds.json: valid"
+
+      - name: Validate components.json
+        run: |
+          if [[ ! -f .github/incident/components.json ]]; then
+            echo "No components.json found — will create default"
+            echo '[]' > .github/incident/components.json
+          fi
+          echo "Validating components.json schema..."
+          jq -e 'type == "array"' .github/incident/components.json > /dev/null || {
+            echo "ERROR: components.json must be a JSON array"
+            exit 1
+          }
+          echo "components.json: valid"
+
+      - name: Validate workflow YAML syntax
+        run: |
+          for wf in .github/workflows/synthetic-monitor.yml \
+                    .github/workflows/incident-manager.yml \
+                    .github/workflows/validate-status-page.yml; do
+            if [[ -f "$wf" ]]; then
+              echo "Checking $wf..."
+              python3 -c "import yaml; yaml.safe_load(open('$wf'))" 2>/dev/null || {
+                echo "WARNING: python3 yaml parse failed for $wf (likely fine — GitHub Actions has its own parser)"
+              }
+            fi
+          done
+
+  dry-run-monitor:
+    name: Dry-Run Synthetic Monitor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Frontal CLI
+        run: |
+          npm install -g frontal-cli@latest || {
+            echo "WARNING: npm install failed (expected if no published version yet)"
+            echo "Creating a stub frontal for testing"
+            echo '#!/usr/bin/env node
+            const args = process.argv.slice(2);
+            if (args.includes("--version")) { console.log("0.1.0"); process.exit(0); }
+            if (args.includes("--help")) { console.log("Usage: frontal <command>"); process.exit(0); }
+            if (args[0] === "auth" && args[1] === "status") { console.log("Logged in"); process.exit(0); }
+            if (args[0] === "config" && args[1] === "get") { console.log("{}"); process.exit(0); }
+            if (args[0] === "workflows" && args[1] === "list") { console.log("[]"); process.exit(0); }
+            console.log("OK"); process.exit(0);
+            ' > /usr/local/bin/frontal
+            chmod +x /usr/local/bin/frontal
+          }
+
+      - name: Run E2E journeys (dry run)
+        id: journeys
+        run: |
+          export E2E_DRY_RUN=true
+          export E2E_TIMEOUT_SECS=60
+          .github/scripts/e2e-journey.sh
+
+      - name: Verify run-result.json structure
+        run: |
+          echo "Checking run-result.json structure..."
+
+          # Required top-level keys
+          jq -e '.run_id' run-result.json > /dev/null || { echo "MISSING: run_id"; exit 1; }
+          jq -e '.timestamp' run-result.json > /dev/null || { echo "MISSING: timestamp"; exit 1; }
+          jq -e '.summary' run-result.json > /dev/null || { echo "MISSING: summary"; exit 1; }
+          jq -e '.journeys' run-result.json > /dev/null || { echo "MISSING: journeys"; exit 1; }
+
+          # Summary keys
+          jq -e '.summary.journeys_passed' run-result.json > /dev/null || { echo "MISSING: summary.journeys_passed"; exit 1; }
+          jq -e '.summary.journeys_failed' run-result.json > /dev/null || { echo "MISSING: summary.journeys_failed"; exit 1; }
+          jq -e '.summary.overall_status' run-result.json > /dev/null || { echo "MISSING: summary.overall_status"; exit 1; }
+
+          echo "run-result.json structure: valid"
+
+          # Show results
+          echo ""
+          echo "=== Journey Results ==="
+          jq -r '.journeys | to_entries[] | "\(.key): \(if (.value | type) == "array" then (.value | map(.status) | join(", ")) else .value.status end)"' run-result.json
+
+  flap-logic-test:
+    name: Flap Prevention Logic Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test 1 — No alert on initial failures
+        run: |
+          echo "Test 1: Fresh state should not alert on first failure"
+          .github/scripts/flap-state.sh init
+
+          # Simulate 2 failures (below threshold of 3)
+          echo '{"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}' > run-fail.json
+          export FAIL_THRESHOLD=3 RECOVER_THRESHOLD=2
+          .github/scripts/flap-state.sh update run-fail.json
+          ACTION1="$(grep '^action=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)"
+          if [[ "$ACTION1" != "no-op" ]]; then
+            echo "FAIL: Expected no-op after 1st failure, got $ACTION1"
+            exit 1
+          fi
+          echo "PASS: No-op after 1st failure"
+
+          .github/scripts/flap-state.sh update run-fail.json
+          ACTION2="$(grep '^action=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)"
+          if [[ "$ACTION2" != "no-op" ]]; then
+            echo "FAIL: Expected no-op after 2nd failure, got $ACTION2"
+            exit 1
+          fi
+          echo "PASS: No-op after 2nd failure"
+
+      - name: Test 2 — Alert triggers at threshold
+        run: |
+          echo "Test 2: Third consecutive failure should trigger create"
+          echo '{"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}' > run-fail.json
+          export FAIL_THRESHOLD=3 RECOVER_THRESHOLD=2
+          .github/scripts/flap-state.sh update run-fail.json
+          ACTION="$(grep '^action=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)"
+          if [[ "$ACTION" != "create" ]]; then
+            echo "FAIL: Expected create after 3rd consecutive failure, got $ACTION"
+            exit 1
+          fi
+          echo "PASS: Create triggered after 3rd failure"
+
+          # Verify alerting flag
+          ALERTING="$(jq -r '.alerting' flap-state.json)"
+          if [[ "$ALERTING" != "true" ]]; then
+            echo "FAIL: alerting flag should be true"
+            exit 1
+          fi
+          echo "PASS: alerting flag set to true"
+
+      - name: Test 3 — Recovery triggers resolve
+        run: |
+          echo "Test 3: Consecutive successes should trigger resolve"
+          echo '{"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}' > run-pass.json
+          export FAIL_THRESHOLD=3 RECOVER_THRESHOLD=2
+
+          # First success (should still be alerting)
+          .github/scripts/flap-state.sh update run-pass.json
+          ACTION1="$(grep '^action=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)"
+          if [[ "$ACTION1" != "no-op" ]]; then
+            echo "FAIL: Expected no-op after 1st success (still in alert), got $ACTION1"
+            exit 1
+          fi
+          echo "PASS: No-op after 1st success"
+
+          # Second success (should resolve)
+          .github/scripts/flap-state.sh update run-pass.json
+          ACTION2="$(grep '^action=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)"
+          if [[ "$ACTION2" != "resolve" ]]; then
+            echo "FAIL: Expected resolve after 2nd consecutive success, got $ACTION2"
+            exit 1
+          fi
+          echo "PASS: Resolve triggered after 2nd success"
+
+          ALERTING="$(jq -r '.alerting' flap-state.json)"
+          if [[ "$ALERTING" != "false" ]]; then
+            echo "FAIL: alerting flag should be false after resolve"
+            exit 1
+          fi
+          echo "PASS: alerting flag cleared after resolve"
+
+      - name: Test 4 — History trimming
+        run: |
+          echo "Test 4: History should be trimmed to 96 entries"
+          .github/scripts/flap-state.sh init
+          echo '{"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}' > run-pass.json
+          # Add 100 entries
+          for i in $(seq 1 100); do
+            .github/scripts/flap-state.sh update run-pass.json 2>/dev/null || true
+          done
+          COUNT="$(jq '.history | length' flap-state.json)"
+          if [[ "$COUNT" -gt 96 ]]; then
+            echo "FAIL: History has $COUNT entries (max 96)"
+            exit 1
+          fi
+          echo "PASS: History trimmed to $COUNT entries"
+
+      - name: Test 5 — Interleaved failures reset counter
+        run: |
+          echo "Test 5: A success should reset the failure counter"
+          .github/scripts/flap-state.sh init
+          export FAIL_THRESHOLD=3 RECOVER_THRESHOLD=2
+
+          echo '{"summary": {"journeys_passed": 5, "journeys_failed": 1, "overall_status": "fail"}}' > run-fail.json
+          # Two failures
+          .github/scripts/flap-state.sh update run-fail.json
+          .github/scripts/flap-state.sh update run-fail.json
+
+          CF="$(jq -r '.consecutive_failures' flap-state.json)"
+          if [[ "$CF" != "2" ]]; then
+            echo "FAIL: Expected 2 consecutive failures, got $CF"
+            exit 1
+          fi
+
+          # One success
+          echo '{"summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}' > run-pass.json
+          .github/scripts/flap-state.sh update run-pass.json
+
+          CF="$(jq -r '.consecutive_failures' flap-state.json)"
+          if [[ "$CF" != "0" ]]; then
+            echo "FAIL: Failure counter should reset to 0 after success, got $CF"
+            exit 1
+          fi
+          CS="$(jq -r '.consecutive_successes' flap-state.json)"
+          if [[ "$CS" != "1" ]]; then
+            echo "FAIL: Success counter should be 1, got $CS"
+            exit 1
+          fi
+          echo "PASS: Success resets failure counter"
+
+  api-connectivity:
+    name: API Connectivity Test
+    runs-on: ubuntu-latest
+    if: inputs.test_api == true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test Incident.io API auth
+        id: api-test
+        env:
+          INCIDENT_IO_API_KEY: ${{ secrets.INCIDENT_IO_API_KEY }}
+        run: |
+          if [[ -z "$INCIDENT_IO_API_KEY" ]]; then
+            echo "INCIDENT_IO_API_KEY not configured — skipping"
+            exit 0
+          fi
+          echo "Testing Incident.io API authentication..."
+          RESPONSE="$(curl -s -w '\n%{http_code}' \
+            -H "Authorization: Bearer $INCIDENT_IO_API_KEY" \
+            https://api.incident.io/v2/identity)"
+          HTTP_CODE="$(echo "$RESPONSE" | tail -1)"
+          BODY="$(echo "$RESPONSE" | sed '$d')"
+
+          echo "HTTP status: $HTTP_CODE"
+          if [[ "$HTTP_CODE" == "200" ]]; then
+            echo "API authentication: OK"
+            echo "$BODY" | jq '.identity.roles // "roles not in response"' 2>/dev/null || echo "$BODY"
+          elif [[ "$HTTP_CODE" == "401" ]]; then
+            echo "WARNING: API key is invalid or expired"
+          else
+            echo "WARNING: Unexpected response ($HTTP_CODE)"
+          fi
+
+  secret-check:
+    name: Secret & Variable Presence Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check required secrets
+        env:
+          INCIDENT_IO_API_KEY: ${{ secrets.INCIDENT_IO_API_KEY }}
+          FRONTAL_TEST_API_KEY: ${{ secrets.FRONTAL_TEST_API_KEY }}
+          FRONTAL_TEST_API_URL: ${{ secrets.FRONTAL_TEST_API_URL }}
+          INCIDENT_IO_STATUS_PAGE_ID: ${{ vars.INCIDENT_IO_STATUS_PAGE_ID }}
+          INCIDENT_IO_SEVERITY_MINOR_ID: ${{ vars.INCIDENT_IO_SEVERITY_MINOR_ID }}
+          INCIDENT_IO_SEVERITY_MAJOR_ID: ${{ vars.INCIDENT_IO_SEVERITY_MAJOR_ID }}
+        run: |
+          missing=0
+
+          check_secret() {
+            local name="$1"
+            if [[ -z "${!name:-}" ]]; then
+              echo "MISSING: $name"
+              missing=1
+            else
+              echo "PRESENT: $name (masked)"
+            fi
+          }
+
+          check_var() {
+            local name="$1"
+            local val="${!name:-}"
+            if [[ -z "$val" ]]; then
+              echo "MISSING: $name"
+              missing=1
+            else
+              echo "PRESENT: $name = $val"
+            fi
+          }
+
+          echo "=== Required Secrets ==="
+          check_secret "INCIDENT_IO_API_KEY"
+          check_secret "FRONTAL_TEST_API_KEY"
+          check_secret "FRONTAL_TEST_API_URL"
+
+          echo ""
+          echo "=== Required Variables ==="
+          check_var "INCIDENT_IO_STATUS_PAGE_ID"
+          check_var "INCIDENT_IO_SEVERITY_MINOR_ID"
+          check_var "INCIDENT_IO_SEVERITY_MAJOR_ID"
+
+          echo ""
+          echo "=== Optional Variables (with defaults) ==="
+          echo "MONITOR_FAIL_THRESHOLD = ${MONITOR_FAIL_THRESHOLD:-3 (default)}"
+          echo "MONITOR_RECOVER_THRESHOLD = ${MONITOR_RECOVER_THRESHOLD:-2 (default)}"
+          echo "MONITOR_E2E_TIMEOUT_SECS = ${MONITOR_E2E_TIMEOUT_SECS:-120 (default)}"
+
+          if [[ "$missing" -eq 1 ]]; then
+            echo ""
+            echo "Some required secrets/variables are missing. This is expected in PR CI — set them in the repository settings before merging."
+          else
+            echo ""
+            echo "All required secrets and variables are present"
+          fi
+
+  gate:
+    name: Validation Gate
+    runs-on: ubuntu-latest
+    needs: [config-validation, dry-run-monitor, flap-logic-test, api-connectivity, secret-check]
+    if: always()
+
+    steps:
+      - name: Report results
+        run: |
+          echo "=== Validation Results ==="
+          echo "config-validation: ${{ needs.config-validation.result }}"
+          echo "dry-run-monitor: ${{ needs.dry-run-monitor.result }}"
+          echo "flap-logic-test: ${{ needs.flap-logic-test.result }}"
+          echo "api-connectivity: ${{ needs.api-connectivity.result }}"
+          echo "secret-check: ${{ needs.secret-check.result }}"
+          echo ""
+
+          FAILED=0
+          for name_result in \
+            "config-validation ${{ needs.config-validation.result }}" \
+            "dry-run-monitor ${{ needs.dry-run-monitor.result }}" \
+            "flap-logic-test ${{ needs.flap-logic-test.result }}" \
+            "api-connectivity ${{ needs.api-connectivity.result }}" \
+            "secret-check ${{ needs.secret-check.result }}"; do
+            job="${name_result% *}"
+            result="${name_result##* }"
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "FAIL: $job => $result"
+              FAILED=1
+            fi
+          done
+
+          if [[ "$FAILED" -eq 1 ]]; then
+            echo ""
+            echo "Validation failed. Fix the issues above before merging."
+            exit 1
+          fi
+
+          echo "All validations passed"

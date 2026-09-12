@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  frontal-cli:
+  frontal:
     build:
       context: .
       dockerfile: Dockerfile
     image: frontal/cli:latest
-    container_name: frontal-cli
+    container_name: frontal
     environment:
       - NODE_ENV=production
       - FRONTAL_API_KEY=${FRONTAL_API_KEY}
