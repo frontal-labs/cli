@@ -176,6 +176,10 @@ jobs:
           sleep 5
           curl -sf localhost:8787/health | grep -q '"ok":true'
           curl -sf -X POST localhost:8787/v1/agents -H 'content-type: application/json' -d '{"name":"ci"}' | grep -q '"id":"agt_'
+          printf 'export default { fetch: () => new Response("ci") };\n' > src/index.ts
+          "$GITHUB_WORKSPACE/dist/frontal" deploy --dry-run --outdir out
+          test -f out/index.js && test -f out/manifest.json
+          FRONTAL_API_KEY=frt_ci_local_key_0000 FRONTAL_API_URL=http://127.0.0.1:8787/v1 "$GITHUB_WORKSPACE/dist/frontal" deploy --preview --json | grep -q '"url":"http://127.0.0.1:8787/v1/workers/demo-preview"'
           kill -INT $DEV_PID
           cat dev.log
         env:

@@ -23,6 +23,7 @@ For the API key and base URL:
   "$schema": "https://frontal.dev/schemas/frontal.jsonc",
   "name": "my-app",                  // lowercase letters, digits, dashes
   "env": "dev",                      // dev | staging | prod
+  "entry": "src/index.ts",           // bundled by `frontal deploy`
   "apiUrl": "https://api.frontal.dev/v1",
   "services": {
     "ai": { "remote": false },
@@ -39,6 +40,7 @@ For the API key and base URL:
 |---|---|
 | `name` | Project name (`^[a-z0-9][a-z0-9-]*$`) |
 | `env` | Default environment; `--env` overrides it |
+| `entry` | File bundled by `frontal deploy` (default `src/index.ts`) |
 | `apiUrl` | API base URL (http/https) |
 | `services` | Map of service → `{ remote }`. Unknown keys are rejected with the list of valid services |
 | `vars` | Non-secret configuration written to `.env.local` by `frontal env pull` |

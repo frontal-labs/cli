@@ -12,7 +12,8 @@ cd my-app && frontal dev          # local server, no API key needed
 frontal deploy --preview          # shareable preview URL
 ```
 
-`init`, `dev`, `types`, `env`, `logs` and `policy check` work today; `deploy` lands next.
+All seven project commands are available: `init`, `dev`, `types`, `env`, `deploy`
+(+ `promote`/`rollback`), `logs` and `policy check`.
 
 > The `bash` blocks in this README are executed in CI (`bun run test:readme`).
 > Blocks tagged `skip` need a real account or an interactive terminal.
@@ -116,6 +117,30 @@ frontal logs --follow --json | jq -r .requestId
 frontal policy check --strict --env prod   # warnings become errors; exit 1 on deny
 ```
 
+## Deploy, promote, rollback
+
+`deploy` bundles the project's `entry` (default `src/index.ts`, via `bun build`) into a
+single ESM file and uploads it as a worker: `<name>-preview` for `--preview` (the default),
+`<name>` for `--prod` (confirmation required unless `--yes`). The URL is
+`<apiUrl>/workers/<name>`. Every deployment is recorded under `.frontal/state/deploys/`
+with an immutable copy of the artifact, so `promote` and `rollback` re-send exactly what
+was deployed — no rebuild. `--dry-run` bundles and writes a manifest (the local state
+*schema* only, never row data) without touching the network:
+
+```bash
+cd my-app
+printf 'export default { fetch: () => new Response("hi") };\n' > src/index.ts
+frontal deploy --dry-run --outdir dist/frontal
+cat dist/frontal/manifest.json
+```
+
+```bash skip
+frontal deploy --preview                          # prints https://api.frontal.dev/v1/workers/my-app-preview
+frontal promote https://api.frontal.dev/v1/workers/my-app-preview
+frontal deploy --prod --yes
+frontal rollback                                  # previous production artifact
+```
+
 ## Project configuration: `frontal.jsonc`
 
 ```jsonc
@@ -129,6 +154,7 @@ frontal policy check --strict --env prod   # warnings become errors; exit 1 on d
     "agents": { "remote": false },
     "graph": { "remote": false }
   },
+  "entry": "src/index.ts",           // bundled by `frontal deploy`
   "vars": { "LOG_LEVEL": "info" },   // written to .env.local by `frontal env pull`
   "secrets": { "required": ["FRONTAL_API_KEY"] }
 }
@@ -165,6 +191,8 @@ Set `FRONTAL_CONFIG_DIR` to relocate the profile store (CI, tests).
 | `frontal init [--name <dir>] [--force]` | Create `frontal.jsonc`, `.env.example`, `.gitignore` entries, `src/` |
 | `frontal dev [--port] [--scenario] [--remote] [--persist-to]` | Local Frontal API backed by `.frontal/state` |
 | `frontal types [--out <file>]` | Generate `FrontalEnv` / `FrontalServices` / `FrontalProject` typings |
+| `frontal deploy [--preview\|--prod] [--yes] [--dry-run --outdir <dir>]` | Bundle + upload a worker; print its URL |
+| `frontal promote <url>` / `frontal rollback [url]` | Re-point production at a recorded artifact (no rebuild) |
 | `frontal env pull [file] [--force]` / `frontal env push [file]` | `.env.local` from `frontal.jsonc` + credentials / upload vars to the current deployment |
 | `frontal logs [--follow] [--filter <q>] [--since 15m] [--level <l>]` | Query or tail platform logs (SSE) |
 | `frontal policy check [--strict] [--user] [--role]` | Dry-run governance: policy files, deploy access per service, compliance |
@@ -177,8 +205,7 @@ Set `FRONTAL_CONFIG_DIR` to relocate the profile store (CI, tests).
 | `frontal completion <bash\|zsh\|fish>` | Shell completions |
 | `frontal migrate-legacy` | v1 → current command mapping |
 
-`deploy`, `promote` and `rollback` are being added next; see [llms.txt](./llms.txt) for
-the current surface.
+See [llms.txt](./llms.txt) for a machine-readable summary of every command.
 
 Every command has an `Examples:` section in `--help`:
 

@@ -25,18 +25,40 @@ export interface DeployRecord {
 
 const CURRENT_PREFIX = "current-";
 
+/**
+ * Latest deployment for an environment; with `target`, the latest of that
+ * kind (`preview` or `prod`).
+ */
 export function readCurrentDeploy(
   root: string,
-  env: string
+  env: string,
+  target?: DeployTarget
 ): DeployRecord | undefined {
   const state = new ProjectState(root);
-  return state.read<DeployRecord>("deploys", `${CURRENT_PREFIX}${env}`);
+  const key = target
+    ? `${CURRENT_PREFIX}${env}-${target}`
+    : `${CURRENT_PREFIX}${env}`;
+  return state.read<DeployRecord>("deploys", key);
 }
 
 export function writeCurrentDeploy(root: string, record: DeployRecord): void {
   const state = new ProjectState(root);
   state.write("deploys", record.id, record);
   state.write("deploys", `${CURRENT_PREFIX}${record.env}`, record);
+  state.write(
+    "deploys",
+    `${CURRENT_PREFIX}${record.env}-${record.target}`,
+    record
+  );
+}
+
+export function findDeploy(
+  root: string,
+  ref: string
+): DeployRecord | undefined {
+  return listDeploys(root).find(
+    (record) => record.url === ref || record.id === ref || record.name === ref
+  );
 }
 
 export function listDeploys(root: string): DeployRecord[] {
