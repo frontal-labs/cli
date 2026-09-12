@@ -65,6 +65,8 @@ export function buildProjectConfigSchema(
           "name must be lowercase letters, digits and dashes"
         ),
       env: z.enum(ENV_NAMES).default("dev"),
+      /** Entry file bundled by `frontal deploy`. */
+      entry: z.string().min(1).default("src/index.ts"),
       apiUrl: clientConfigSchema.shape.baseUrl,
       services: servicesSchema.default({}),
       vars: z

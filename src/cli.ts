@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { registerAuthCommands } from "@/commands/auth.js";
 import { registerCompletionCommands } from "@/commands/completion.js";
 import { registerConfigCommands } from "@/commands/config.js";
+import { registerDeployCommands } from "@/commands/deploy.js";
 import { registerDevCommand } from "@/commands/dev.js";
 import { registerEnvCommands } from "@/commands/env.js";
 import { registerEventsCommands } from "@/commands/events.js";
@@ -46,6 +47,7 @@ export function buildProgram(program = new Command()): Command {
   registerEnvCommands(program);
   registerLogsCommand(program);
   registerPolicyCommands(program);
+  registerDeployCommands(program);
   registerAuthCommands(program);
   registerConfigCommands(program);
   registerWorkflowsCommands(program);

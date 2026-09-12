@@ -21,6 +21,9 @@ Version: frontal-cli@0.1.0. Verify with `frontal --version`.
 - `frontal env push [file=.env.local] [--env <name>]`: validates `secrets.required`, verifies the credential (`GET /auth/account/profile`), then redeploys the current deployment (`POST /workers`, `env_vars` = `vars` + file entries except `FRONTAL_API_KEY`/`FRONTAL_API_URL`). Errors: `ENV_FILE_MISSING`, `MISSING_SECRETS` (2), `NO_DEPLOYMENT` (6, run `frontal deploy` first). `--json` → `{deployment, keys, requestId}`.
 - `frontal logs [--follow] [--filter <query>] [--since 15m] [--level <l>] [--limit 100]`: `POST /observability/logs/query` (default query `project:<name>`, ISO `timeFrom`, `order: asc`); `--follow` streams `GET /observability/logs/stream` (SSE) with exponential reconnect (500ms→10s) on transport errors, stops on Ctrl+C, aborts immediately on 401/403. `--json` = NDJSON entries (+ `{"type":"reconnect"}` lines); `--filter` is sent server-side and applied client-side as a substring fallback.
 - `frontal policy check [--strict] [--user <id>] [--role <name>...] [--env <name>]`: validates `.frontal/policies/*.{json,rego,cel}` via `POST /policies/validate`, lists active policies, runs `POST /access/check` (action `deploy`) for every service in `frontal.jsonc` as the current identity (`GET /auth/account/profile`, or `--user/--role`), reads `GET /compliance/score` (warn < 70). Prints `✓/!/✗ rule — reason` + `fix:`; exit 1 on any deny; `--strict` turns warnings into denies. `--json` → `{passed, policyId, userId, strict, summary:{pass,warn,deny}, ruleResults:[{ruleId, result, passed, reason, fix}]}`.
+- `frontal deploy [--preview|--prod] [--yes] [--dry-run] [--outdir <dir>] [--env <name>]`: bundles `entry` from `frontal.jsonc` (default `src/index.ts`) with `bun build` (in-process under Bun, `bun build` CLI under Node → `BUNDLER_UNAVAILABLE` if Bun is missing) into `<outdir>/index.js` + `manifest.json` (name, env, target, sha, size, vars, state *schema* only). `--dry-run` stops there (no network). Otherwise `POST /workers` as `<name>-preview` (default) or `<name>` (`--prod`, needs `--yes` non-interactively → `CONFIRMATION_REQUIRED`). Prints `<apiUrl>/workers/<name>` + request id; records `.frontal/state/deploys/<id>.json` (+ `current-<env>`, `current-<env>-<target>`) with an immutable artifact copy in `.frontal/artifacts/<sha>/`. `--json` → `{dryRun, target, sha, size, manifest, record?}`.
+- `frontal promote <url|id>`: re-`POST /workers` the recorded preview artifact under the prod name; no rebuild. Errors `DEPLOYMENT_NOT_FOUND`, `ARTIFACT_MISSING` (5).
+- `frontal rollback [url|id]`: re-deploys the previous production record (or the given one). `NO_ROLLBACK_TARGET` (5) when there is nothing older.
 - `frontal auth login [--method browser|api-key] [--auth-url <url>]`: browser PKCE login or validated API key; stores into the active profile.
 - `frontal auth password-login --email <e> --password <p>` / `frontal auth signup --email <e> --password <p>`: public auth API (no credentials needed).
 - `frontal auth whoami [--local]`: local credential status plus `GET /auth/account/profile`; `--local` skips the API.
@@ -31,8 +34,6 @@ Version: frontal-cli@0.1.0. Verify with `frontal --version`.
 - `frontal runs <list|create --body>`; `frontal invocations create --body`; `frontal events <list|get <id>|query --body|usage --body|reprocess --body>`.
 - `frontal completion <bash|zsh|fish>`; `frontal migrate-legacy`.
 
-Planned (not yet in this version): `deploy`, `promote`, `rollback`.
-
 ## Global flags
 
 `--json`, `--yaml`, `--quiet`, `--verbose` (or `FRONTAL_DEBUG=1`), `--debug`, `--env <dev|staging|prod>`, `--api-key`, `--api-url`, `--profile`, `--yes`, `--no-color`, `--watch [s]`, `--until field=value`.
@@ -40,7 +41,7 @@ Planned (not yet in this version): `deploy`, `promote`, `rollback`.
 ## frontal.jsonc
 
 ```jsonc
-{ "$schema": "https://frontal.dev/schemas/frontal.jsonc", "name": "my-app", "env": "dev",
+{ "$schema": "https://frontal.dev/schemas/frontal.jsonc", "name": "my-app", "env": "dev", "entry": "src/index.ts",
   "apiUrl": "https://api.frontal.dev/v1",
   "services": { "ai": { "remote": false }, "agents": { "remote": false }, "graph": { "remote": false } },
   "vars": {}, "secrets": { "required": ["FRONTAL_API_KEY"] } }

@@ -110,6 +110,32 @@ frontal types --out types/frontal.d.ts
 frontal types --env staging --json
 ```
 
+### `frontal deploy [--preview | --prod] [--yes] [--dry-run] [--outdir <dir>]`
+
+1. Bundles `entry` from `frontal.jsonc` (default `src/index.ts`) with `bun build`
+   (`--format=esm --target=bun`) into `<outdir>/index.js` (default
+   `.frontal/build/<target>/`). Under Node the `bun` CLI is spawned; without Bun the
+   command fails with `BUNDLER_UNAVAILABLE`.
+2. Writes `manifest.json`: name, env, target, entry, sha256, size, var names and a
+   snapshot of the local state *schema* (namespaces, counts, field names — no rows).
+3. `--dry-run` stops here — no credentials, no network.
+4. `--prod` asks for confirmation (`--yes` / `-y` in CI, otherwise `CONFIRMATION_REQUIRED`).
+5. `POST /workers` with `{ name, code, entrypoint: "index.js", env_vars: vars }` where
+   `name` is `<project>-preview` or `<project>`; prints `<apiUrl>/workers/<name>` and the
+   request id.
+6. Records the deployment in `.frontal/state/deploys/` and keeps an immutable copy of the
+   artifact in `.frontal/artifacts/<sha>/`.
+
+### `frontal promote <url|id>`
+
+Finds the recorded deployment and re-uploads its artifact under the production name.
+Nothing is rebuilt, so what goes to production is byte-for-byte the promoted preview.
+
+### `frontal rollback [url|id]`
+
+Re-deploys the previous production record (or the given one). Needs at least two
+production deploys unless a reference is passed (`NO_ROLLBACK_TARGET`).
+
 ### `frontal env pull [file] [--force]`
 
 Writes `.env.local` (or `file`) from the project config:
