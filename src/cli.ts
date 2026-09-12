@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { registerAuthCommands } from "@/commands/auth.js";
 import { registerCompletionCommands } from "@/commands/completion.js";
 import { registerConfigCommands } from "@/commands/config.js";
+import { registerDevCommand } from "@/commands/dev.js";
 import { registerEventsCommands } from "@/commands/events.js";
 import { registerInitCommand } from "@/commands/init.js";
 import { registerInvocationsCommands } from "@/commands/invocations.js";
@@ -37,6 +38,7 @@ export function buildProgram(program = new Command()): Command {
     .option("--no-color", "Disable colors");
 
   registerInitCommand(program);
+  registerDevCommand(program);
   registerTypesCommand(program);
   registerAuthCommands(program);
   registerConfigCommands(program);
