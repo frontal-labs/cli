@@ -29,21 +29,20 @@ interface ApiErrorShape {
 const RETRY_HINT = "Wait and try again.";
 
 const FIX_BY_CODE: Record<string, string> = {
-  UNAUTHORIZED: "Run `frontal auth login` or set a valid FRONTAL_API_KEY.",
+  CONFLICT: "The resource changed underneath you; re-fetch and retry.",
+  FORBIDDEN: "Check your role with `frontal auth whoami` or ask an admin.",
   INVALID_API_KEY:
     "Check FRONTAL_API_KEY — it must be a valid key starting with frt_.",
-  FORBIDDEN: "Check your role with `frontal auth whoami` or ask an admin.",
   NOT_FOUND: "Verify the resource id belongs to this workspace/environment.",
-  VALIDATION_ERROR: "Fix the request payload; see the listed fields.",
   RATE_LIMITED: "Back off and retry, or lower request concurrency.",
-  CONFLICT: "The resource changed underneath you; re-fetch and retry.",
+  UNAUTHORIZED: "Run `frontal auth login` or set a valid FRONTAL_API_KEY.",
+  VALIDATION_ERROR: "Fix the request payload; see the listed fields.",
 };
 
 function asApiError(err: unknown): ApiErrorShape | undefined {
   if (err instanceof Error && typeof (err as ApiErrorShape).code === "string") {
     return err as ApiErrorShape;
   }
-  return;
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -114,22 +113,23 @@ function classifyApiError(err: ApiErrorShape): ErrorReport {
 
   return {
     code,
-    message: String(err.message ?? "Request failed."),
-    statusCode,
-    requestId: optionalString(err.requestId),
     docs: optionalString(err.docs) ?? docsUrlFor(code),
-    fix,
-    fields: fieldsFrom(err.fields),
-    retryAfter,
     exitCode: exitCodeForApiError(name, statusCode),
+    fields: fieldsFrom(err.fields),
+    fix,
+    message: String(err.message ?? "Request failed."),
+    requestId: optionalString(err.requestId),
+    retryAfter,
+    statusCode,
   };
 }
 
 function classifyZodError(err: Error): ErrorReport {
-  const issues = (err as { issues?: unknown }).issues;
+  const { issues } = err as { issues?: unknown };
   return {
     code: "VALIDATION_ERROR",
-    message: "Input validation failed.",
+    docs: docsUrlFor("VALIDATION_ERROR"),
+    exitCode: EXIT_CODES.VALIDATION_ERROR,
     fields: Array.isArray(issues)
       ? issues.map((issue) => ({
           field: Array.isArray(issue.path) ? issue.path.join(".") : "",
@@ -137,8 +137,7 @@ function classifyZodError(err: Error): ErrorReport {
         }))
       : undefined,
     fix: FIX_BY_CODE.VALIDATION_ERROR,
-    docs: docsUrlFor("VALIDATION_ERROR"),
-    exitCode: EXIT_CODES.VALIDATION_ERROR,
+    message: "Input validation failed.",
   };
 }
 
@@ -149,11 +148,11 @@ export function classifyError(
   if (err instanceof CliError) {
     return {
       code: err.code,
-      message: err.message,
-      fix: err.fix,
       docs: err.docs,
-      requestId: err.requestId ?? context.requestId,
       exitCode: err.exitCode,
+      fix: err.fix,
+      message: err.message,
+      requestId: err.requestId ?? context.requestId,
     };
   }
 
@@ -164,22 +163,22 @@ export function classifyError(
   if (err instanceof Error && err.name === "NetworkError") {
     return {
       code: "NETWORK_ERROR",
-      message: "Could not reach the Frontal API.",
-      fix: "Check your connection and the API URL (`frontal config list`).",
       docs: docsUrlFor("NETWORK_ERROR"),
-      requestId: context.requestId,
       exitCode: EXIT_CODES.NETWORK_ERROR,
+      fix: "Check your connection and the API URL (`frontal config list`).",
+      message: "Could not reach the Frontal API.",
+      requestId: context.requestId,
     };
   }
 
   if (err instanceof Error && err.name === "TimeoutError") {
     return {
       code: "TIMEOUT",
-      message: err.message,
-      fix: "Try again; the API did not respond in time.",
       docs: docsUrlFor("TIMEOUT"),
-      requestId: context.requestId,
       exitCode: EXIT_CODES.TIMEOUT_ERROR,
+      fix: "Try again; the API did not respond in time.",
+      message: err.message,
+      requestId: context.requestId,
     };
   }
 
@@ -192,19 +191,19 @@ export function classifyError(
   if (err instanceof Error) {
     return {
       code: "UNHANDLED_ERROR",
-      message: err.message,
       docs: docsUrlFor("UNHANDLED_ERROR"),
-      requestId: context.requestId,
       exitCode: EXIT_CODES.GENERAL_ERROR,
+      message: err.message,
+      requestId: context.requestId,
     };
   }
 
   return {
     code: "UNEXPECTED_ERROR",
-    message: "An unexpected error occurred.",
     docs: docsUrlFor("UNEXPECTED_ERROR"),
-    requestId: context.requestId,
     exitCode: EXIT_CODES.GENERAL_ERROR,
+    message: "An unexpected error occurred.",
+    requestId: context.requestId,
   };
 }
 
@@ -240,13 +239,13 @@ export function renderError(
       JSON.stringify({
         error: redact({
           code: report.code,
-          message: report.message,
-          fix: report.fix,
           docs: report.docs,
-          requestId: report.requestId,
-          statusCode: report.statusCode,
           fields: report.fields,
+          fix: report.fix,
+          message: report.message,
+          requestId: report.requestId,
           retryAfter: report.retryAfter,
+          statusCode: report.statusCode,
         }),
       })
     );

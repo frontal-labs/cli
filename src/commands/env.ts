@@ -33,8 +33,8 @@ export interface PullResult {
 interface PullInput {
   config: ProjectConfig;
   /** Credential-derived defaults for secrets (never read from the target file). */
-  defaults: Record<string, string>;
-  existing: Record<string, string>;
+  defaults: Partial<Record<string, string>>;
+  existing: Partial<Record<string, string>>;
 }
 
 function renderDotenv(
@@ -75,7 +75,7 @@ export function buildEnvFile(input: PullInput): {
     source: "written" | "preserved",
     comment?: string
   ): void => {
-    entries.push({ key, value, comment });
+    entries.push({ comment, key, value });
     seen.add(key);
     (source === "written" ? written : preserved).push(key);
   };
@@ -97,7 +97,7 @@ export function buildEnvFile(input: PullInput): {
         "required secret"
       );
     } else {
-      entries.push({ key, value: "", comment: "required secret — fill in" });
+      entries.push({ comment: "required secret — fill in", key, value: "" });
       seen.add(key);
       missing.push(key);
     }
@@ -110,12 +110,12 @@ export function buildEnvFile(input: PullInput): {
   }
 
   for (const [key, value] of Object.entries(existing)) {
-    if (!seen.has(key)) {
+    if (!seen.has(key) && value !== undefined) {
       push(key, value, "preserved");
     }
   }
 
-  return { content: renderDotenv(entries), written, preserved, missing };
+  return { content: renderDotenv(entries), missing, preserved, written };
 }
 
 export async function pullEnv(
@@ -131,8 +131,8 @@ export async function pullEnv(
       "ENV_FILE_EXISTS",
       `${relative(process.cwd(), file) || file} already exists.`,
       {
-        fix: "Re-run with --force to merge into it (existing secret values are kept), or pass another file name.",
         exitCode: EXIT_CODES.GENERAL_ERROR,
+        fix: "Re-run with --force to merge into it (existing secret values are kept), or pass another file name.",
       }
     );
   }
@@ -149,13 +149,13 @@ export async function pullEnv(
     defaults.FRONTAL_API_KEY = credential.apiKey;
   }
 
-  const built = buildEnvFile({ config, existing, defaults });
+  const built = buildEnvFile({ config, defaults, existing });
   writeFileSync(file, built.content, { mode: 0o600 });
   return {
     file,
-    written: built.written,
-    preserved: built.preserved,
     missing: built.missing,
+    preserved: built.preserved,
+    written: built.written,
   };
 }
 
@@ -183,8 +183,8 @@ export async function pushEnv(
       "ENV_FILE_MISSING",
       `${relative(process.cwd(), file) || file} not found.`,
       {
-        fix: "Run `frontal env pull` first, then fill in the required secrets.",
         exitCode: EXIT_CODES.CONFIG_ERROR,
+        fix: "Run `frontal env pull` first, then fill in the required secrets.",
       }
     );
   }
@@ -196,8 +196,8 @@ export async function pushEnv(
       "MISSING_SECRETS",
       `Missing required secrets: ${missing.join(", ")}.`,
       {
-        fix: `Set ${missing.join(", ")} in ${relative(process.cwd(), file) || file}.`,
         exitCode: EXIT_CODES.VALIDATION_ERROR,
+        fix: `Set ${missing.join(", ")} in ${relative(process.cwd(), file) || file}.`,
       }
     );
   }
@@ -208,8 +208,8 @@ export async function pushEnv(
       "NO_DEPLOYMENT",
       `No deployment recorded for environment "${config.env}".`,
       {
-        fix: "Run `frontal deploy --preview` (or --prod) first; env push updates that deployment's variables.",
         exitCode: EXIT_CODES.CONFIG_ERROR,
+        fix: "Run `frontal deploy --preview` (or --prod) first; env push updates that deployment's variables.",
       }
     );
   }
@@ -237,13 +237,13 @@ function deployPayload(
   envVars: Record<string, string>
 ) {
   return {
-    name: deployment.name,
     code: readFileSync(
       join(deployment.artifactDir, deployment.entrypoint),
       "utf-8"
     ),
     entrypoint: deployment.entrypoint,
     envVars,
+    name: deployment.name,
   };
 }
 

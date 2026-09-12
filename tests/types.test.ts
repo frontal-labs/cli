@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { force: true, recursive: true });
 });
 
 describe("renderTypes", () => {
@@ -109,7 +109,7 @@ describe("generateTypes", () => {
       expect(proc.stdout + proc.stderr).toBe("");
       expect(proc.status).toBe(0);
     } finally {
-      rmSync(check, { recursive: true, force: true });
+      rmSync(check, { force: true, recursive: true });
     }
   }, 60_000);
 
@@ -143,7 +143,7 @@ describe("frontal types (CLI)", () => {
         code: "NO_PROJECT",
       });
     } finally {
-      rmSync(empty, { recursive: true, force: true });
+      rmSync(empty, { force: true, recursive: true });
     }
 
     vi.spyOn(process, "cwd").mockReturnValue(root);

@@ -24,24 +24,26 @@ export async function exchangeCode(params: {
   codeVerifier: string;
 }): Promise<TokenSet> {
   const body = new URLSearchParams({
-    grant_type: "authorization_code",
     client_id: params.clientId ?? CLI_CLIENT_ID,
     code: params.code,
-    redirect_uri: params.redirectUri,
     code_verifier: params.codeVerifier,
+    grant_type: "authorization_code",
+    redirect_uri: params.redirectUri,
   });
 
   const response = await fetch(`${params.authUrl}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    method: "POST",
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
+    const err = (await response.json().catch(() => ({}))) as Partial<
+      Record<string, string>
+    >;
     throw new Error(
-      (err as Record<string, string>).error_description ??
-        (err as Record<string, string>).error ??
+      err.error_description ??
+        err.error ??
         `Token exchange failed (${response.status})`
     );
   }
@@ -49,8 +51,8 @@ export async function exchangeCode(params: {
   const data = (await response.json()) as TokenResponse;
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
     expiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
+    refreshToken: data.refresh_token,
   };
 }
 
@@ -60,22 +62,24 @@ export async function refreshTokens(params: {
   refreshToken: string;
 }): Promise<TokenSet> {
   const body = new URLSearchParams({
-    grant_type: "refresh_token",
     client_id: params.clientId ?? CLI_CLIENT_ID,
+    grant_type: "refresh_token",
     refresh_token: params.refreshToken,
   });
 
   const response = await fetch(`${params.authUrl}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    method: "POST",
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
+    const err = (await response.json().catch(() => ({}))) as Partial<
+      Record<string, string>
+    >;
     throw new Error(
-      (err as Record<string, string>).error_description ??
-        (err as Record<string, string>).error ??
+      err.error_description ??
+        err.error ??
         `Token refresh failed (${response.status})`
     );
   }
@@ -83,8 +87,8 @@ export async function refreshTokens(params: {
   const data = (await response.json()) as TokenResponse;
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
     expiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
+    refreshToken: data.refresh_token,
   };
 }
 

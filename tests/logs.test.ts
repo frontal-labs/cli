@@ -24,7 +24,7 @@ beforeEach(() => {
 afterEach(async () => {
   await server?.stop();
   server = undefined;
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { force: true, recursive: true });
 });
 
 describe("helpers", () => {
@@ -49,28 +49,28 @@ describe("frontal logs (query)", () => {
   it("queries the observability API with the project query and window, printing NDJSON", async () => {
     const mock = await mockApi([
       {
-        method: "POST",
-        path: "/observability/logs/query",
         body: {
           data: [
             {
               id: "log_1",
-              timestamp: "2026-01-01T00:00:00Z",
               level: "info",
-              service: "api",
               message: "hello",
+              service: "api",
+              timestamp: "2026-01-01T00:00:00Z",
             },
             {
               id: "log_2",
-              timestamp: "2026-01-01T00:00:01Z",
               level: "error",
-              service: "api",
               message: "boom",
               metadata: { request_id: "req_9" },
+              service: "api",
+              timestamp: "2026-01-01T00:00:01Z",
             },
           ],
           pagination: { cursor: "c", has_more: true },
         },
+        method: "POST",
+        path: "/observability/logs/query",
       },
     ]);
 
@@ -88,14 +88,14 @@ describe("frontal logs (query)", () => {
     expect(result.exitCode).toBe(0);
     const request = mock.expectCalled("POST", "/observability/logs/query");
     expect(request.body).toMatchObject({
+      level: "error",
+      limit: 2,
+      order: "asc",
       query: `project:${root
         .split("/")
         .pop()
         ?.toLowerCase()
         .replace(NON_NAME, "-")}`,
-      level: "error",
-      limit: 2,
-      order: "asc",
     });
     expect(String((request.body as { timeFrom: string }).timeFrom)).toMatch(
       ISO_YEAR
@@ -110,20 +110,20 @@ describe("frontal logs (query)", () => {
   it("uses --filter as the server query and applies it client-side too", async () => {
     await mockApi([
       {
-        method: "POST",
-        path: "/observability/logs/query",
         body: {
           data: [
             {
               id: "log_1",
-              timestamp: "t",
               level: "info",
               message: "agents ok",
+              timestamp: "t",
             },
-            { id: "log_2", timestamp: "t", level: "info", message: "graph ok" },
+            { id: "log_2", level: "info", message: "graph ok", timestamp: "t" },
           ],
           pagination: { cursor: "end", has_more: false },
         },
+        method: "POST",
+        path: "/observability/logs/query",
       },
     ]);
 
@@ -137,10 +137,10 @@ describe("frontal logs (query)", () => {
   it("propagates API errors with request ids", async () => {
     await mockApi([
       {
+        body: { code: "FORBIDDEN", message: "no", requestId: "req_403" },
         method: "POST",
         path: "/observability/logs/query",
         status: 403,
-        body: { code: "FORBIDDEN", message: "no", requestId: "req_403" },
       },
     ]);
     const result = await runCli(["logs", "--json"]);
@@ -154,11 +154,11 @@ describe("frontal logs (query)", () => {
 
 describe("frontal logs --follow", () => {
   it("tails the dev server's stream, reconnects on drops and stops on abort", async () => {
-    server = new DevServer({ root, port: 0, globalOpts: {}, watch: false });
+    server = new DevServer({ globalOpts: {}, port: 0, root, watch: false });
     const info = await server.start();
     const baseUrl = `${info.url}/v1`;
     const sdkModule = await import("@/lib/sdk.js");
-    const globalOpts = { json: true, apiKey: TEST_API_KEY, apiUrl: baseUrl };
+    const globalOpts = { apiKey: TEST_API_KEY, apiUrl: baseUrl, json: true };
     const lines: string[] = [];
     vi.mocked(console.log).mockImplementation((line: unknown) => {
       lines.push(String(line));
@@ -166,19 +166,19 @@ describe("frontal logs --follow", () => {
 
     const controller = new AbortController();
     const ctx = {
-      globalOpts,
       fmt: Formatter.from(globalOpts),
+      globalOpts,
       sdk: (options?: { signal?: AbortSignal }) =>
         sdkModule.createSdkHandle({
-          credential: { kind: "api-key", apiKey: TEST_API_KEY },
           baseUrl,
+          credential: { apiKey: TEST_API_KEY, kind: "api-key" },
           maxRetries: 0,
           signal: options?.signal,
         }),
     };
     const done = followLogs(
       ctx,
-      { follow: true, filter: "agents" },
+      { filter: "agents", follow: true },
       controller.signal
     );
 
@@ -209,10 +209,10 @@ describe("frontal logs --follow", () => {
   it("aborts immediately on auth errors instead of retrying", async () => {
     await mockApi([
       {
+        body: { code: "UNAUTHORIZED", message: "nope", requestId: "req_401" },
         method: "GET",
         path: "/observability/logs/stream",
         status: 401,
-        body: { code: "UNAUTHORIZED", message: "nope", requestId: "req_401" },
       },
     ]);
     const result = await runCli(["logs", "--follow", "--json"]);
@@ -230,9 +230,9 @@ describe("logs default query", () => {
     vi.spyOn(process, "cwd").mockReturnValue(outside);
     const mock = await mockApi([
       {
+        body: { data: [], pagination: { cursor: "end", has_more: false } },
         method: "POST",
         path: "/observability/logs/query",
-        body: { data: [], pagination: { cursor: "end", has_more: false } },
       },
     ]);
     const result = await runCli(["logs"]);
@@ -240,6 +240,6 @@ describe("logs default query", () => {
     expect(
       mock.expectCalled("POST", "/observability/logs/query").body
     ).toMatchObject({ query: "*" });
-    rmSync(outside, { recursive: true, force: true });
+    rmSync(outside, { force: true, recursive: true });
   });
 });

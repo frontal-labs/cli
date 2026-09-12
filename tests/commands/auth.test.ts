@@ -5,12 +5,12 @@ import { lastJson, mockApi, runCli, TEST_API_KEY } from "../helpers/cli.js";
 
 function resetProfile(): void {
   configManager.setProfile("default", {
-    apiKey: undefined,
     accessToken: undefined,
-    refreshToken: undefined,
-    tokenExpiresAt: undefined,
+    apiKey: undefined,
     authUrl: undefined,
     baseUrl: undefined,
+    refreshToken: undefined,
+    tokenExpiresAt: undefined,
   });
   configManager.setActiveProfile("default");
 }
@@ -21,13 +21,13 @@ describe("frontal auth", () => {
   it("password-login posts credentials without an Authorization header and stores tokens", async () => {
     const mock = await mockApi([
       {
-        method: "POST",
-        path: "/auth/login",
         body: {
           access_token: "jwt-access",
-          refresh_token: "jwt-refresh",
           expires_at: 1_900_000_000,
+          refresh_token: "jwt-refresh",
         },
+        method: "POST",
+        path: "/auth/login",
       },
     ]);
 
@@ -58,7 +58,7 @@ describe("frontal auth", () => {
 
   it("signup posts to /auth/signup anonymously", async () => {
     const mock = await mockApi([
-      { method: "POST", path: "/auth/signup", status: 201, body: { id: "u1" } },
+      { body: { id: "u1" }, method: "POST", path: "/auth/signup", status: 201 },
     ]);
 
     const result = await runCli([
@@ -80,19 +80,19 @@ describe("frontal auth", () => {
 
   it("mfa subcommands call the /auth/mfa endpoints", async () => {
     const mock = await mockApi([
-      { method: "GET", path: "/auth/mfa/status", body: { enabled: false } },
+      { body: { enabled: false }, method: "GET", path: "/auth/mfa/status" },
       {
+        body: { secret: "otp-secret" },
         method: "POST",
         path: "/auth/mfa/setup",
-        body: { secret: "otp-secret" },
       },
-      { method: "POST", path: "/auth/mfa/enable", body: { enabled: true } },
-      { method: "POST", path: "/auth/mfa/disable", body: { enabled: false } },
-      { method: "POST", path: "/auth/mfa/verify", body: { ok: true } },
+      { body: { enabled: true }, method: "POST", path: "/auth/mfa/enable" },
+      { body: { enabled: false }, method: "POST", path: "/auth/mfa/disable" },
+      { body: { ok: true }, method: "POST", path: "/auth/mfa/verify" },
       {
+        body: { codes: ["a"] },
         method: "POST",
         path: "/auth/mfa/backup-codes/regenerate",
-        body: { codes: ["a"] },
       },
     ]);
 
@@ -120,9 +120,9 @@ describe("frontal auth", () => {
     configManager.setProfile("default", { apiKey: TEST_API_KEY });
     await mockApi([
       {
+        body: { email: "dev@example.com", id: "user_1" },
         method: "GET",
         path: "/auth/account/profile",
-        body: { id: "user_1", email: "dev@example.com" },
       },
     ]);
 
@@ -130,7 +130,7 @@ describe("frontal auth", () => {
 
     expect(result.exitCode).toBe(0);
     expect(lastJson(result.stdout)).toMatchObject({
-      account: { id: "user_1", email: "dev@example.com" },
+      account: { email: "dev@example.com", id: "user_1" },
     });
   });
 
@@ -151,7 +151,7 @@ describe("frontal auth", () => {
 
   it("login --method api-key validates the key against the account profile before saving", async () => {
     const mock = createMockFetch([
-      { method: "GET", path: "/auth/account/profile", body: { id: "user_1" } },
+      { body: { id: "user_1" }, method: "GET", path: "/auth/account/profile" },
     ]);
     vi.stubGlobal("fetch", mock.fetch);
     const interactive = await import("@/utils/interactive.js");
@@ -176,10 +176,10 @@ describe("frontal auth", () => {
   it("login --method api-key rejects a key the API refuses", async () => {
     const mock = createMockFetch([
       {
+        body: { code: "UNAUTHORIZED", message: "nope", requestId: "req_x" },
         method: "GET",
         path: "/auth/account/profile",
         status: 401,
-        body: { code: "UNAUTHORIZED", message: "nope", requestId: "req_x" },
       },
     ]);
     vi.stubGlobal("fetch", mock.fetch);

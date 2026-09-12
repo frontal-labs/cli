@@ -52,8 +52,11 @@ export function compilePath(
 ): (pathname: string) => Record<string, string> | undefined {
   if (pattern instanceof RegExp) {
     return (pathname) => {
-      const match = pattern.exec(pathname);
-      return match ? { ...match.groups } : undefined;
+      const match = pathname.match(pattern);
+      if (match === null) {
+        return;
+      }
+      return { ...match.groups };
     };
   }
 
@@ -101,15 +104,15 @@ export function scenarioToRoute(route: ScenarioRoute): RouteDefinition {
   const path = route.path.startsWith("^") ? new RegExp(route.path) : route.path;
   const headers = { "content-type": "application/json", ...route.headers };
   return {
-    method: route.method.toUpperCase(),
-    path,
-    times: route.times,
-    service: "scenario",
     handler: () =>
       new Response(route.body === undefined ? "" : JSON.stringify(route.body), {
-        status: route.status ?? 200,
         headers,
+        status: route.status ?? 200,
       }),
+    method: route.method.toUpperCase(),
+    path,
+    service: "scenario",
+    times: route.times,
   };
 }
 
@@ -132,8 +135,8 @@ export class Router {
   replace(routes: RouteDefinition[]): void {
     this.routes = routes.map((route) => ({
       ...route,
-      method: route.method.toUpperCase(),
       matcher: compilePath(route.path),
+      method: route.method.toUpperCase(),
       remaining: route.times ?? Number.POSITIVE_INFINITY,
     }));
   }
@@ -150,9 +153,8 @@ export class Router {
       const params = route.matcher(pathname);
       if (params) {
         route.remaining -= 1;
-        return { route, params };
+        return { params, route };
       }
     }
-    return;
   }
 }

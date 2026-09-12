@@ -15,10 +15,10 @@ export async function mockApi(routes: MockRoute[] = []): Promise<MockApi> {
   const sdkModule = await import("@/lib/sdk.js");
   vi.spyOn(sdkModule, "getSdk").mockImplementation((globalOpts, options) =>
     sdkModule.createSdkHandle({
+      baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
       credential: options?.anonymous
         ? { kind: "anonymous" }
-        : { kind: "api-key", apiKey: TEST_API_KEY },
-      baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
+        : { apiKey: TEST_API_KEY, kind: "api-key" },
       fetch: mock.fetch,
       maxRetries: 0,
       signal: options?.signal,
@@ -77,12 +77,12 @@ export async function runCli(args: string[]): Promise<CliResult> {
     await run(["node", "frontal", ...args]);
   } catch (err) {
     if (err instanceof ExitError) {
-      exitCode = err.exitCode;
+      ({ exitCode } = err);
     } else {
       throw err;
     }
   }
-  return { exitCode, stdout, stderr };
+  return { exitCode, stderr, stdout };
 }
 
 export function lastJson(lines: string[]): Record<string, unknown> {

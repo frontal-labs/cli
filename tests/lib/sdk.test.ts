@@ -58,11 +58,11 @@ describe("sanitizeSdkEnv", () => {
 describe("resolveCredential precedence", () => {
   beforeEach(() => {
     configManager.setProfile("default", {
-      apiKey: undefined,
       accessToken: undefined,
+      apiKey: undefined,
+      authUrl: undefined,
       refreshToken: undefined,
       tokenExpiresAt: undefined,
-      authUrl: undefined,
     });
     configManager.setActiveProfile("default");
   });
@@ -73,34 +73,34 @@ describe("resolveCredential precedence", () => {
 
     expect(
       resolveCredential(resolveConfig({ apiKey: "frt_from_flag_0000" }))
-    ).toEqual({ kind: "api-key", apiKey: "frt_from_flag_0000" });
+    ).toEqual({ apiKey: "frt_from_flag_0000", kind: "api-key" });
     expect(resolveCredential(resolveConfig({}))).toEqual({
-      kind: "api-key",
       apiKey: "frt_from_env_000000",
+      kind: "api-key",
     });
 
     delete process.env.FRONTAL_API_KEY;
     expect(resolveCredential(resolveConfig({}))).toEqual({
-      kind: "api-key",
       apiKey: "frt_from_profile_00",
+      kind: "api-key",
     });
   });
 
   it("falls back to the stored OAuth session", () => {
     configManager.setProfile("default", {
       accessToken: "token-abc",
+      authUrl: "https://auth.test.frontal.dev",
       refreshToken: "refresh-abc",
       tokenExpiresAt: 123,
-      authUrl: "https://auth.test.frontal.dev",
     });
 
     expect(resolveCredential(resolveConfig({}))).toEqual({
-      kind: "oauth",
       accessToken: "token-abc",
-      refreshToken: "refresh-abc",
-      expiresAt: 123,
       authUrl: "https://auth.test.frontal.dev",
+      expiresAt: 123,
+      kind: "oauth",
       profileName: "default",
+      refreshToken: "refresh-abc",
     });
   });
 
@@ -121,12 +121,12 @@ describe("mapEnvironment", () => {
 describe("createAuthFetch", () => {
   it("injects the OAuth bearer token in place of the SDK placeholder", async () => {
     const mock = createMockFetch([
-      { method: "GET", path: "/ping", body: { ok: true } },
+      { body: { ok: true }, method: "GET", path: "/ping" },
     ]);
     const authFetch = createAuthFetch(
       {
-        kind: "oauth",
         accessToken: jwtWithExp(Math.floor(Date.now() / 1000) + 3600),
+        kind: "oauth",
         profileName: "default",
       },
       { fetch: mock.fetch }
@@ -143,7 +143,7 @@ describe("createAuthFetch", () => {
 
   it("removes the Authorization header for anonymous calls", async () => {
     const mock = createMockFetch([
-      { method: "POST", path: "/auth/login", body: {} },
+      { body: {}, method: "POST", path: "/auth/login" },
     ]);
     const authFetch = createAuthFetch(
       { kind: "anonymous" },
@@ -151,8 +151,8 @@ describe("createAuthFetch", () => {
     );
 
     await authFetch("https://api.test.frontal.dev/v1/auth/login", {
-      method: "POST",
       headers: { Authorization: "Bearer frt_placeholder_000000" },
+      method: "POST",
     });
 
     expect(
@@ -164,16 +164,16 @@ describe("createAuthFetch", () => {
     const freshToken = jwtWithExp(Math.floor(Date.now() / 1000) + 7200);
     const mock = createMockFetch([
       {
-        method: "POST",
-        path: "/oauth/token",
         body: {
           access_token: freshToken,
-          refresh_token: "refresh-2",
           expires_in: 7200,
+          refresh_token: "refresh-2",
           token_type: "Bearer",
         },
+        method: "POST",
+        path: "/oauth/token",
       },
-      { method: "GET", path: "/ping", body: { ok: true } },
+      { body: { ok: true }, method: "GET", path: "/ping" },
     ]);
     // refreshTokens() uses the global fetch.
     vi.stubGlobal("fetch", mock.fetch);
@@ -181,12 +181,12 @@ describe("createAuthFetch", () => {
 
     const authFetch = createAuthFetch(
       {
-        kind: "oauth",
         accessToken: "expired-token",
-        refreshToken: "refresh-1",
-        expiresAt: Math.floor(Date.now() / 1000) - 10,
         authUrl: "https://auth.test.frontal.dev",
+        expiresAt: Math.floor(Date.now() / 1000) - 10,
+        kind: "oauth",
         profileName: "default",
+        refreshToken: "refresh-1",
       },
       { fetch: mock.fetch }
     );
@@ -209,9 +209,9 @@ describe("createAuthFetch", () => {
 
   it("fails with TOKEN_EXPIRED when there is nothing to refresh with", async () => {
     const authFetch = createAuthFetch({
-      kind: "oauth",
       accessToken: "expired-token",
       expiresAt: 1,
+      kind: "oauth",
       profileName: "default",
     });
 
@@ -223,15 +223,15 @@ describe("createAuthFetch", () => {
   it("reports the response request id", async () => {
     const mock = createMockFetch([
       {
-        method: "GET",
-        path: "/ping",
         body: {},
         headers: { "x-request-id": "req_123" },
+        method: "GET",
+        path: "/ping",
       },
     ]);
     const seen: string[] = [];
     const authFetch = createAuthFetch(
-      { kind: "api-key", apiKey: TEST_API_KEY },
+      { apiKey: TEST_API_KEY, kind: "api-key" },
       { fetch: mock.fetch, onRequestId: (id) => seen.push(id) }
     );
 
@@ -245,19 +245,19 @@ describe("createSdkHandle / getSdk", () => {
   it("builds a client that sends the API key and CLI header through the SDK", async () => {
     const mock = createMockFetch([
       {
-        method: "GET",
-        path: "/workflows",
         body: {
           data: [{ id: "wf_1", name: "n" }],
           pagination: { cursor: "c", has_more: false },
         },
         headers: { "x-request-id": "req_wf" },
+        method: "GET",
+        path: "/workflows",
       },
     ]);
 
     const handle = await createSdkHandle({
-      credential: { kind: "api-key", apiKey: TEST_API_KEY },
       baseUrl: TEST_BASE_URL,
+      credential: { apiKey: TEST_API_KEY, kind: "api-key" },
       fetch: mock.fetch,
       maxRetries: 0,
     });
@@ -274,16 +274,16 @@ describe("createSdkHandle / getSdk", () => {
   it("rejects malformed keys with CONFIG_INVALID", async () => {
     await expect(
       createSdkHandle({
-        credential: { kind: "api-key", apiKey: "bad" },
         baseUrl: TEST_BASE_URL,
+        credential: { apiKey: "bad", kind: "api-key" },
       })
     ).rejects.toMatchObject({ code: "CONFIG_INVALID", exitCode: 6 });
   });
 
   it("throws NO_CREDENTIALS when nothing is configured", async () => {
     configManager.setProfile("default", {
-      apiKey: undefined,
       accessToken: undefined,
+      apiKey: undefined,
     });
     await expect(getSdk({})).rejects.toBeInstanceOf(CliError);
     await expect(getSdk({})).rejects.toMatchObject({ code: "NO_CREDENTIALS" });

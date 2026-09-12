@@ -97,8 +97,8 @@ for (const [routePath, entry] of Object.entries(paths)) {
     operations.push({
       key: `${method.toUpperCase()} ${normalizePath(routePath)}`,
       method: method.toUpperCase(),
-      path: normalizePath(routePath),
       operationId,
+      path: normalizePath(routePath),
     });
   }
 }

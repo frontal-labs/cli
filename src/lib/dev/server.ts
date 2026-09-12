@@ -134,6 +134,7 @@ async function writeResponse(
   const reader = response.body.getReader();
   try {
     for (;;) {
+      // biome-ignore lint/performance/noAwaitInLoops: streaming the body is sequential
       const { done, value } = await reader.read();
       if (done) {
         break;
@@ -179,8 +180,8 @@ export class DevServer {
     );
     this.ctx = {
       env: options.env ?? "dev",
-      logs: [],
       logSubscribers: new Set(),
+      logs: [],
       services: {},
       startedAt: Date.now(),
       state,
@@ -274,10 +275,10 @@ export class DevServer {
     return {
       host,
       port,
-      url: `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`,
       routes: this.routeCount,
-      services: this.ctx.services,
       scenario: this.scenarioName,
+      services: this.ctx.services,
+      url: `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`,
     };
   }
 
@@ -294,9 +295,9 @@ export class DevServer {
       clearTimeout(this.reloadTimer);
     }
     for (const subscriber of this.subscribers) {
-      subscriber({ type: "reload", data: { reason: "shutdown" } });
+      subscriber({ data: { reason: "shutdown" }, type: "reload" });
     }
-    const server = this.server;
+    const { server } = this;
     if (!server) {
       return;
     }
@@ -320,7 +321,7 @@ export class DevServer {
     const info = { reason, routes: this.routeCount };
     this.options.onReload?.(info);
     for (const subscriber of this.subscribers) {
-      subscriber({ type: "reload", data: info });
+      subscriber({ data: info, type: "reload" });
     }
     return true;
   }
@@ -425,18 +426,18 @@ export class DevServer {
       }
     }
     const raw = new Request(url, {
-      method,
-      headers,
       body: bytes && bytes.length > 0 ? bytes : undefined,
+      headers,
+      method,
       signal: controller.signal,
     });
     const devRequest: DevRequest = {
+      body: parseBody(bytes, headers.get("content-type") ?? ""),
+      headers,
       method,
+      params: {},
       path,
       query: url.searchParams,
-      headers,
-      body: parseBody(bytes, headers.get("content-type") ?? ""),
-      params: {},
       raw,
       requestId,
     };
@@ -459,19 +460,19 @@ export class DevServer {
       const response = match
         ? await match.route.handler(req)
         : apiError(404, "NOT_FOUND", "no health route", req.requestId);
-      return { response, mode: "local", service: "dev" };
+      return { mode: "local", response, service: "dev" };
     }
 
     if (req.path === "/__dev/events" && req.method === "GET") {
-      return { response: this.devEvents(req), mode: "local", service: "dev" };
+      return { mode: "local", response: this.devEvents(req), service: "dev" };
     }
 
     const scenario = this.scenarioRouter.match(req.method, req.path);
     if (scenario) {
       req.params = scenario.params;
       return {
-        response: await scenario.route.handler(req),
         mode: "scenario",
+        response: await scenario.route.handler(req),
         service: scenario.route.service ?? "scenario",
       };
     }
@@ -479,8 +480,8 @@ export class DevServer {
     const service = serviceForPath(req.path);
     if (service && this.ctx.services[service] === "remote") {
       return {
-        response: await this.proxy.forward(req, service),
         mode: "remote",
+        response: await this.proxy.forward(req, service),
         service,
       };
     }
@@ -489,13 +490,14 @@ export class DevServer {
     if (local) {
       req.params = local.params;
       return {
-        response: await local.route.handler(req),
         mode: "local",
+        response: await local.route.handler(req),
         service: local.route.service ?? service ?? "local",
       };
     }
 
     return {
+      mode: "local",
       response: apiError(
         404,
         "NOT_FOUND",
@@ -507,7 +509,6 @@ export class DevServer {
             : "Add a scenario route in .frontal/scenarios/<name>.json or check the path.",
         }
       ),
-      mode: "local",
       service: service ?? "unknown",
     };
   }
@@ -530,28 +531,28 @@ export class DevServer {
       emitLog(
         this.ctx,
         logEntry(level, `${req.method} ${req.path} ${status}`, {
-          request_id: req.requestId,
-          method: req.method,
-          path: req.path,
-          status,
           duration_ms: durationMs,
+          method: req.method,
           mode,
+          path: req.path,
+          request_id: req.requestId,
           service,
+          status,
         })
       );
     }
     for (const subscriber of this.subscribers) {
       subscriber({
-        type: "request",
         data: {
-          requestId: req.requestId,
-          method: req.method,
-          path: req.path,
-          status,
           durationMs,
+          method: req.method,
           mode,
+          path: req.path,
+          requestId: req.requestId,
           service,
+          status,
         },
+        type: "request",
       });
     }
   }
@@ -559,8 +560,8 @@ export class DevServer {
   /** `GET /__dev/events`: SSE feed of reloads and requests for tooling. */
   private devEvents(req: DevRequest): Response {
     const encoder = new TextEncoder();
-    const subscribers = this.subscribers;
-    const signal = req.raw.signal;
+    const { subscribers } = this;
+    const { signal } = req.raw;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         const send = (event: DevEvent): void => {
@@ -592,8 +593,8 @@ export class DevServer {
     });
     return new Response(stream, {
       headers: {
-        "content-type": "text/event-stream",
         "cache-control": "no-cache",
+        "content-type": "text/event-stream",
         "x-request-id": req.requestId,
       },
     });

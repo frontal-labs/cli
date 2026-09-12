@@ -23,8 +23,8 @@ export class Formatter {
   static from(globalOpts: Record<string, unknown>): Formatter {
     return new Formatter({
       json: globalOpts.json as boolean,
-      yaml: globalOpts.yaml as boolean,
       quiet: globalOpts.quiet as boolean,
+      yaml: globalOpts.yaml as boolean,
     });
   }
 

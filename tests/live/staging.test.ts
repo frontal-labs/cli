@@ -19,8 +19,8 @@ describe.skipIf(!live)(
   () => {
     const sdk = () =>
       createSdkHandle({
-        credential: { kind: "api-key", apiKey: apiKey as string },
         baseUrl,
+        credential: { apiKey: apiKey as string, kind: "api-key" },
         maxRetries: 1,
         timeout: 20_000,
       });
@@ -35,10 +35,10 @@ describe.skipIf(!live)(
     it("queries logs for the last hour", async () => {
       const handle = await sdk();
       const page = await handle.frontal.observability.logs.query({
+        limit: 5,
         query: "*",
         timeFrom: new Date(Date.now() - 3_600_000).toISOString(),
         timeTo: new Date().toISOString(),
-        limit: 5,
       });
       expect(Array.isArray(page.data)).toBe(true);
     });

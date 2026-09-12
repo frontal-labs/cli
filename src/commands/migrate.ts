@@ -8,35 +8,35 @@ const COMMAND_MAPPING: {
   current: string;
   status: string;
 }[] = [
-  { legacy: "orgs *", current: "removed", status: "not in public API scope" },
+  { current: "removed", legacy: "orgs *", status: "not in public API scope" },
   {
-    legacy: "workspaces *",
     current: "removed",
+    legacy: "workspaces *",
     status: "not in public API scope",
   },
   {
-    legacy: "workflows trigger",
     current: "workflows run/get|summary|timeline",
+    legacy: "workflows trigger",
     status: "changed",
   },
   {
-    legacy: "agents *",
     current: "removed",
+    legacy: "agents *",
     status: "not in Phase 1",
   },
   {
-    legacy: "functions *",
     current: "invocations create",
+    legacy: "functions *",
     status: "changed",
   },
   {
-    legacy: "pipelines *",
     current: "runs *",
+    legacy: "pipelines *",
     status: "partially mapped",
   },
   {
-    legacy: "auth mfa:*",
     current: "auth mfa <subcommand>",
+    legacy: "auth mfa:*",
     status: "renamed",
   },
 ];
@@ -52,24 +52,24 @@ export function registerMigrateCommand(program: Command): void {
 
         const checks = {
           activeProfile: cfg.activeProfile,
-          profileCount: Object.keys(cfg.profiles).length,
-          hasApiKey: Boolean(configManager.getProfile().apiKey),
           hasAccessToken: Boolean(configManager.getProfile().accessToken),
+          hasApiKey: Boolean(configManager.getProfile().apiKey),
+          profileCount: Object.keys(cfg.profiles).length,
           removedDomains: ["orgs", "workspaces"],
         };
 
         if (cmd.optsWithGlobals().json || cmd.optsWithGlobals().yaml) {
           fmt.raw({
-            migration: COMMAND_MAPPING,
             checks,
+            migration: COMMAND_MAPPING,
           });
           return;
         }
 
         fmt.table(COMMAND_MAPPING, [
-          { key: "legacy", header: "LEGACY" },
-          { key: "current", header: "CURRENT" },
-          { key: "status", header: "STATUS" },
+          { header: "LEGACY", key: "legacy" },
+          { header: "CURRENT", key: "current" },
+          { header: "STATUS", key: "status" },
         ]);
         fmt.object(checks);
       } catch (err) {

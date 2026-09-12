@@ -19,11 +19,11 @@ function createCaptureLogger() {
 
   return {
     getOutput: () => lastOutput,
-    resetOutput: () => {
-      lastOutput = "";
-    },
     hijack: () => {
       console.log = captureLog;
+    },
+    resetOutput: () => {
+      lastOutput = "";
     },
     restore: () => {
       console.log = originalLog;
@@ -85,11 +85,12 @@ async function watchLoop(
   capture: ReturnType<typeof createCaptureLogger>
 ) {
   const maxAttempts = condition ? 150 : Number.POSITIVE_INFINITY;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (attempt > 0) {
       process.stdout.write("\x1b[2J\x1b[H");
     }
 
+    // biome-ignore lint/performance/noAwaitInLoops: --watch re-runs sequentially
     await runOnce(handler, context, args, capture);
 
     if (condition) {

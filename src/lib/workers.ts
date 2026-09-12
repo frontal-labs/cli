@@ -27,10 +27,10 @@ export async function deployWorker(
   input: DeployWorkerInput
 ): Promise<DeployedWorker> {
   const response = await handle.http.postRaw("/workers", {
-    name: input.name,
     code: input.code,
     entrypoint: input.entrypoint,
     env_vars: input.envVars,
+    name: input.name,
   });
   const requestId = response.headers.get("x-request-id");
   if (requestId) {

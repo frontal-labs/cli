@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { force: true, recursive: true });
 });
 
 describe("initProject", () => {
@@ -27,28 +27,28 @@ describe("initProject", () => {
     const result = initProject(root, { name: "my-app" });
 
     expect(result.dir).toBe(join(root, "my-app"));
-    expect(result.created.sort()).toEqual(
+    expect(result.created.sort((a, b) => a.localeCompare(b))).toEqual(
       [
         ".env.example",
         ".gitignore",
         "frontal.jsonc",
         "package.json",
         "src/.gitkeep",
-      ].sort()
+      ].sort((a, b) => a.localeCompare(b))
     );
     const config = parseJsonc(
       readFileSync(join(result.dir, "frontal.jsonc"), "utf-8")
     );
     expect(config).toMatchObject({
-      name: "my-app",
-      env: "dev",
       apiUrl: "https://api.frontal.dev/v1",
+      env: "dev",
+      name: "my-app",
+      secrets: { required: ["FRONTAL_API_KEY"] },
       services: {
-        ai: { remote: false },
         agents: { remote: false },
+        ai: { remote: false },
         graph: { remote: false },
       },
-      secrets: { required: ["FRONTAL_API_KEY"] },
     });
     expect(readFileSync(join(result.dir, ".env.example"), "utf-8")).toContain(
       "FRONTAL_API_KEY=\n"
@@ -59,8 +59,8 @@ describe("initProject", () => {
     expect(
       JSON.parse(readFileSync(join(result.dir, "package.json"), "utf-8"))
     ).toMatchObject({
-      name: "my-app",
       dependencies: { "@frontal-labs/sdk": "^1.0.4" },
+      name: "my-app",
     });
   });
 
@@ -72,8 +72,11 @@ describe("initProject", () => {
 
     const second = initProject(root, { name: "app" });
     expect(second.created).toEqual([]);
-    expect(second.skipped.sort()).toEqual([".env.example", "frontal.jsonc"]);
-    expect(second.kept.sort()).toEqual([
+    expect(second.skipped.sort((a, b) => a.localeCompare(b))).toEqual([
+      ".env.example",
+      "frontal.jsonc",
+    ]);
+    expect(second.kept.sort((a, b) => a.localeCompare(b))).toEqual([
       ".gitignore",
       "package.json",
       "src/.gitkeep",
@@ -82,8 +85,11 @@ describe("initProject", () => {
       '{ "name": "custom" }'
     );
 
-    const forced = initProject(root, { name: "app", force: true });
-    expect(forced.updated.sort()).toEqual([".env.example", "frontal.jsonc"]);
+    const forced = initProject(root, { force: true, name: "app" });
+    expect(forced.updated.sort((a, b) => a.localeCompare(b))).toEqual([
+      ".env.example",
+      "frontal.jsonc",
+    ]);
     expect(readFileSync(join(dir, "package.json"), "utf-8")).toBe(
       '{ "name": "mine" }'
     );
@@ -132,8 +138,8 @@ describe("frontal init (CLI)", () => {
     const json = await runCli(["init", "--name", "demo", "--json"]);
     expect(json.exitCode).toBe(0);
     expect(lastJson(json.stdout)).toMatchObject({
-      name: "demo",
       created: [],
+      name: "demo",
       skipped: expect.arrayContaining(["frontal.jsonc"]),
     });
   });

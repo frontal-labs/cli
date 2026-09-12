@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { force: true, recursive: true });
 });
 
 describe("parseJsonc", () => {
@@ -81,7 +81,7 @@ describe("validateProjectConfig", () => {
 
   it("reuses the SDK url rule for apiUrl", async () => {
     await expect(
-      validateProjectConfig({ name: "x", apiUrl: "ftp://nope" })
+      validateProjectConfig({ apiUrl: "ftp://nope", name: "x" })
     ).rejects.toMatchObject({
       code: "CONFIG_INVALID",
       message: expect.stringContaining("apiUrl"),
@@ -90,7 +90,7 @@ describe("validateProjectConfig", () => {
 
   it("rejects unknown top-level keys and bad var names", async () => {
     await expect(
-      validateProjectConfig({ name: "x", extra: 1 })
+      validateProjectConfig({ extra: 1, name: "x" })
     ).rejects.toMatchObject({ code: "CONFIG_INVALID" });
     await expect(
       validateProjectConfig({ name: "x", vars: { "lower-case": "v" } })
@@ -159,9 +159,9 @@ describe("dotenv + secrets", () => {
       `# comment\nexport FRONTAL_API_KEY="frt_local_key_000000"\nFRONTAL_API_URL=http://localhost:8787/v1 # trailing\nEMPTY=\n`
     );
     expect(loadDotenvLocal(root)).toEqual({
+      EMPTY: "",
       FRONTAL_API_KEY: "frt_local_key_000000",
       FRONTAL_API_URL: "http://localhost:8787/v1",
-      EMPTY: "",
     });
     expect(process.env.FRONTAL_API_KEY).toBeUndefined();
     expect(parseDotenv("A='x y'")).toEqual({ A: "x y" });

@@ -36,8 +36,8 @@ function parsePort(value: string | undefined): number {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 0 || port > 65_535) {
     throw new CliError("INVALID_PORT", `Invalid port "${value}".`, {
-      fix: "Use an integer between 0 and 65535 (0 picks a free port).",
       exitCode: EXIT_CODES.VALIDATION_ERROR,
+      fix: "Use an integer between 0 and 65535 (0 picks a free port).",
     });
   }
   return port;
@@ -100,7 +100,7 @@ function createOutput(globalOpts: GlobalOptions): DevOutput {
     log: showLog
       ? (line) => {
           if (json) {
-            emitJsonLine({ type: "request", line });
+            emitJsonLine({ line, type: "request" });
           } else {
             console.error(theme.dim(line));
           }
@@ -124,7 +124,7 @@ function createOutput(globalOpts: GlobalOptions): DevOutput {
     },
     stopped: (signal) => {
       if (json) {
-        emitJsonLine({ type: "stopped", signal });
+        emitJsonLine({ signal, type: "stopped" });
       } else if (!quiet) {
         console.error(theme.dim(`\nstopped (${signal})`));
       }
@@ -143,10 +143,11 @@ async function startOrExplain(
       err instanceof Error &&
       (err as NodeJS.ErrnoException).code === "EADDRINUSE"
     ) {
+      // biome-ignore lint/style/useErrorCause: cause is forwarded through CliError options
       throw new CliError("PORT_IN_USE", `Port ${port} is already in use.`, {
-        fix: "Pass --port <other> or stop the process using it.",
-        exitCode: EXIT_CODES.GENERAL_ERROR,
         cause: err,
+        exitCode: EXIT_CODES.GENERAL_ERROR,
+        fix: "Pass --port <other> or stop the process using it.",
       });
     }
     throw err;
@@ -177,25 +178,25 @@ export function registerDevCommand(program: Command): void {
               "NO_PROJECT",
               "No frontal.jsonc found in this directory or its parents.",
               {
-                fix: "Run `frontal init` first, or cd into a Frontal project.",
                 exitCode: EXIT_CODES.CONFIG_ERROR,
+                fix: "Run `frontal init` first, or cd into a Frontal project.",
               }
             );
           }
 
           const output = createOutput(globalOpts);
           const server = new DevServer({
-            root,
             env: globalOpts.env,
             globalOpts,
-            port: parsePort(opts.port),
             host: opts.host,
-            scenario: opts.scenario,
-            remote: parseRemote(opts.remote),
-            persistTo: opts.persistTo,
-            watch: opts.watch !== false,
             log: output.log,
             onReload: output.reload,
+            persistTo: opts.persistTo,
+            port: parsePort(opts.port),
+            remote: parseRemote(opts.remote),
+            root,
+            scenario: opts.scenario,
+            watch: opts.watch !== false,
           });
 
           const info = await startOrExplain(server, parsePort(opts.port));

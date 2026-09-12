@@ -109,13 +109,14 @@ export function readConfigFile(file: string): Record<string, unknown> {
   try {
     parsed = parseJsonc(readFileSync(file, "utf-8"));
   } catch (err) {
+    // biome-ignore lint/style/useErrorCause: cause is forwarded through CliError options
     throw new CliError(
       "CONFIG_PARSE_ERROR",
       `Could not parse ${file}: ${err instanceof Error ? err.message : String(err)}`,
       {
-        fix: "Check the file for JSON syntax errors (comments and trailing commas are allowed).",
-        exitCode: EXIT_CODES.CONFIG_ERROR,
         cause: err,
+        exitCode: EXIT_CODES.CONFIG_ERROR,
+        fix: "Check the file for JSON syntax errors (comments and trailing commas are allowed).",
       }
     );
   }
@@ -155,8 +156,8 @@ export function loadRawProjectConfig(
       "NO_PROJECT",
       `No ${PROJECT_CONFIG_FILE} found in ${resolve(options.cwd ?? process.cwd())} or its parents.`,
       {
-        fix: "Run `frontal init` to create a project, or cd into one.",
         exitCode: EXIT_CODES.CONFIG_ERROR,
+        fix: "Run `frontal init` to create a project, or cd into one.",
       }
     );
   }
@@ -169,8 +170,8 @@ export function loadRawProjectConfig(
   if (env !== undefined) {
     if (!ENV_NAMES.includes(env as EnvName)) {
       throw new CliError("CONFIG_INVALID", `Unknown environment "${env}".`, {
-        fix: `Use one of: ${ENV_NAMES.join(", ")}.`,
         exitCode: EXIT_CODES.CONFIG_ERROR,
+        fix: `Use one of: ${ENV_NAMES.join(", ")}.`,
       });
     }
     const overlay = join(root, `frontal.${env}.jsonc`);
@@ -181,7 +182,7 @@ export function loadRawProjectConfig(
     raw.env = env;
   }
 
-  return { root, files, raw, env: env as EnvName | undefined };
+  return { env: env as EnvName | undefined, files, raw, root };
 }
 
 const NEWLINE = /\r?\n/;

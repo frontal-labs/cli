@@ -20,17 +20,17 @@ export interface BundleResult {
 
 interface BunBuildOutput {
   logs: { message: string }[];
-  outputs: { text(): Promise<string> }[];
+  outputs: { text: () => Promise<string> }[];
   success: boolean;
 }
 
 interface BunGlobal {
-  build(options: {
+  build: (options: {
     entrypoints: string[];
     format: "esm";
     minify: boolean;
     target: "bun";
-  }): Promise<BunBuildOutput>;
+  }) => Promise<BunBuildOutput>;
 }
 
 function bunRuntime(): BunGlobal | undefined {
@@ -45,8 +45,8 @@ function buildError(detail: string): CliError {
     "BUNDLE_FAILED",
     `Could not bundle the entry file: ${detail}`,
     {
-      fix: "Fix the build errors above, or check `entry` in frontal.jsonc.",
       exitCode: EXIT_CODES.GENERAL_ERROR,
+      fix: "Fix the build errors above, or check `entry` in frontal.jsonc.",
     }
   );
 }
@@ -66,7 +66,7 @@ async function bundleEntry(entryFile: string, root: string): Promise<string> {
         result.logs.map((log) => log.message).join("\n") || "unknown error"
       );
     }
-    return await (result.outputs[0] as { text(): Promise<string> }).text();
+    return await (result.outputs[0] as { text: () => Promise<string> }).text();
   }
 
   const proc = spawnSync(
@@ -79,8 +79,8 @@ async function bundleEntry(entryFile: string, root: string): Promise<string> {
       "BUNDLER_UNAVAILABLE",
       "Bundling needs the Bun runtime.",
       {
-        fix: "Install Bun (https://bun.sh) or run the compiled `frontal` binary; `bun build` is used to bundle the entry file.",
         exitCode: EXIT_CODES.GENERAL_ERROR,
+        fix: "Install Bun (https://bun.sh) or run the compiled `frontal` binary; `bun build` is used to bundle the entry file.",
       }
     );
   }
@@ -109,8 +109,8 @@ export async function bundleProject(options: {
       "ENTRY_NOT_FOUND",
       `Entry file not found: ${options.entry}`,
       {
-        fix: "Create the file or set `entry` in frontal.jsonc to your app's entry point.",
         exitCode: EXIT_CODES.CONFIG_ERROR,
+        fix: "Create the file or set `entry` in frontal.jsonc to your app's entry point.",
       }
     );
   }
@@ -152,8 +152,8 @@ export function snapshotStateSchema(root: string): StateSchemaSnapshot {
       }
     }
     snapshot[namespace] = {
-      records: records.length,
       fields: [...fields].sort(),
+      records: records.length,
     };
   }
   return snapshot;

@@ -36,8 +36,8 @@ const servicesSchema = z
       if (!SERVICE_KEY_SET.has(key)) {
         ctx.addIssue({
           code: "custom",
-          path: [key],
           message: `Unknown service "${key}". Valid services: ${SERVICE_KEYS.join(", ")}.`,
+          path: [key],
         });
       }
     }
@@ -57,6 +57,12 @@ export function buildProjectConfigSchema(
   return z
     .object({
       $schema: z.string().optional(),
+      /** Agent ids owned by this project; `frontal rollback` reverts them too. */
+      agents: z.array(z.string().min(1)).default([]),
+      apiUrl: clientConfigSchema.shape.baseUrl,
+      /** Entry file bundled by `frontal deploy`. */
+      entry: z.string().min(1).default("src/index.ts"),
+      env: z.enum(ENV_NAMES).default("dev"),
       name: z
         .string()
         .min(1)
@@ -64,13 +70,25 @@ export function buildProjectConfigSchema(
           PROJECT_NAME_PATTERN,
           "name must be lowercase letters, digits and dashes"
         ),
-      env: z.enum(ENV_NAMES).default("dev"),
-      /** Entry file bundled by `frontal deploy`. */
-      entry: z.string().min(1).default("src/index.ts"),
-      apiUrl: clientConfigSchema.shape.baseUrl,
+      sdk: clientConfigSchema
+        .pick({
+          headers: true,
+          maxRetries: true,
+          retryDelay: true,
+          timeout: true,
+        })
+        .partial()
+        .strict()
+        .optional(),
+      secrets: z
+        .object({
+          required: z
+            .array(z.string().regex(ENV_VAR_NAME_PATTERN))
+            .default(["FRONTAL_API_KEY"]),
+        })
+        .strict()
+        .default({ required: ["FRONTAL_API_KEY"] }),
       services: servicesSchema.default({}),
-      /** Agent ids owned by this project; `frontal rollback` reverts them too. */
-      agents: z.array(z.string().min(1)).default([]),
       vars: z
         .record(
           z
@@ -82,24 +100,6 @@ export function buildProjectConfigSchema(
           z.string()
         )
         .default({}),
-      secrets: z
-        .object({
-          required: z
-            .array(z.string().regex(ENV_VAR_NAME_PATTERN))
-            .default(["FRONTAL_API_KEY"]),
-        })
-        .strict()
-        .default({ required: ["FRONTAL_API_KEY"] }),
-      sdk: clientConfigSchema
-        .pick({
-          timeout: true,
-          maxRetries: true,
-          retryDelay: true,
-          headers: true,
-        })
-        .partial()
-        .strict()
-        .optional(),
     })
     .strict();
 }
@@ -150,11 +150,11 @@ export async function validateProjectConfig(
     "CONFIG_INVALID",
     `Invalid ${source}:\n${formatConfigIssues(result.error)}`,
     {
+      cause: result.error,
+      exitCode: EXIT_CODES.CONFIG_ERROR,
       fix: unknownService
         ? `Remove or rename the service. Valid services: ${SERVICE_KEYS.join(", ")}.`
         : `Fix the listed fields; see ${PROJECT_SCHEMA_URL} for the full schema.`,
-      exitCode: EXIT_CODES.CONFIG_ERROR,
-      cause: result.error,
     }
   );
 }
@@ -168,7 +168,7 @@ export async function loadProjectConfig(
 ): Promise<LoadedProject> {
   const { root, files, raw } = loadRawProjectConfig(options);
   const config = await validateProjectConfig(raw, files.join(" + "));
-  return { root, files, config };
+  return { config, files, root };
 }
 
 /** Like `loadProjectConfig` but resolves undefined when not inside a project. */

@@ -39,8 +39,8 @@ export async function promptText(
 ): Promise<string> {
   const { text } = await import("@clack/prompts");
   const result = await text({
-    message,
     defaultValue,
+    message,
     placeholder: defaultValue,
   });
   if (typeof result !== "string") {

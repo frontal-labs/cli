@@ -41,11 +41,11 @@ const SAFE_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
 export function json(body: unknown, status = 200, headers: Obj = {}): Response {
   return new Response(JSON.stringify(body), {
-    status,
     headers: {
       "content-type": "application/json",
       ...(headers as Record<string, string>),
     },
+    status,
   });
 }
 
@@ -59,9 +59,9 @@ export function apiError(
   return json(
     {
       code,
+      docs: `${DOCS_URL}#${code.toLowerCase()}`,
       message,
       requestId,
-      docs: `${DOCS_URL}#${code.toLowerCase()}`,
       ...extra,
     },
     status
@@ -122,8 +122,8 @@ function sseResponse(
   });
   return new Response(stream, {
     headers: {
-      "content-type": "text/event-stream",
       "cache-control": "no-cache",
+      "content-type": "text/event-stream",
       "x-request-id": requestId,
     },
   });
@@ -135,6 +135,7 @@ function once(
   return {
     async *[Symbol.asyncIterator]() {
       for (const item of items) {
+        // biome-ignore lint/performance/noAwaitInLoops: emits events in order
         yield await Promise.resolve(item);
       }
     },
@@ -144,26 +145,26 @@ function once(
 function healthRoutes(ctx: LocalContext): RouteDefinition[] {
   const health = (): Response =>
     json({
-      ok: true,
-      status: "ok",
-      version: VERSION,
       env: ctx.env,
-      uptime_ms: Date.now() - ctx.startedAt,
+      ok: true,
       services: ctx.services,
+      status: "ok",
+      uptime_ms: Date.now() - ctx.startedAt,
+      version: VERSION,
     });
   return [
-    { method: "GET", path: "/health", service: "dev", handler: health },
+    { handler: health, method: "GET", path: "/health", service: "dev" },
     {
+      handler: health,
       method: "GET",
       path: "/agents/health",
       service: "agents",
-      handler: health,
     },
     {
+      handler: health,
       method: "GET",
       path: "/ontology/graph/health",
       service: "graph",
-      handler: health,
     },
   ];
 }
@@ -182,9 +183,6 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
 
   return [
     {
-      method: "GET",
-      path: "/agents",
-      service: "agents",
       handler: (req) => {
         let agents = state.list<Obj>("agents");
         const status = req.query.get("status");
@@ -193,11 +191,11 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
         }
         return json(page(agents, pageOptions(req)));
       },
-    },
-    {
-      method: "POST",
+      method: "GET",
       path: "/agents",
       service: "agents",
+    },
+    {
       handler: (req) => {
         const definition = bodyObject(req);
         if (
@@ -218,22 +216,22 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
         save(agent);
         return json(agent, 201);
       },
+      method: "POST",
+      path: "/agents",
+      service: "agents",
     },
     {
-      method: "GET",
-      path: "/agents/runs/{runId}/conversation",
-      service: "agents",
       handler: (req) => {
         const run = state.read<Obj>("runs", req.params.runId as string);
         return run
-          ? json({ messages: [{ role: "system", content: "local dev run" }] })
+          ? json({ messages: [{ content: "local dev run", role: "system" }] })
           : notFound(req, `Run ${req.params.runId}`);
       },
+      method: "GET",
+      path: "/agents/runs/{runId}/conversation",
+      service: "agents",
     },
     {
-      method: "GET",
-      path: "/agents/runs/{runId}/stream",
-      service: "agents",
       handler: (req) => {
         const run = state.read<Obj>("runs", req.params.runId as string);
         if (!run) {
@@ -241,39 +239,39 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
         }
         return sseResponse(
           once([
-            { event: "status", data: { run_id: run.id, status: "running" } },
-            { event: "step", data: { step: 1, type: "observe" } },
-            { event: "status", data: { run_id: run.id, status: run.status } },
-            { event: "done", data: run },
+            { data: { run_id: run.id, status: "running" }, event: "status" },
+            { data: { step: 1, type: "observe" }, event: "step" },
+            { data: { run_id: run.id, status: run.status }, event: "status" },
+            { data: run, event: "done" },
           ]),
           req.requestId
         );
       },
+      method: "GET",
+      path: "/agents/runs/{runId}/stream",
+      service: "agents",
     },
     {
-      method: "GET",
-      path: "/agents/runs/{runId}",
-      service: "agents",
       handler: (req) => {
         const run = state.read<Obj>("runs", req.params.runId as string);
         return run ? json(run) : notFound(req, `Run ${req.params.runId}`);
       },
+      method: "GET",
+      path: "/agents/runs/{runId}",
+      service: "agents",
     },
     {
-      method: "GET",
-      path: "/agents/{id}/versions",
-      service: "agents",
       handler: (req) => {
         const agent = load(req.params.id as string);
         return agent
           ? json(page(versionsOf(agent), pageOptions(req)))
           : notFound(req, `Agent ${req.params.id}`);
       },
+      method: "GET",
+      path: "/agents/{id}/versions",
+      service: "agents",
     },
     {
-      method: "POST",
-      path: "/agents/{id}/rollback",
-      service: "agents",
       handler: (req) => {
         const agent = load(req.params.id as string);
         if (!agent) {
@@ -301,19 +299,19 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
         }
         const rolledBack = {
           ...agent,
-          version: current + 1,
           rolled_back_from: current,
           rolled_back_to: target,
           updated_at: nowIso(),
+          version: current + 1,
         };
         save(rolledBack);
         return json(rolledBack);
       },
+      method: "POST",
+      path: "/agents/{id}/rollback",
+      service: "agents",
     },
     {
-      method: "GET",
-      path: "/agents/{id}/runs",
-      service: "agents",
       handler: (req) => {
         const agent = load(req.params.id as string);
         if (!agent) {
@@ -324,11 +322,11 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
           .filter((r) => r.agent_id === agent.id);
         return json(page(runs, pageOptions(req)));
       },
-    },
-    {
-      method: "POST",
+      method: "GET",
       path: "/agents/{id}/runs",
       service: "agents",
+    },
+    {
       handler: (req) => {
         const agent = load(req.params.id as string);
         if (!agent) {
@@ -338,7 +336,7 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
         const run = executionRecord(
           String(agent.id),
           String(body.event ?? "manual"),
-          (body.payload as Obj) ?? {}
+          (body.payload as Obj | undefined) ?? {}
         );
         state.write("runs", String(run.id), run);
         emitLog(
@@ -350,20 +348,20 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
         );
         return json(run, 202);
       },
+      method: "POST",
+      path: "/agents/{id}/runs",
+      service: "agents",
     },
     {
-      method: "GET",
-      path: "/agents/{id}",
-      service: "agents",
       handler: (req) => {
         const agent = load(req.params.id as string);
         return agent ? json(agent) : notFound(req, `Agent ${req.params.id}`);
       },
-    },
-    {
-      method: "PUT",
+      method: "GET",
       path: "/agents/{id}",
       service: "agents",
+    },
+    {
       handler: (req) => {
         const agent = load(req.params.id as string);
         if (!agent) {
@@ -373,21 +371,24 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
           ...agent,
           ...bodyObject(req),
           id: agent.id,
-          version: Number(agent.version ?? 1) + 1,
           updated_at: nowIso(),
+          version: Number(agent.version ?? 1) + 1,
         };
         save(updated);
         return json(updated);
       },
-    },
-    {
-      method: "DELETE",
+      method: "PUT",
       path: "/agents/{id}",
       service: "agents",
+    },
+    {
       handler: (req) =>
         state.remove("agents", req.params.id as string)
           ? new Response(null, { status: 204 })
           : notFound(req, `Agent ${req.params.id}`),
+      method: "DELETE",
+      path: "/agents/{id}",
+      service: "agents",
     },
   ];
 }
@@ -399,7 +400,7 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
   const load = (id: string): Obj | undefined => state.read<Obj>("graph", id);
 
   const matches = (entity: Obj, conditions: Obj): boolean => {
-    const fields = (entity.fields as Obj) ?? {};
+    const fields = (entity.fields as Obj | undefined) ?? {};
     return Object.entries(conditions).every(([key, expected]) => {
       const actual = key === "type" ? entity.type : fields[key];
       if (key === "type" && entity.type === null) {
@@ -411,7 +412,10 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
 
   const queryHandler = (req: DevRequest): Response => {
     const body = bodyObject(req);
-    const conditions = (body.conditions as Obj) ?? (body.filter as Obj) ?? {};
+    const conditions =
+      (body.conditions as Obj | undefined) ??
+      (body.filter as Obj | undefined) ??
+      {};
     const entityType = body.entity_type ?? body.type;
     // Entities created via `use(type).create()` carry no type on the wire;
     // they match any entity_type filter.
@@ -430,22 +434,19 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
 
   return [
     {
+      handler: () => json({ entities: entities().length, name: "frontal-dev" }),
       method: "GET",
       path: "/ontology/graph/info",
       service: "graph",
-      handler: () => json({ name: "frontal-dev", entities: entities().length }),
     },
     {
+      handler: () =>
+        json({ neighborhood: true, path: true, query: true, semantic: false }),
       method: "GET",
       path: "/ontology/graph/capabilities",
       service: "graph",
-      handler: () =>
-        json({ query: true, neighborhood: true, path: true, semantic: false }),
     },
     {
-      method: "GET",
-      path: "/ontology/graph/entities",
-      service: "graph",
       handler: (req) => {
         const conditions = req.query.get("conditions");
         let items = entities();
@@ -464,23 +465,23 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
         }
         return json(page(items, pageOptions(req)));
       },
-    },
-    {
-      method: "POST",
+      method: "GET",
       path: "/ontology/graph/entities",
       service: "graph",
+    },
+    {
       handler: (req) => {
         const body = bodyObject(req);
-        const fields = (body.fields as Obj) ?? body;
+        const fields = (body.fields as Obj | undefined) ?? body;
         const entity = entityRecord(fields);
         state.write("graph", String(entity.id), entity);
         return json(entity, 201);
       },
+      method: "POST",
+      path: "/ontology/graph/entities",
+      service: "graph",
     },
     {
-      method: "GET",
-      path: "/ontology/graph/entities/{id}/provenance",
-      service: "graph",
       handler: (req) => {
         const entity = load(req.params.id as string);
         if (!entity) {
@@ -492,18 +493,18 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
             (r) => String(r.id).startsWith("rel_") && r.from_id === entity.id
           );
         return json({
-          entity_id: entity.id,
           data: links,
+          entity_id: entity.id,
           history: [
-            { version: 1, changed_at: entity.created_at, change: "created" },
+            { change: "created", changed_at: entity.created_at, version: 1 },
           ],
         });
       },
-    },
-    {
-      method: "POST",
+      method: "GET",
       path: "/ontology/graph/entities/{id}/provenance",
       service: "graph",
+    },
+    {
       handler: (req) => {
         const entity = load(req.params.id as string);
         if (!entity) {
@@ -511,30 +512,30 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
         }
         const body = bodyObject(req);
         const relationship = {
-          id: newId("rel"),
+          created_at: nowIso(),
+          fields: (body.fields as Obj | undefined) ?? {},
           from_id: entity.id,
+          id: newId("rel"),
           to_id: body.target_id ?? body.to_id ?? body.entity_id,
           type: body.type ?? body.relationship ?? "related",
-          fields: (body.fields as Obj) ?? {},
-          created_at: nowIso(),
         };
         state.write("graph", String(relationship.id), relationship);
         return json(relationship, 201);
       },
+      method: "POST",
+      path: "/ontology/graph/entities/{id}/provenance",
+      service: "graph",
     },
     {
-      method: "GET",
-      path: "/ontology/graph/entities/{id}",
-      service: "graph",
       handler: (req) => {
         const entity = load(req.params.id as string);
         return entity ? json(entity) : notFound(req, `Entity ${req.params.id}`);
       },
-    },
-    {
-      method: "PUT",
+      method: "GET",
       path: "/ontology/graph/entities/{id}",
       service: "graph",
+    },
+    {
       handler: (req) => {
         const entity = load(req.params.id as string);
         if (!entity) {
@@ -545,61 +546,61 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
           ...entity,
           fields: {
             ...(entity.fields as Obj),
-            ...((body.fields as Obj) ?? {}),
+            ...((body.fields as Obj | undefined) ?? {}),
           },
-          version: Number(entity.version ?? 1) + 1,
           updated_at: nowIso(),
+          version: Number(entity.version ?? 1) + 1,
         };
         state.write("graph", String(entity.id), updated);
         return json(updated);
       },
-    },
-    {
-      method: "DELETE",
+      method: "PUT",
       path: "/ontology/graph/entities/{id}",
       service: "graph",
+    },
+    {
       handler: (req) =>
         state.remove("graph", req.params.id as string)
           ? new Response(null, { status: 204 })
           : notFound(req, `Entity ${req.params.id}`),
+      method: "DELETE",
+      path: "/ontology/graph/entities/{id}",
+      service: "graph",
     },
     {
-      method: "GET",
-      path: "/ontology/graph/relationships/{id}",
-      service: "graph",
       handler: (req) => {
         const rel = load(req.params.id as string);
         return rel ? json(rel) : notFound(req, `Relationship ${req.params.id}`);
       },
-    },
-    {
-      method: "DELETE",
+      method: "GET",
       path: "/ontology/graph/relationships/{id}",
       service: "graph",
+    },
+    {
       handler: (req) =>
         state.remove("graph", req.params.id as string)
           ? new Response(null, { status: 204 })
           : notFound(req, `Relationship ${req.params.id}`),
+      method: "DELETE",
+      path: "/ontology/graph/relationships/{id}",
+      service: "graph",
     },
     {
+      handler: queryHandler,
       method: "POST",
       path: "/ontology/graph/graph/query",
       service: "graph",
-      handler: queryHandler,
     },
     {
+      handler: (req) => {
+        const ids = (bodyObject(req).ids as string[] | undefined) ?? [];
+        return json({ data: ids.map((id) => load(id)).filter(Boolean) });
+      },
       method: "POST",
       path: "/ontology/graph/graph/bulk-read",
       service: "graph",
-      handler: (req) => {
-        const ids = (bodyObject(req).ids as string[]) ?? [];
-        return json({ data: ids.map((id) => load(id)).filter(Boolean) });
-      },
     },
     {
-      method: "POST",
-      path: "/ontology/graph/graph/neighborhood",
-      service: "graph",
       handler: (req) => {
         const body = bodyObject(req);
         const startId = String(
@@ -618,13 +619,13 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
           start,
           ...rels.map((r) => load(String(r.to_id))).filter(Boolean),
         ];
-        return json({ nodes, edges: rels, data: nodes, results: nodes });
+        return json({ data: nodes, edges: rels, nodes, results: nodes });
       },
+      method: "POST",
+      path: "/ontology/graph/graph/neighborhood",
+      service: "graph",
     },
     {
-      method: "POST",
-      path: "/ontology/graph/graph/path",
-      service: "graph",
       handler: (req) => {
         const body = bodyObject(req);
         const from = load(String(body.from_id ?? body.start_id ?? ""));
@@ -641,25 +642,28 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
               r.to_id === to.id
           );
         return json({
-          found: Boolean(direct),
-          path: direct ? [from, to] : [],
           edges: direct ? [direct] : [],
+          found: Boolean(direct),
           length: direct ? 1 : 0,
+          path: direct ? [from, to] : [],
         });
       },
+      method: "POST",
+      path: "/ontology/graph/graph/path",
+      service: "graph",
     },
     {
-      method: "POST",
-      path: "/ontology/graph/graph/analyze",
-      service: "graph",
       handler: (req) => {
         const body = bodyObject(req);
         return json({
-          question: body.question ?? body.query,
           answer: `Local dev graph has ${entities().length} entities.`,
           data: entities().slice(0, 10),
+          question: body.question ?? body.query,
         });
       },
+      method: "POST",
+      path: "/ontology/graph/graph/analyze",
+      service: "graph",
     },
   ];
 }
@@ -671,15 +675,12 @@ function datasetRoutes(ctx: LocalContext): RouteDefinition[] {
 
   return [
     {
+      handler: (req) => json(page(datasets(), pageOptions(req))),
       method: "GET",
       path: "/data/ingest/datasets",
       service: "datasets",
-      handler: (req) => json(page(datasets(), pageOptions(req))),
     },
     {
-      method: "POST",
-      path: "/data/ingest/datasets/ingest",
-      service: "datasets",
       handler: (req) => {
         const body = bodyObject(req);
         const existing =
@@ -696,47 +697,47 @@ function datasetRoutes(ctx: LocalContext): RouteDefinition[] {
           : datasetRecord(body);
         state.write("datasets", String(dataset.id), dataset);
         return json(
-          { dataset_id: dataset.id, ingested: rows.length, dataset },
+          { dataset, dataset_id: dataset.id, ingested: rows.length },
           202
         );
       },
+      method: "POST",
+      path: "/data/ingest/datasets/ingest",
+      service: "datasets",
     },
     {
-      method: "GET",
-      path: "/data/ingest/datasets/{id}",
-      service: "datasets",
       handler: (req) => {
         const ds = state.read<Obj>("datasets", req.params.id as string);
         return ds ? json(ds) : notFound(req, `Dataset ${req.params.id}`);
       },
+      method: "GET",
+      path: "/data/ingest/datasets/{id}",
+      service: "datasets",
     },
     {
+      handler: (req) => json(page([], pageOptions(req))),
       method: "GET",
       path: "/data/ingest/schemas",
       service: "datasets",
-      handler: (req) => json(page([], pageOptions(req))),
     },
     {
+      handler: (req) => json(page(datasets().map(catalog), pageOptions(req))),
       method: "GET",
       path: "/data/catalog/catalog/datasets",
       service: "datasets",
-      handler: (req) => json(page(datasets().map(catalog), pageOptions(req))),
     },
     {
-      method: "GET",
-      path: "/data/catalog/catalog/datasets/{id}",
-      service: "datasets",
       handler: (req) => {
         const ds = state.read<Obj>("datasets", req.params.id as string);
         return ds
           ? json(catalog(ds))
           : notFound(req, `Dataset ${req.params.id}`);
       },
+      method: "GET",
+      path: "/data/catalog/catalog/datasets/{id}",
+      service: "datasets",
     },
     {
-      method: "GET",
-      path: "/data/catalog/catalog/sources",
-      service: "datasets",
       handler: (req) =>
         json(
           page(
@@ -744,6 +745,9 @@ function datasetRoutes(ctx: LocalContext): RouteDefinition[] {
             pageOptions(req)
           )
         ),
+      method: "GET",
+      path: "/data/catalog/catalog/sources",
+      service: "datasets",
     },
   ];
 }
@@ -772,9 +776,6 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
 
   return [
     {
-      method: "POST",
-      path: "/blob/object/list/{bucket}",
-      service: "blob",
       handler: (req) => {
         const body = bodyObject(req);
         const prefix = typeof body.prefix === "string" ? body.prefix : "";
@@ -784,66 +785,66 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
             (m) => m.bucket === req.params.bucket && m.key.startsWith(prefix)
           )
           .map((m) => ({
-            key: m.key,
-            name: m.key,
-            size: m.size,
             content_type: m.content_type,
             created_at: m.created_at,
+            key: m.key,
             last_modified: m.created_at,
+            name: m.key,
+            size: m.size,
           }));
         return json({
-          objects,
           data: objects,
           has_more: false,
+          objects,
           total: objects.length,
         });
       },
+      method: "POST",
+      path: "/blob/object/list/{bucket}",
+      service: "blob",
     },
     {
-      method: "POST",
-      path: "/blob/object/sign/{bucket}/*",
-      service: "blob",
       handler: (req) => {
         const { bucket, key } = objectPath(req);
-        const origin = new URL(req.raw.url).origin;
+        const { origin } = new URL(req.raw.url);
         return json({
           signed_url: `${origin}/v1/blob/object/${bucket}/${key}?token=dev`,
         });
       },
+      method: "POST",
+      path: "/blob/object/sign/{bucket}/*",
+      service: "blob",
     },
     {
-      method: "GET",
-      path: "/blob/object/info/{bucket}/*",
-      service: "blob",
       handler: (req) => {
         const { bucket, key } = objectPath(req);
         const found = meta(bucket, key);
         return found
           ? json({
-              key,
-              size: found.size,
               content_type: found.content_type,
               created_at: found.created_at,
+              key,
+              size: found.size,
             })
           : notFound(req, `Object ${bucket}/${key}`);
       },
+      method: "GET",
+      path: "/blob/object/info/{bucket}/*",
+      service: "blob",
     },
     {
+      handler: (req) => copyOrMove(req, false),
       method: "POST",
       path: "/blob/object/copy",
       service: "blob",
-      handler: (req) => copyOrMove(req, false),
     },
     {
+      handler: (req) => copyOrMove(req, true),
       method: "POST",
       path: "/blob/object/move",
       service: "blob",
-      handler: (req) => copyOrMove(req, true),
     },
     {
-      method: "POST",
-      path: "/blob/object/{bucket}/*",
-      service: "blob",
       handler: async (req) => {
         const { bucket, key } = objectPath(req);
         let bytes: Uint8Array;
@@ -875,22 +876,22 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
         writeFileSync(file, bytes);
         state.write("blob", id, {
           bucket,
-          key,
           content_type: contentType,
-          size: bytes.byteLength,
           created_at: nowIso(),
           file,
+          key,
+          size: bytes.byteLength,
         } satisfies BlobMeta);
         return json(
-          { key, size: bytes.byteLength, content_type: contentType },
+          { content_type: contentType, key, size: bytes.byteLength },
           201
         );
       },
-    },
-    {
-      method: "GET",
+      method: "POST",
       path: "/blob/object/{bucket}/*",
       service: "blob",
+    },
+    {
       handler: (req) => {
         const { bucket, key } = objectPath(req);
         const found = meta(bucket, key);
@@ -899,16 +900,16 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
         }
         return new Response(readFileSync(found.file), {
           headers: {
-            "content-type": found.content_type,
             "content-length": String(found.size),
+            "content-type": found.content_type,
           },
         });
       },
-    },
-    {
-      method: "DELETE",
+      method: "GET",
       path: "/blob/object/{bucket}/*",
       service: "blob",
+    },
+    {
       handler: (req) => {
         const { bucket, key } = objectPath(req);
         const found = meta(bucket, key);
@@ -919,6 +920,9 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
         state.remove("blob", metaId(bucket, key));
         return new Response(null, { status: 204 });
       },
+      method: "DELETE",
+      path: "/blob/object/{bucket}/*",
+      service: "blob",
     },
   ];
 
@@ -944,15 +948,15 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
     state.write("blob", id, {
       ...srcMeta,
       bucket: dstBucket,
-      key: dstKey,
-      file,
       created_at: nowIso(),
+      file,
+      key: dstKey,
     });
     if (move) {
       rmSync(srcMeta.file, { force: true });
       state.remove("blob", metaId(srcMeta.bucket, srcMeta.key));
     }
-    return json({ key: dstKey, bucket: dstBucket, moved: move });
+    return json({ bucket: dstBucket, key: dstKey, moved: move });
   }
 }
 
@@ -971,9 +975,6 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
 
   return [
     {
-      method: "POST",
-      path: "/observability/logs/query",
-      service: "observability",
       handler: (req) => {
         const body = bodyObject(req);
         const entries = filterLogs(body);
@@ -985,15 +986,15 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
           })
         );
       },
+      method: "POST",
+      path: "/observability/logs/query",
+      service: "observability",
     },
     {
-      method: "GET",
-      path: "/observability/logs/stream",
-      service: "observability",
       handler: (req) => {
         const query = req.query.get("query") ?? "";
         const level = req.query.get("level") ?? undefined;
-        const signal = req.raw.signal;
+        const { signal } = req.raw;
         const events: AsyncIterable<{
           data: unknown;
           event?: string;
@@ -1003,7 +1004,7 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
             const queue: Obj[] = [];
             let wake: (() => void) | undefined;
             const subscriber = (entry: Obj): void => {
-              if (filterLogs({ query, level }).includes(entry)) {
+              if (filterLogs({ level, query }).includes(entry)) {
                 queue.push(entry);
                 wake?.();
               }
@@ -1017,6 +1018,7 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
             return {
               async next() {
                 while (queue.length === 0 && !signal.aborted) {
+                  // biome-ignore lint/performance/noAwaitInLoops: waits for the next log entry
                   await new Promise<void>((resolve) => {
                     wake = resolve;
                   });
@@ -1029,7 +1031,7 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
                 }
                 return {
                   done: false,
-                  value: { event: "log", id: String(entry.id), data: entry },
+                  value: { data: entry, event: "log", id: String(entry.id) },
                 };
               },
               return() {
@@ -1041,50 +1043,53 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
         };
         return sseResponse(events, req.requestId);
       },
+      method: "GET",
+      path: "/observability/logs/stream",
+      service: "observability",
     },
     {
-      method: "POST",
-      path: "/observability/logs/ingest",
-      service: "observability",
       handler: (req) => {
-        const entries = (bodyObject(req).entries as Obj[]) ?? [];
+        const entries = (bodyObject(req).entries as Obj[] | undefined) ?? [];
         for (const entry of entries) {
           emitLog(ctx, {
             id: newId("log"),
-            timestamp: nowIso(),
             service: "app",
+            timestamp: nowIso(),
             ...entry,
           });
         }
         return json({ ingested: entries.length }, 202);
       },
+      method: "POST",
+      path: "/observability/logs/ingest",
+      service: "observability",
     },
     {
-      method: "GET",
-      path: "/observability/metrics",
-      service: "observability",
       handler: () =>
         json({
           data: [
             {
               name: "frontal_dev_requests_total",
-              value: ctx.logs.length,
               unit: "count",
+              value: ctx.logs.length,
             },
             {
               name: "frontal_dev_uptime_ms",
-              value: Date.now() - ctx.startedAt,
               unit: "ms",
+              value: Date.now() - ctx.startedAt,
             },
           ],
         }),
+      method: "GET",
+      path: "/observability/metrics",
+      service: "observability",
     },
     {
+      handler: () =>
+        json({ by_level: countBy(ctx.logs, "level"), total: ctx.logs.length }),
       method: "GET",
       path: "/observability/events/stats",
       service: "observability",
-      handler: () =>
-        json({ total: ctx.logs.length, by_level: countBy(ctx.logs, "level") }),
     },
   ];
 }
@@ -1177,7 +1182,7 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
   const policies = (): Obj[] => state.list<Obj>("policies");
   const denyRules = (): Obj[] =>
     policies().flatMap((p) => {
-      const def = (p.definition as Obj) ?? {};
+      const def = (p.definition as Obj | undefined) ?? {};
       const deny = Array.isArray(def.deny) ? (def.deny as Obj[]) : [];
       return deny.map((rule) => ({
         ...rule,
@@ -1188,27 +1193,24 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
 
   return [
     {
-      method: "GET",
-      path: "/policies/templates",
-      service: "governance",
       handler: (req) =>
         json(
           page(
             [
               {
+                definition_format: "json_schema",
                 id: "tpl_deny_prod_without_review",
                 name: "Require review before production deploys",
-                definition_format: "json_schema",
               },
             ],
             pageOptions(req)
           )
         ),
+      method: "GET",
+      path: "/policies/templates",
+      service: "governance",
     },
     {
-      method: "GET",
-      path: "/policies",
-      service: "governance",
       handler: (req) => {
         const status = req.query.get("status");
         const items = status
@@ -1216,24 +1218,24 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
           : policies();
         return json(page(items, pageOptions(req)));
       },
-    },
-    {
-      method: "POST",
+      method: "GET",
       path: "/policies",
       service: "governance",
+    },
+    {
       handler: (req) => {
         const policy = policyRecord(bodyObject(req));
         state.write("policies", String(policy.id), policy);
         return json(policy, 201);
       },
+      method: "POST",
+      path: "/policies",
+      service: "governance",
     },
     {
-      method: "POST",
-      path: "/policies/validate",
-      service: "governance",
       handler: (req) => {
         const body = bodyObject(req);
-        const definition = body.definition;
+        const { definition } = body;
         const format = String(body.definition_format ?? "json_schema");
         const errors: string[] = [];
         if (
@@ -1251,33 +1253,33 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
           errors.push(`${format} definitions must be strings`);
         }
         return json({
-          valid: errors.length === 0,
           errors: errors.length > 0 ? errors : undefined,
+          valid: errors.length === 0,
         });
       },
+      method: "POST",
+      path: "/policies/validate",
+      service: "governance",
     },
     {
-      method: "GET",
-      path: "/policies/{id}",
-      service: "governance",
       handler: (req) => {
         const policy = state.read<Obj>("policies", req.params.id as string);
         return policy ? json(policy) : notFound(req, `Policy ${req.params.id}`);
       },
-    },
-    {
-      method: "DELETE",
+      method: "GET",
       path: "/policies/{id}",
       service: "governance",
+    },
+    {
       handler: (req) =>
         state.remove("policies", req.params.id as string)
           ? new Response(null, { status: 204 })
           : notFound(req, `Policy ${req.params.id}`),
+      method: "DELETE",
+      path: "/policies/{id}",
+      service: "governance",
     },
     {
-      method: "POST",
-      path: "/access/check",
-      service: "governance",
       handler: (req) => {
         const body = bodyObject(req);
         const action = String(body.action ?? "");
@@ -1296,17 +1298,17 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
         );
         return json({
           allowed: !denied,
+          policy_id: denied?.policy_id,
           reason: denied
             ? String(denied.reason ?? `denied by policy ${denied.policy_name}`)
             : undefined,
-          policy_id: denied?.policy_id,
         });
       },
+      method: "POST",
+      path: "/access/check",
+      service: "governance",
     },
     {
-      method: "GET",
-      path: "/roles",
-      service: "governance",
       handler: (req) =>
         json(
           page(
@@ -1314,40 +1316,43 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
             pageOptions(req)
           )
         ),
+      method: "GET",
+      path: "/roles",
+      service: "governance",
     },
     {
+      handler: (req) =>
+        json(page([{ id: "perm_all", name: "*" }], pageOptions(req))),
       method: "GET",
       path: "/permissions",
       service: "governance",
-      handler: (req) =>
-        json(page([{ id: "perm_all", name: "*" }], pageOptions(req))),
     },
     {
+      handler: (req) =>
+        json(page([{ id: "fw_local", name: "local-dev" }], pageOptions(req))),
       method: "GET",
       path: "/compliance/frameworks",
       service: "governance",
-      handler: (req) =>
-        json(page([{ id: "fw_local", name: "local-dev" }], pageOptions(req))),
     },
     {
-      method: "GET",
-      path: "/compliance/score",
-      service: "governance",
       handler: () => {
         const total = policies().length;
         return json({
-          score: total === 0 ? 100 : Math.max(0, 100 - denyRules().length * 10),
-          policies: total,
-          violations: 0,
           computed_at: nowIso(),
+          policies: total,
+          score: total === 0 ? 100 : Math.max(0, 100 - denyRules().length * 10),
+          violations: 0,
         });
       },
+      method: "GET",
+      path: "/compliance/score",
+      service: "governance",
     },
     {
+      handler: (req) => json(page([], pageOptions(req))),
       method: "GET",
       path: "/compliance/violations",
       service: "governance",
-      handler: (req) => json(page([], pageOptions(req))),
     },
   ];
 }
@@ -1357,16 +1362,13 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
 
   return [
     {
+      handler: (req) =>
+        json(page(state.list<Obj>("workers"), pageOptions(req))),
       method: "GET",
       path: "/workers",
       service: "workers",
-      handler: (req) =>
-        json(page(state.list<Obj>("workers"), pageOptions(req))),
     },
     {
-      method: "POST",
-      path: "/workers",
-      service: "workers",
       handler: (req) => {
         const body = bodyObject(req);
         const name = String(body.name ?? "");
@@ -1392,25 +1394,25 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
         }
         const previous = state.read<Obj>("workers", name);
         const version = Number(previous?.version ?? 0) + 1;
-        const origin = new URL(req.raw.url).origin;
+        const { origin } = new URL(req.raw.url);
         const worker = {
-          name,
-          version,
-          entrypoint: body.entrypoint ?? "index.js",
-          env_vars: (body.env_vars as Obj) ?? {},
           code_size: body.code.length,
-          url: `${origin}/v1/workers/${name}`,
           deployed_at: nowIso(),
+          entrypoint: body.entrypoint ?? "index.js",
+          env_vars: (body.env_vars as Obj | undefined) ?? {},
           environment: ctx.env,
+          name,
+          url: `${origin}/v1/workers/${name}`,
+          version,
         };
         state.write("workers", name, { ...worker, code: body.code });
         return json(worker, 201);
       },
+      method: "POST",
+      path: "/workers",
+      service: "workers",
     },
     {
-      method: "GET",
-      path: "/workers/{name}",
-      service: "workers",
       handler: (req) => {
         const worker = state.read<Obj>("workers", req.params.name as string);
         if (!worker) {
@@ -1419,58 +1421,61 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
         const { code: _code, env_vars: _env, ...visible } = worker;
         return json({ ...visible, invoked: true });
       },
-    },
-    {
-      method: "POST",
+      method: "GET",
       path: "/workers/{name}",
       service: "workers",
+    },
+    {
       handler: (req) => {
         const worker = state.read<Obj>("workers", req.params.name as string);
         if (!worker) {
           return notFound(req, `Worker ${req.params.name}`);
         }
         return json({
+          input: req.body ?? null,
+          invoked: true,
           name: worker.name,
           version: worker.version,
-          invoked: true,
-          input: req.body ?? null,
         });
       },
-    },
-    {
-      method: "DELETE",
+      method: "POST",
       path: "/workers/{name}",
       service: "workers",
+    },
+    {
       handler: (req) =>
         state.remove("workers", req.params.name as string)
           ? new Response(null, { status: 204 })
           : notFound(req, `Worker ${req.params.name}`),
+      method: "DELETE",
+      path: "/workers/{name}",
+      service: "workers",
     },
   ];
 }
 
 function authRoutes(ctx: LocalContext): RouteDefinition[] {
   const profile = (): Obj => ({
-    id: "usr_local_dev",
-    email: "dev@localhost",
-    name: "Local developer",
-    roles: ["developer"],
-    role_names: ["developer"],
-    environment: ctx.env,
     created_at: new Date(ctx.startedAt).toISOString(),
+    email: "dev@localhost",
+    environment: ctx.env,
+    id: "usr_local_dev",
+    name: "Local developer",
+    role_names: ["developer"],
+    roles: ["developer"],
   });
   return [
     {
+      handler: () => json(profile()),
       method: "GET",
       path: "/auth/account/profile",
       service: "auth",
-      handler: () => json(profile()),
     },
     {
+      handler: () => json({ enabled: false, methods: [] }),
       method: "GET",
       path: "/auth/mfa/status",
       service: "auth",
-      handler: () => json({ enabled: false, methods: [] }),
     },
   ];
 }

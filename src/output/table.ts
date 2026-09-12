@@ -14,7 +14,7 @@ export function renderTable(
 ): string {
   const table = new Table({
     head: columns.map((c) => theme.bold(c.header)),
-    style: { head: [], border: [] },
+    style: { border: [], head: [] },
   });
 
   for (const row of data) {

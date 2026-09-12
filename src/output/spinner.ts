@@ -8,7 +8,7 @@ export function suppressSpinner(value: boolean): void {
 
 export function createSpinner(text: string): Ora {
   if (suppressed) {
-    return ora({ text, isEnabled: false });
+    return ora({ isEnabled: false, text });
   }
   return ora(text);
 }

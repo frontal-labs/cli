@@ -41,9 +41,9 @@ export interface PolicyCheckOptions {
 }
 
 const POLICY_FORMATS: Record<string, "rego" | "json_schema" | "cel"> = {
+  ".cel": "cel",
   ".json": "json_schema",
   ".rego": "rego",
-  ".cel": "cel",
 };
 const MIN_COMPLIANCE_SCORE = 70;
 const CHECKED_ACTION = "deploy";
@@ -71,7 +71,6 @@ function pickString(source: Obj, keys: string[]): string | undefined {
       return value;
     }
   }
-  return;
 }
 
 function pickRoles(profile: Obj): string[] {
@@ -112,15 +111,15 @@ export async function resolveIdentity(
       "NO_IDENTITY",
       "Could not determine the user to evaluate policies for.",
       {
-        fix: "Pass --user <id> (and --role <name>) or sign in with `frontal auth login`.",
         exitCode: EXIT_CODES.AUTH_ERROR,
+        fix: "Pass --user <id> (and --role <name>) or sign in with `frontal auth login`.",
       }
     );
   }
   if (roleNames.length === 0) {
     roleNames = ["member"];
   }
-  return { userId, roleNames };
+  return { roleNames, userId };
 }
 
 async function validatePolicyFiles(
@@ -141,16 +140,17 @@ async function validatePolicyFiles(
         definition = JSON.parse(text);
       } catch (err) {
         reports.push({
-          ruleId: `policy-file:${rel}`,
-          resource: rel,
-          result: "deny",
+          fix: `Fix the JSON syntax in ${rel}.`,
           passed: false,
           reason: `not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-          fix: `Fix the JSON syntax in ${rel}.`,
+          resource: rel,
+          result: "deny",
+          ruleId: `policy-file:${rel}`,
         });
         continue;
       }
     }
+    // biome-ignore lint/performance/noAwaitInLoops: ordered output, rate-limited API
     const result = await handle.frontal.governance.policies.validate({
       definition,
       definitionFormat: format,
@@ -161,16 +161,16 @@ async function validatePolicyFiles(
         : String((e as Obj).message ?? JSON.stringify(e))
     );
     reports.push({
-      ruleId: `policy-file:${rel}`,
-      resource: rel,
-      result: result.valid ? "pass" : "deny",
+      fix: result.valid
+        ? undefined
+        : `Fix the policy definition in ${rel} (format: ${format}).`,
       passed: Boolean(result.valid),
       reason: result.valid
         ? `valid ${format} policy`
         : errors.join("; ") || "invalid policy",
-      fix: result.valid
-        ? undefined
-        : `Fix the policy definition in ${rel} (format: ${format}).`,
+      resource: rel,
+      result: result.valid ? "pass" : "deny",
+      ruleId: `policy-file:${rel}`,
     });
   }
   return reports;
@@ -183,23 +183,24 @@ async function checkAccess(
 ): Promise<RuleReport[]> {
   const reports: RuleReport[] = [];
   for (const service of Object.keys(config.services).sort()) {
+    // biome-ignore lint/performance/noAwaitInLoops: ordered output, rate-limited API
     const result = await handle.frontal.governance.access.check({
-      userId: identity.userId,
-      roleNames: identity.roleNames,
       action: CHECKED_ACTION,
       resourceType: service,
+      roleNames: identity.roleNames,
+      userId: identity.userId,
     });
     reports.push({
-      ruleId: `access:${CHECKED_ACTION}:${service}`,
-      resource: service,
-      result: result.allowed ? "pass" : "deny",
+      fix: result.allowed
+        ? undefined
+        : `Ask an admin to grant "${CHECKED_ACTION}" on ${service} to ${identity.roleNames.join(", ")}, or adjust the denying policy.`,
       passed: Boolean(result.allowed),
       reason: result.allowed
         ? `${identity.roleNames.join(", ")} may ${CHECKED_ACTION} ${service}`
         : (result.reason ?? `${CHECKED_ACTION} on ${service} denied`),
-      fix: result.allowed
-        ? undefined
-        : `Ask an admin to grant "${CHECKED_ACTION}" on ${service} to ${identity.roleNames.join(", ")}, or adjust the denying policy.`,
+      resource: service,
+      result: result.allowed ? "pass" : "deny",
+      ruleId: `access:${CHECKED_ACTION}:${service}`,
     });
   }
   return reports;
@@ -211,17 +212,17 @@ async function checkActivePolicies(handle: SdkHandle): Promise<RuleReport> {
   });
   const count = page.data.length;
   return {
-    ruleId: "policies:active",
-    result: count > 0 ? "pass" : "warn",
+    fix:
+      count > 0
+        ? undefined
+        : "Create a policy with `frontal governance` in the dashboard or from a template.",
     passed: count > 0,
     reason:
       count > 0
         ? `${count} active polic${count === 1 ? "y" : "ies"}`
         : "no active policies in this workspace",
-    fix:
-      count > 0
-        ? undefined
-        : "Create a policy with `frontal governance` in the dashboard or from a template.",
+    result: count > 0 ? "pass" : "warn",
+    ruleId: "policies:active",
   };
 }
 
@@ -230,22 +231,22 @@ async function checkCompliance(handle: SdkHandle): Promise<RuleReport> {
   const score = Number(result.score ?? result.value ?? Number.NaN);
   if (Number.isNaN(score)) {
     return {
-      ruleId: "compliance:score",
-      result: "warn",
+      fix: "Run a compliance assessment for this workspace.",
       passed: false,
       reason: "compliance score unavailable",
-      fix: "Run a compliance assessment for this workspace.",
+      result: "warn",
+      ruleId: "compliance:score",
     };
   }
   const ok = score >= MIN_COMPLIANCE_SCORE;
   return {
-    ruleId: "compliance:score",
-    result: ok ? "pass" : "warn",
-    passed: ok,
-    reason: `compliance score ${score}/100`,
     fix: ok
       ? undefined
       : `Resolve open violations to reach at least ${MIN_COMPLIANCE_SCORE}/100.`,
+    passed: ok,
+    reason: `compliance score ${score}/100`,
+    result: ok ? "pass" : "warn",
+    ruleId: "compliance:score",
   };
 }
 
@@ -274,31 +275,31 @@ export async function runPolicyCheck(
     strict && rule.result === "warn"
       ? {
           ...rule,
-          result: "deny" as const,
           passed: false,
           reason: `${rule.reason} (warning treated as error by --strict)`,
+          result: "deny" as const,
         }
       : rule
   );
   const summary = {
+    deny: effective.filter((r) => r.result === "deny").length,
     pass: effective.filter((r) => r.result === "pass").length,
     warn: effective.filter((r) => r.result === "warn").length,
-    deny: effective.filter((r) => r.result === "deny").length,
   };
   return {
-    policyId: `project:${config.name}:${config.env}`,
-    userId: identity.userId,
-    strict,
     passed: summary.deny === 0,
+    policyId: `project:${config.name}:${config.env}`,
     ruleResults: effective,
+    strict,
     summary,
+    userId: identity.userId,
   };
 }
 
 const MARK: Record<RuleResult, string> = {
+  deny: theme.error("✗"),
   pass: theme.success("✓"),
   warn: theme.warn("!"),
-  deny: theme.error("✗"),
 };
 
 export function printPolicyReport(report: PolicyCheckReport): void {

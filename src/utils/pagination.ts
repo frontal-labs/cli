@@ -42,6 +42,7 @@ export async function fetchAllPages<T = Record<string, unknown>>(
       params.cursor = cursor;
     }
 
+    // biome-ignore lint/performance/noAwaitInLoops: pages depend on the previous cursor
     const result = await fetcher(params);
     allData.push(...result.data);
 
