@@ -8,14 +8,14 @@ WORKDIR /app
 # Copy package files
 COPY package.json bun.lock ./
 
-# Install dependencies
-RUN bun install --frozen-lockfile --production
+# Install all dependencies (build tooling is a devDependency)
+RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
-# Build the project
-RUN bun run build
+# Build the project, then prune to production dependencies
+RUN bun run build && bun install --frozen-lockfile --production
 
 # Production stage
 FROM node:22-alpine AS production
@@ -34,6 +34,9 @@ COPY --from=builder --chown=frontal:nodejs /app/dist ./dist
 COPY --from=builder --chown=frontal:nodejs /app/package.json ./
 COPY --from=builder --chown=frontal:nodejs /app/node_modules ./node_modules
 
+# Expose the CLI as `frontal`
+RUN ln -s /app/dist/index.js /usr/local/bin/frontal
+
 # Create directories for CLI usage
 RUN mkdir -p /home/frontal/.frontal && \
     chown -R frontal:nodejs /home/frontal/.frontal
@@ -43,7 +46,6 @@ USER frontal
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PATH="/app/dist/bin:${PATH}"
 ENV HOME=/home/frontal
 
 # Expose volume for configuration

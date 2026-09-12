@@ -34,6 +34,9 @@ jobs:
       - name: Run tests
         run: bun run test
 
+      - name: Build binaries
+        run: bun run build:binaries
+
       - name: Create Release Pull Request or Publish
         id: changesets
         uses: changesets/action@v1
@@ -72,8 +75,13 @@ jobs:
             ```bash
             docker pull ghcr.io/frontal-labs/cli:latest
             ```
+
+            ### Single binary
+            Download `frontal-<os>-<arch>` below, `chmod +x` it and put it on your PATH.
           draft: false
           prerelease: ${{ contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'alpha') || contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'beta') || contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'rc') }}
-          files: dist/bin/frontal.js
+          files: |
+            dist/index.js
+            dist/binaries/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

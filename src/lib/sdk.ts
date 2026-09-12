@@ -4,11 +4,17 @@ import { isTokenExpired, refreshTokens } from "@/auth/token-manager.js";
 import { configManager } from "@/config/manager.js";
 import {
   type GlobalOptions,
+  type ProjectOverlay,
   type ResolvedConfig,
   resolveConfig,
 } from "@/config/resolve.js";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
+import {
+  findProjectRoot,
+  loadDotenvLocal,
+  loadRawProjectConfig,
+} from "@/lib/project.js";
 import { redactString } from "@/output/redact.js";
 import { theme } from "@/output/theme.js";
 import { VERSION } from "@/version.js";
@@ -236,11 +242,35 @@ export function createAuthFetch(
  * config with the SDK's own schema and returns the unified `Frontal` client
  * alongside the generic HTTP client.
  */
+/**
+ * Project-level inputs for credential/URL resolution: `.env.local` values
+ * and the `apiUrl` from `frontal.jsonc`, when run inside a project.
+ */
+export function resolveProjectOverlay(
+  globalOpts: GlobalOptions,
+  cwd = process.cwd()
+): ProjectOverlay {
+  const root = findProjectRoot(cwd);
+  if (!root) {
+    return {};
+  }
+  const overlay: ProjectOverlay = { dotenv: loadDotenvLocal(root) };
+  try {
+    const { raw } = loadRawProjectConfig({ cwd: root, env: globalOpts.env });
+    if (typeof raw.apiUrl === "string") {
+      overlay.projectApiUrl = raw.apiUrl;
+    }
+  } catch {
+    // A broken frontal.jsonc is reported by the commands that need it.
+  }
+  return overlay;
+}
+
 export async function getSdk(
   globalOpts: GlobalOptions,
   options: GetSdkOptions = {}
 ): Promise<SdkHandle> {
-  const config = resolveConfig(globalOpts);
+  const config = resolveConfig(globalOpts, resolveProjectOverlay(globalOpts));
   const credential: Credential | undefined = options.anonymous
     ? { kind: "anonymous" }
     : resolveCredential(config);
