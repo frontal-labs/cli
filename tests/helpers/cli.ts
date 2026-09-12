@@ -60,8 +60,17 @@ export async function runCli(args: string[]): Promise<CliResult> {
   vi.mocked(console.error).mockImplementation((...parts: unknown[]) => {
     stderr.push(parts.map(String).join(" "));
   });
+  // commander writes --help / usage errors straight to the streams.
+  vi.spyOn(process.stdout, "write").mockImplementation(((chunk: unknown) => {
+    stdout.push(String(chunk));
+    return true;
+  }) as never);
+  vi.spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => {
+    stderr.push(String(chunk));
+    return true;
+  }) as never);
 
-  const { run } = await import("@/index.js");
+  const { run } = await import("@/cli.js");
   let exitCode = 0;
   try {
     await run(["node", "frontal", ...args]);

@@ -1,5 +1,10 @@
 # Frontal CLI Usage Guide
 
+> **Outdated:** this page describes the legacy v1 command tree and is kept for reference only.
+> The current commands are documented in [COMMAND_REFERENCE.md](./COMMAND_REFERENCE.md)
+> and [CONFIGURATION.md](./CONFIGURATION.md).
+
+
 This guide provides practical examples and common usage patterns for the Frontal CLI.
 
 ## Quick Start

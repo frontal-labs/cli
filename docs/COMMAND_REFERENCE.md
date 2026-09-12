@@ -1,1225 +1,169 @@
 # Command Reference
 
-This comprehensive reference covers all available commands in the Frontal CLI.
+Every command supports `--help` with an `Examples:` block. Machine-readable output
+is available with `--json` (stdout) and errors are always printed as
+`{"error":{"code","message","fix","docs","requestId","statusCode"}}` on stderr.
 
-## Global Options
+## Global options
 
-All commands support these global options:
+| Flag | Description |
+|---|---|
+| `-p, --profile <name>` | Configuration profile (default `default`, or `FRONTAL_PROFILE`) |
+| `--api-key <key>` | Override the API key for this call |
+| `--api-url <url>` | Override the API base URL |
+| `--env <name>` | Environment: `dev`, `staging` or `prod` (selects `frontal.<env>.jsonc`) |
+| `-j, --json` / `--yaml` | Machine-readable output; secrets are redacted |
+| `-q, --quiet` | Suppress non-essential output |
+| `-v, --verbose` | Log every request/response (also `FRONTAL_DEBUG=1`) |
+| `--debug` | Print stack traces with errors |
+| `-y, --yes` | Assume yes for confirmation prompts |
+| `--no-color` | Disable colors |
+| `--watch [seconds]`, `--until <field=value>` | Re-run a read command on an interval / until a JSON field matches |
 
-- `-p, --profile <name>`: Use specific configuration profile
-- `-o, --org <id>`: Set organization context
-- `-w, --workspace <id>`: Set workspace context
-- `--api-key <key>`: Override API key
-- `--api-url <url>`: Override API base URL
-- `-j, --json`: Output as JSON
-- `--yaml`: Output as YAML
-- `-q, --quiet`: Suppress non-essential output
-- `-v, --verbose`: Verbose logging
-- `--debug`: Debug mode
-- `--no-color`: Disable colors
+## Exit codes
 
-## Authentication Commands
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | General error |
+| 2 | Validation error |
+| 3 | Authentication error |
+| 4 | Permission denied |
+| 5 | Not found |
+| 6 | Configuration error |
+| 10 | Network error |
+| 11 | Timeout |
+| 12 | Rate limited |
 
-### auth
+---
 
-Authentication and credential management.
+## Project
 
-#### auth login
+### `frontal init [--name <dir>] [--force]`
 
-Authenticate with the Frontal API.
+Creates a minimal project:
 
-```bash
-frontal auth login [--profile <name>]
-```
-
-**Options:**
-- `--profile <name>`: Save to specific profile (default: default)
-
-**Example:**
-```bash
-frontal auth login --profile production
-```
-
-#### auth logout
-
-Remove credentials from a profile.
-
-```bash
-frontal auth logout [--profile <name>] [--all]
-```
-
-**Options:**
-- `--profile <name>`: Profile to logout from
-- `--all`: Logout from all profiles
-
-#### auth status
-
-Check current authentication status.
-
-```bash
-frontal auth status
-```
-
-## Configuration Commands
-
-### config
-
-Manage CLI configuration.
-
-#### config set
-
-Set a configuration value.
-
-```bash
-frontal config set <key> <value>
-```
-
-**Example:**
-```bash
-frontal config set defaults.outputFormat json
-```
-
-#### config get
-
-Get a configuration value.
-
-```bash
-frontal config get <key>
-```
-
-#### config list
-
-Display all configuration.
-
-```bash
-frontal config list
-```
-
-#### config reset
-
-Reset configuration to defaults.
-
-```bash
-frontal config reset [--profile <name>]
-```
-
-## Organization Commands
-
-### orgs
-
-Organization operations and management.
-
-#### orgs list
-
-List all accessible organizations.
-
-```bash
-frontal orgs list [--format table|json|yaml]
-```
-
-#### orgs info
-
-Get organization details.
-
-```bash
-frontal orgs info <org-id>
-```
-
-#### orgs create
-
-Create a new organization.
-
-```bash
-frontal orgs create <name> [--description <text>]
-```
-
-#### orgs update
-
-Update organization information.
-
-```bash
-frontal orgs update <org-id> [--name <name>] [--description <text>]
-```
-
-#### orgs delete
-
-Delete an organization.
-
-```bash
-frontal orgs delete <org-id> [--confirm]
-```
-
-#### orgs use
-
-Set active organization.
-
-```bash
-frontal orgs use <org-id>
-```
-
-## Workspace Commands
-
-### workspaces
-
-Workspace management operations.
-
-#### workspaces list
-
-List workspaces in organization.
-
-```bash
-frontal workspaces list [--org <org-id>]
-```
-
-#### workspaces info
-
-Get workspace details.
-
-```bash
-frontal workspaces info <workspace-id>
-```
-
-#### workspaces create
-
-Create a new workspace.
-
-```bash
-frontal workspaces create <name> [--org <org-id>] [--description <text>]
-```
-
-#### workspaces update
-
-Update workspace information.
-
-```bash
-frontal workspaces update <workspace-id> [--name <name>] [--description <text>]
-```
-
-#### workspaces delete
-
-Delete a workspace.
-
-```bash
-frontal workspaces delete <workspace-id> [--confirm]
-```
-
-#### workspaces use
-
-Set active workspace.
-
-```bash
-frontal workspaces use <workspace-id>
-```
-
-## Team Commands
-
-### teams
-
-Team management operations.
-
-#### teams list
-
-List teams in organization.
-
-```bash
-frontal teams list [--org <org-id>]
-```
-
-#### teams info
-
-Get team details.
-
-```bash
-frontal teams info <team-id>
-```
-
-#### teams create
-
-Create a new team.
-
-```bash
-frontal teams create <name> [--description <text>]
-```
-
-#### teams update
-
-Update team information.
-
-```bash
-frontal teams update <team-id> [--name <name>] [--description <text>]
-```
-
-#### teams delete
-
-Delete a team.
-
-```bash
-frontal teams delete <team-id> [--confirm]
-```
-
-#### teams add-member
-
-Add member to team.
-
-```bash
-frontal teams add-member <team-id> <user-id> [--role member|admin]
-```
-
-#### teams remove-member
-
-Remove member from team.
-
-```bash
-frontal teams remove-member <team-id> <user-id>
-```
-
-## Role Commands
-
-### roles
-
-Role-based access control.
-
-#### roles list
-
-List available roles.
-
-```bash
-frontal roles list [--org <org-id>]
-```
-
-#### roles info
-
-Get role details.
-
-```bash
-frontal roles info <role-id>
-```
-
-#### roles create
-
-Create a new role.
-
-```bash
-frontal roles create <name> [--permissions <permissions>]
-```
-
-#### roles update
-
-Update role permissions.
-
-```bash
-frontal roles update <role-id> [--permissions <permissions>]
-```
-
-#### roles delete
-
-Delete a role.
-
-```bash
-frontal roles delete <role-id> [--confirm]
-```
-
-## Policy Commands
-
-### policies
-
-Policy management.
-
-#### policies list
-
-List policies.
-
-```bash
-frontal policies list [--org <org-id>] [--workspace <workspace-id>]
-```
-
-#### policies info
-
-Get policy details.
-
-```bash
-frontal policies info <policy-id>
-```
-
-#### policies create
-
-Create a new policy.
-
-```bash
-frontal policies create <name> [--rules <rules>]
-```
-
-#### policies update
-
-Update policy rules.
-
-```bash
-frontal policies update <policy-id> [--rules <rules>]
-```
-
-#### policies delete
-
-Delete a policy.
-
-```bash
-frontal policies delete <policy-id> [--confirm]
-```
-
-## API Key Commands
-
-### api-keys
-
-API key management.
-
-#### api-keys list
-
-List API keys.
-
-```bash
-frontal api-keys list [--org <org-id>]
-```
-
-#### api-keys info
-
-Get API key details.
-
-```bash
-frontal api-keys info <key-id>
-```
-
-#### api-keys create
-
-Create a new API key.
-
-```bash
-frontal api-keys create <name> [--permissions <permissions>] [--expires <date>]
-```
-
-#### api-keys revoke
-
-Revoke an API key.
-
-```bash
-frontal api-keys revoke <key-id>
-```
-
-## Function Commands
-
-### functions
-
-Function deployment and management.
-
-#### functions list
-
-List functions.
-
-```bash
-frontal functions list [--workspace <workspace-id>]
-```
-
-#### functions info
-
-Get function details.
-
-```bash
-frontal functions info <function-id>
-```
-
-#### functions deploy
-
-Deploy a function.
-
-```bash
-frontal functions deploy <path> [--name <name>] [--runtime <runtime>]
-```
-
-#### functions update
-
-Update function configuration.
-
-```bash
-frontal functions update <function-id> [--env <env-vars>] [--memory <size>]
-```
-
-#### functions delete
-
-Delete a function.
-
-```bash
-frontal functions delete <function-id> [--confirm]
-```
-
-#### functions invoke
-
-Invoke a function.
-
-```bash
-frontal functions invoke <function-id> [--data <data>]
-```
-
-#### functions logs
-
-View function logs.
-
-```bash
-frontal functions logs <function-id> [--tail] [--since <time>]
-```
-
-## Container Commands
-
-### containers
-
-Container management.
-
-#### containers list
-
-List containers.
-
-```bash
-frontal containers list [--workspace <workspace-id>]
-```
-
-#### containers info
-
-Get container details.
-
-```bash
-frontal containers info <container-id>
-```
-
-#### containers deploy
-
-Deploy a container.
-
-```bash
-frontal containers deploy <image> [--name <name>] [--port <port>]
-```
-
-#### containers update
-
-Update container configuration.
-
-```bash
-frontal containers update <container-id> [--env <env-vars>] [--replicas <count>]
-```
-
-#### containers delete
-
-Delete a container.
-
-```bash
-frontal containers delete <container-id> [--confirm]
-```
-
-#### containers logs
-
-View container logs.
-
-```bash
-frontal containers logs <container-id> [--tail] [--since <time>]
-```
-
-## Deployment Commands
-
-### deployments
-
-Deployment operations.
-
-#### deployments list
-
-List deployments.
-
-```bash
-frontal deployments list [--workspace <workspace-id>]
-```
-
-#### deployments info
-
-Get deployment details.
-
-```bash
-frontal deployments info <deployment-id>
-```
-
-#### deployments create
-
-Create a new deployment.
-
-```bash
-frontal deployments create <config-file>
-```
-
-#### deployments rollback
-
-Rollback deployment.
-
-```bash
-frontal deployments rollback <deployment-id> [--to <version>]
-```
-
-#### deployments delete
-
-Delete deployment.
-
-```bash
-frontal deployments delete <deployment-id> [--confirm]
-```
-
-## Workflow Commands
-
-### workflows
-
-Workflow management.
-
-#### workflows list
-
-List workflows.
-
-```bash
-frontal workflows list [--workspace <workspace-id>]
-```
-
-#### workflows info
-
-Get workflow details.
-
-```bash
-frontal workflows info <workflow-id>
-```
-
-#### workflows create
-
-Create a workflow.
-
-```bash
-frontal workflows create <name> [--definition <def-file>]
-```
-
-#### workflows update
-
-Update workflow definition.
-
-```bash
-frontal workflows update <workflow-id> [--definition <def-file>]
-```
-
-#### workflows delete
-
-Delete a workflow.
-
-```bash
-frontal workflows delete <workflow-id> [--confirm]
-```
-
-#### workflows run
-
-Execute a workflow.
-
-```bash
-frontal workflows run <workflow-id> [--input <data>]
-```
-
-## Pipeline Commands
-
-### pipelines
-
-Pipeline operations.
-
-#### pipelines list
-
-List pipelines.
-
-```bash
-frontal pipelines list [--workspace <workspace-id>]
-```
-
-#### pipelines info
-
-Get pipeline details.
-
-```bash
-frontal pipelines info <pipeline-id>
-```
-
-#### pipelines create
-
-Create a pipeline.
-
-```bash
-frontal pipelines create <name> [--config <config-file>]
-```
-
-#### pipelines update
-
-Update pipeline configuration.
-
-```bash
-frontal pipelines update <pipeline-id> [--config <config-file>]
-```
-
-#### pipelines delete
-
-Delete a pipeline.
-
-```bash
-frontal pipelines delete <pipeline-id> [--confirm]
-```
-
-#### pipelines run
-
-Execute a pipeline.
-
-```bash
-frontal pipelines run <pipeline-id> [--trigger <event>]
-```
-
-## Metrics Commands
-
-### metrics
-
-Metrics and monitoring.
-
-#### metrics get
-
-Get metrics for a resource.
-
-```bash
-frontal metrics get <resource-type> <resource-id> [--metric <name>] [--from <time>] [--to <time>]
-```
-
-#### metrics list
-
-List available metrics.
-
-```bash
-frontal metrics list [--resource-type <type>]
-```
-
-#### metrics dashboard
-
-Show metrics dashboard.
-
-```bash
-frontal metrics dashboard [--resource <id>] [--refresh <seconds>]
-```
-
-## Log Commands
+- `frontal.jsonc` — see [CONFIGURATION.md](./CONFIGURATION.md)
+- `.env.example` — `FRONTAL_API_KEY=` and `FRONTAL_API_URL`
+- `.gitignore` entries for `.frontal/`, `.env`, `.env.local`
+- `src/.gitkeep`
+- `package.json` — only if none exists (never replaced, even with `--force`)
 
-### logs
+Existing `frontal.jsonc` / `.env.example` are kept unless `--force` is given.
 
-Log management.
-
-#### logs list
-
-List log sources.
-
-```bash
-frontal logs list [--workspace <workspace-id>]
-```
-
-#### logs tail
-
-Tail logs in real-time.
-
-```bash
-frontal logs tail [--source <source>] [--since <time>] [--filter <filter>]
-```
-
-#### logs search
-
-Search logs.
-
-```bash
-frontal logs search <query> [--from <time>] [--to <time>] [--source <source>]
-```
-
-#### logs export
-
-Export logs.
-
-```bash
-frontal logs export [--format json|csv] [--output <file>] [--from <time>] [--to <time>]
-```
-
-## Webhook Commands
-
-### webhooks
-
-Webhook configuration.
-
-#### webhooks list
-
-List webhooks.
-
-```bash
-frontal webhooks list [--org <org-id>]
-```
-
-#### webhooks info
-
-Get webhook details.
-
-```bash
-frontal webhooks info <webhook-id>
-```
-
-#### webhooks create
-
-Create a webhook.
-
-```bash
-frontal webhooks create <url> [--events <events>] [--secret <secret>]
-```
-
-#### webhooks update
-
-Update webhook configuration.
-
-```bash
-frontal webhooks update <webhook-id> [--url <url>] [--events <events>]
-```
-
-#### webhooks delete
-
-Delete a webhook.
-
-```bash
-frontal webhooks delete <webhook-id> [--confirm]
-```
-
-#### webhooks test
-
-Test webhook delivery.
-
-```bash
-frontal webhooks test <webhook-id> [--event <event>]
-```
-
-## Billing Commands
-
-### billing
-
-Billing and usage management.
-
-#### billing info
-
-Get billing information.
-
-```bash
-frontal billing info [--org <org-id>]
-```
-
-#### billing usage
-
-View usage statistics.
-
-```bash
-frontal billing usage [--from <date>] [--to <date>] [--granularity daily|monthly]
-```
-
-#### billing invoices
-
-List invoices.
-
-```bash
-frontal billing invoices [--status paid|pending|overdue]
-```
-
-#### billing invoice
-
-Get invoice details.
-
-```bash
-frontal billing invoice <invoice-id>
-```
-
-## Agent Commands
-
-### agents
-
-AI agent management.
-
-#### agents list
-
-List agents.
-
-```bash
-frontal agents list [--workspace <workspace-id>]
-```
-
-#### agents info
-
-Get agent details.
-
-```bash
-frontal agents info <agent-id>
-```
-
-#### agents create
-
-Create an agent.
-
-```bash
-frontal agents create <name> [--model <model>] [--instructions <text>]
-```
-
-#### agents update
-
-Update agent configuration.
-
-```bash
-frontal agents update <agent-id> [--name <name>] [--model <model>] [--instructions <text>]
-```
-
-#### agents delete
-
-Delete an agent.
-
-```bash
-frontal agents delete <agent-id> [--confirm]
-```
-
-#### agents chat
-
-Chat with an agent.
-
-```bash
-frontal agents chat <agent-id> [--message <text>]
-```
-
-## Status Commands
-
-### status
-
-Platform status and health.
-
-#### status check
-
-Check platform status.
-
-```bash
-frontal status check [--detailed]
-```
-
-#### status services
-
-Check service health.
-
-```bash
-frontal status services [--service <name>]
-```
-
-## Marketplace Commands
-
-### marketplace
-
-Marketplace operations.
-
-#### marketplace list
-
-List marketplace items.
-
 ```bash
-frontal marketplace list [--category <category>] [--search <query>]
+frontal init --name my-app
+frontal init --force
+frontal init --json      # {"dir","name","created","updated","skipped","kept"}
 ```
 
-#### marketplace info
+### `frontal types [--out <file>]`
 
-Get marketplace item details.
+Generates TypeScript typings from `frontal.jsonc` (default `src/frontal-configuration.d.ts`):
 
-```bash
-frontal marketplace info <item-id>
-```
-
-#### marketplace install
-
-Install marketplace item.
-
-```bash
-frontal marketplace install <item-id> [--workspace <workspace-id>]
-```
-
-#### marketplace uninstall
-
-Uninstall marketplace item.
-
-```bash
-frontal marketplace uninstall <item-id> [--workspace <workspace-id>]
-```
-
-## Support Commands
-
-### support
-
-Support ticket management.
-
-#### support tickets
-
-List support tickets.
-
-```bash
-frontal support tickets [--status open|closed|all]
-```
-
-#### support create
-
-Create support ticket.
-
-```bash
-frontal support create <subject> [--description <text>] [--priority low|medium|high]
-```
-
-#### support info
-
-Get ticket details.
-
-```bash
-frontal support info <ticket-id>
-```
-
-#### support update
-
-Update ticket.
-
-```bash
-frontal support update <ticket-id> [--comment <text>] [--status <status>]
-```
-
-## Service Commands
-
-### services
-
-Service catalog management.
-
-#### services list
-
-List available services.
-
-```bash
-frontal services list [--category <category>]
-```
-
-#### services info
-
-Get service details.
-
-```bash
-frontal services info <service-id>
-```
-
-#### services enable
-
-Enable a service.
-
-```bash
-frontal services enable <service-id> [--workspace <workspace-id>]
-```
-
-#### services disable
-
-Disable a service.
-
-```bash
-frontal services disable <service-id> [--workspace <workspace-id>]
-```
-
-## Feature Flag Commands
-
-### flags
-
-Feature flag management.
-
-#### flags list
-
-List feature flags.
-
-```bash
-frontal flags list [--workspace <workspace-id>]
-```
-
-#### flags info
-
-Get flag details.
-
-```bash
-frontal flags info <flag-id>
-```
-
-#### flags create
-
-Create a feature flag.
-
-```bash
-frontal flags create <name> [--description <text>] [--enabled true|false]
-```
-
-#### flags update
-
-Update flag configuration.
-
-```bash
-frontal flags update <flag-id> [--enabled true|false] [--description <text>]
-```
-
-#### flags delete
-
-Delete a feature flag.
-
-```bash
-frontal flags delete <flag-id> [--confirm]
-```
-
-## Completion Commands
-
-### completion
-
-Command completion setup.
-
-#### completion bash
-
-Generate bash completion.
-
-```bash
-frontal completion bash
-```
-
-#### completion zsh
-
-Generate zsh completion.
+| Type | Contents |
+|---|---|
+| `FrontalVars` | one `string` property per `vars` key |
+| `FrontalSecrets` | one `string` property per `secrets.required` entry |
+| `FrontalEnv` | `FrontalVars & FrontalSecrets` + `FRONTAL_ENV?`, `FRONTAL_API_URL?`; also merged into `NodeJS.ProcessEnv` |
+| `FrontalServices` | per enabled service: `{ remote: boolean; client: Frontal["<service>"] }` |
+| `FrontalProject` | the validated project shape (`name` is a literal type) |
 
-```bash
-frontal completion zsh
-```
-
-#### completion fish
-
-Generate fish completion.
+The file starts with `// Generated by frontal types — do not edit.` Re-run after
+editing `frontal.jsonc`; the command reports `up-to-date` when nothing changed.
 
 ```bash
-frontal completion fish
+frontal types
+frontal types --out types/frontal.d.ts
+frontal types --env staging --json
 ```
-
-## Data Management Commands
-
-### blob
-
-Blob storage operations.
-
-#### blob list
 
-List blobs.
+---
 
-```bash
-frontal blob list [--prefix <prefix>] [--workspace <workspace-id>]
-```
+## Authentication
 
-#### blob upload
+### `frontal auth login [--method browser|api-key] [--auth-url <url>] [--profile <name>]`
 
-Upload file to blob storage.
-
-```bash
-frontal blob upload <local-path> <remote-path>
-```
+- `browser` (default when a TTY is available): OAuth PKCE flow, tokens stored in the profile.
+- `api-key`: prompts for a `frt_…` key, validates it against `/auth/account/profile`
+  and stores it. A rejected key fails with `INVALID_API_KEY` (exit 3) and nothing is saved.
 
-#### blob download
+### `frontal auth password-login --email <email> --password <password>`
 
-Download file from blob storage.
+Public auth API login; stores access/refresh tokens in the profile.
 
-```bash
-frontal blob download <remote-path> <local-path>
-```
+### `frontal auth signup --email <email> --password <password>`
 
-#### blob delete
+### `frontal auth logout [--profile <name>]`
 
-Delete blob.
+### `frontal auth whoami [--local]`
 
-```bash
-frontal blob delete <remote-path> [--confirm]
-```
+Prints the resolved profile, auth method and token expiry. Unless `--local` is
+given, also fetches the account profile (`GET /auth/account/profile`).
 
-### graph
+### `frontal auth token`
 
-Graph database operations.
+Prints the raw access token or API key (for piping into other tools).
 
-#### graph query
+### `frontal auth refresh`
 
-Execute graph query.
+Refreshes the stored OAuth session.
 
-```bash
-frontal graph query <query> [--variables <vars>]
-```
+### `frontal auth mfa <status|setup|enable --code|disable --code|verify --code|backup-codes-regenerate>`
 
-#### graph schema
+---
 
-Show graph schema.
+## Configuration profiles
 
-```bash
-frontal graph schema [--format table|json]
-```
+### `frontal config set <key> <value>` / `get <key>` / `list` / `reset [--yes]`
 
-### ontology
+### `frontal config profiles` / `frontal config use <profile>`
 
-Ontology management.
+### `frontal config telemetry [on|off]`
 
-#### ontology list
+Profiles live in `~/.frontal/config.json` (override with `FRONTAL_CONFIG_DIR`).
 
-List ontologies.
+---
 
-```bash
-frontal ontology list [--workspace <workspace-id>]
-```
+## Workflows
 
-#### ontology info
+### `frontal workflows list [--limit <n>] [--cursor <cursor>]`
 
-Get ontology details.
+Returns `{ data, pagination: { cursor, hasMore, total? } }`.
 
-```bash
-frontal ontology info <ontology-id>
-```
+### `frontal workflows create --body <json>`
 
-#### ontology create
+The body is validated locally against the SDK's `WorkflowDefinitionSchema`
+(`name`, `triggers[]`, `steps[]`, optional `description`, `version`, `variables`, `tags`)
+before the request is sent; invalid definitions exit with code 2 and list the fields.
 
-Create an ontology.
+### `frontal workflows search --body <json>` / `batch --body <json>`
 
-```bash
-frontal ontology create <name> [--definition <def-file>]
-```
+### `frontal workflows run get <workflow-id> <run-id>` / `run summary <workflow-id> <run-id>`
 
-#### ontology update
+### `frontal workflows run timeline <workflow-id> <run-id>`
 
-Update ontology definition.
+Streams the execution timeline over SSE. Human output prints `[event] data` lines;
+`--json` prints one JSON object per line (`{ "type", "data", "id" }`).
 
-```bash
-frontal ontology update <ontology-id> [--definition <def-file>]
-```
+---
 
-#### ontology delete
+## Runs, invocations, events
 
-Delete an ontology.
+### `frontal runs list [--limit --cursor]` / `frontal runs create --body <json>`
 
-```bash
-frontal ontology delete <ontology-id> [--confirm]
-```
+### `frontal invocations create --body <json>`
 
-## Getting Help
+### `frontal events list [--limit --cursor]` / `get <id>` / `query --body` / `usage --body` / `reprocess --body`
 
-For any command, you can use:
+Request bodies are sent to the API in `snake_case`; responses are returned in `camelCase`.
 
-- `frontal --help`: Show global help
-- `frontal <command> --help`: Show command-specific help
-- `frontal <command> <subcommand> --help`: Show subcommand help
+---
 
-## Output Formats
+## Shell integration
 
-Most commands support multiple output formats:
+### `frontal completion <bash|zsh|fish>`
 
-- **table**: Human-readable tables (default)
-- **json**: Machine-readable JSON
-- **yaml**: Human-readable YAML
-- **csv**: Comma-separated values
+### `frontal migrate-legacy`
 
-Example:
-```bash
-frontal orgs list --output json
-frontal functions list --output yaml
-```
+Prints the mapping from v1 commands to the current command tree.

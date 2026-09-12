@@ -2,7 +2,6 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: {
-    "bin/frontal": "bin/frontal.ts",
     index: "src/index.ts",
   },
   format: ["esm"],

@@ -1,0 +1,15 @@
+{
+  // Fixture used by tests/types.test.ts and tests/config.test.ts
+  "$schema": "https://frontal.dev/schemas/frontal.jsonc",
+  "name": "fixture-app",
+  "env": "dev",
+  "apiUrl": "https://api.test.frontal.dev/v1",
+  "services": {
+    "ai": { "remote": true },
+    "agents": { "remote": false },
+    "graph": { "remote": false } // trailing comma below is allowed
+  },
+  "vars": { "LOG_LEVEL": "info", "REGION": "eu-west-1" },
+  "secrets": { "required": ["FRONTAL_API_KEY", "OPENAI_API_KEY"] },
+  "sdk": { "timeout": 5000 }
+}

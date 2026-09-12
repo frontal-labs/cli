@@ -1,5 +1,10 @@
 # API Documentation
 
+> **Outdated:** this page describes the legacy v1 command tree and is kept for reference only.
+> The current commands are documented in [COMMAND_REFERENCE.md](./COMMAND_REFERENCE.md)
+> and [CONFIGURATION.md](./CONFIGURATION.md).
+
+
 This guide covers the Frontal API and how to interact with it programmatically using the CLI.
 
 ## Overview
