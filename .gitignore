@@ -123,3 +123,6 @@ temp/
 *.njsproj
 *.sln
 *.sw?
+
+# bun build --compile temp files
+*.bun-build
