@@ -11,8 +11,6 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
-  id-token: write
-  packages: write
 
 jobs:
   release:
@@ -29,94 +27,22 @@ jobs:
         with:
           bun-version: "1.3.8"
 
-      - name: Setup Node.js (npm registry auth)
-        uses: actions/setup-node@v7
-        with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Run tests
         run: bun run test
 
-      - name: Build binaries
-        run: bun run build:binaries
-
-      # Opens/updates the "chore: release packages" PR while changesets are
-      # pending; once that PR is merged, publishes to npm (frontal-cli).
-      - name: Create Release Pull Request or Publish to npm
+      # Versions + opens the "chore: release packages" PR while changesets are
+      # pending. Merging that PR tags vX.Y.Z; publish.yml does the publishing
+      # (npm via OIDC, GitHub Packages, GitHub Release with binaries).
+      - name: Create Release Pull Request or tag the release
         id: changesets
         uses: changesets/action@v1
         with:
           version: bun run version-packages
-          publish: bun run release
+          publish: bun run build && changeset tag
           commit: "chore: release packages"
           title: "chore: release packages"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # GitHub Packages only accepts packages scoped to the repository owner,
-      # so the same build is published there as @frontal-labs/cli.
-      - name: Publish to GitHub Packages
-        if: steps.changesets.outputs.published == 'true'
-        run: |
-          node -e '
-            const fs = require("fs");
-            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-            pkg.name = "@frontal-labs/cli";
-            pkg.publishConfig = { registry: "https://npm.pkg.github.com", access: "public" };
-            pkg.repository = { type: "git", url: "https://github.com/frontal-labs/cli.git" };
-            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
-          '
-          echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" > .npmrc
-          npm publish --registry https://npm.pkg.github.com --access public --provenance=false
-          git checkout -- package.json
-          rm -f .npmrc
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create GitHub Release
-        if: steps.changesets.outputs.published == 'true'
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ fromJSON(steps.changesets.outputs.publishedPackages)[0].version }}
-          name: v${{ fromJSON(steps.changesets.outputs.publishedPackages)[0].version }}
-          body: |
-            See [CHANGELOG.md](./CHANGELOG.md) for release notes.
-
-            ## Installation
-
-            ### npm
-            ```bash
-            npm install -g frontal-cli@latest
-            ```
-
-            ### GitHub Packages
-            ```bash
-            npm install -g @frontal-labs/cli --registry=https://npm.pkg.github.com
-            ```
-
-            ### Homebrew
-            ```bash
-            brew tap frontal-labs/cli
-            brew install frontal-cli
-            ```
-
-            ### Docker
-            ```bash
-            docker pull ghcr.io/frontal-labs/cli:latest
-            ```
-
-            ### Single binary
-            Download `frontal-<os>-<arch>` below, `chmod +x` it and put it on your PATH.
-          draft: false
-          prerelease: ${{ contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'alpha') || contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'beta') || contains(fromJSON(steps.changesets.outputs.publishedPackages)[0].version, 'rc') }}
-          files: |
-            dist/index.js
-            dist/binaries/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
