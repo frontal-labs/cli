@@ -196,55 +196,29 @@ export class ConfigManager {
 4. Global configuration
 5. Default values
 
-### 5. HTTP Client
+### 5. SDK Access (`src/lib/sdk.ts`)
 
-**File**: `src/http/client.ts`
-
-Handles all API communication with retry logic, error handling, and authentication.
+All API communication goes through `@frontal-labs/sdk`. The CLI never calls
+`fetch` against `api.frontal.dev` directly.
 
 ```typescript
-export class ApiClient {
-  private baseUrl: string;
-  private apiKey: string;
-  private timeout: number;
-  private retries: number;
+// src/lib/sdk.ts
+export async function getSdk(globalOpts, options?): Promise<SdkHandle>;
 
-  constructor(config: Config) {
-    this.baseUrl = config.baseUrl;
-    this.apiKey = config.apiKey;
-    this.timeout = config.http.timeout;
-    this.retries = config.http.retries;
-  }
-
-  async request<T>(
-    method: string,
-    path: string,
-    data?: unknown
-  ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${path}`;
-    
-    for (let attempt = 0; attempt <= this.retries; attempt++) {
-      try {
-        const response = await fetch(url, {
-          method,
-          headers: this.getHeaders(),
-          body: data ? JSON.stringify(data) : undefined,
-          signal: AbortSignal.timeout(this.timeout),
-        });
-
-        if (!response.ok) {
-          throw new ApiError(response.status, await response.text());
-        }
-
-        return response.json();
-      } catch (error) {
-        if (attempt === this.retries) throw error;
-        await this.delay(this.getRetryDelay(attempt));
-      }
-    }
-  }
+interface SdkHandle {
+  frontal: Frontal;        // unified client: frontal.workflows, frontal.auth, ...
+  client: FrontalClient;   // core client
+  http: HttpClient;        // generic get/post/stream for endpoints the SDK does not model
+  credential: Credential;  // api-key | oauth | anonymous
+  lastRequestId?: string;  // X-Request-Id of the last response, for error output
 }
 ```
+
+- Credentials resolve with precedence `--api-key` > `FRONTAL_API_KEY` > profile API key > profile OAuth session.
+- OAuth sessions are bridged with a custom `fetch` that injects `Authorization: Bearer <jwt>` and refreshes expired tokens (persisting them to the profile). The SDK itself only knows about `frt_` keys.
+- The SDK is imported lazily and `FRONTAL_*` environment variables are sanitized first, because `@frontal-labs/core` validates them at import time.
+- Client configuration is validated with the SDK's own `clientConfigSchema`; the CLI adds an `X-Frontal-Cli: <version>` header.
+- Retries, timeouts, snake_case/camelCase transforms and error parsing are the SDK's.
 
 ### 6. Output Formatting System
 
@@ -377,7 +351,7 @@ export interface Plugin {
 
 export interface PluginContext {
   config: Config;
-  httpClient: ApiClient;
+  sdk: SdkHandle;
   logger: Logger;
 }
 ```
@@ -660,7 +634,8 @@ tests/
 
 ```typescript
 // tests/helpers/mock-client.ts
-export class MockApiClient implements ApiClient {
+// Use createMockFetch() from @frontal-labs/testing and inject it via createSdkHandle({ fetch })
+export class MockApiClient {
   private responses: Map<string, unknown> = new Map();
 
   setResponse(path: string, response: unknown): void {

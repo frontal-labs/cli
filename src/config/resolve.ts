@@ -1,13 +1,13 @@
 import { configManager } from "@/config/manager.js";
-import type { ApiClientConfig } from "@/http/client.js";
 
-const DEFAULT_BASE_URL = "https://api.frontal.dev/v1";
+export const DEFAULT_BASE_URL = "https://api.frontal.dev/v1";
 
 export interface GlobalOptions {
   apiKey?: string;
   apiUrl?: string;
   color?: boolean;
   debug?: boolean;
+  env?: string;
   json?: boolean;
   org?: string;
   profile?: string;
@@ -15,19 +15,31 @@ export interface GlobalOptions {
   verbose?: boolean;
   workspace?: string;
   yaml?: boolean;
+  yes?: boolean;
 }
 
-export interface ResolvedConfig extends ApiClientConfig {
+export interface ResolvedConfig {
   accessToken?: string;
+  apiKey: string;
   authUrl?: string;
+  baseUrl: string;
+  debug: boolean;
   orgId?: string;
+  profileName: string;
   refreshToken?: string;
   tokenExpiresAt?: number;
   workspaceId?: string;
 }
 
+/**
+ * Resolves effective settings with precedence flag > env var > profile > default.
+ * Credentials are returned raw here; `getSdk()` turns them into an SDK client.
+ */
 export function resolveConfig(opts: GlobalOptions): ResolvedConfig {
-  const profileName = opts.profile ?? process.env.FRONTAL_PROFILE ?? undefined;
+  const profileName =
+    opts.profile ??
+    process.env.FRONTAL_PROFILE ??
+    configManager.getActiveProfileName();
   const profile = configManager.getProfile(profileName);
 
   const apiKey =
@@ -46,20 +58,16 @@ export function resolveConfig(opts: GlobalOptions): ResolvedConfig {
 
   const debug = opts.debug ?? profile.debug ?? false;
 
-  const accessToken = profile.accessToken;
-  const refreshToken = profile.refreshToken;
-  const tokenExpiresAt = profile.tokenExpiresAt;
-  const authUrl = process.env.FRONTAL_AUTH_URL ?? profile.authUrl;
-
   return {
     apiKey,
     baseUrl,
     debug,
     orgId,
+    profileName,
     workspaceId,
-    accessToken,
-    refreshToken,
-    tokenExpiresAt,
-    authUrl,
+    accessToken: profile.accessToken,
+    refreshToken: profile.refreshToken,
+    tokenExpiresAt: profile.tokenExpiresAt,
+    authUrl: process.env.FRONTAL_AUTH_URL ?? profile.authUrl,
   };
 }

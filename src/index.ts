@@ -18,6 +18,8 @@ export async function run(argv: string[]) {
     .option("-p, --profile <name>", "Config profile", "default")
     .option("--api-key <key>", "Override API key")
     .option("--api-url <url>", "Override API base URL")
+    .option("--env <name>", "Target environment (dev | staging | prod)")
+    .option("-y, --yes", "Assume yes for confirmation prompts (CI)")
     .option("-j, --json", "Output as JSON")
     .option("--yaml", "Output as YAML")
     .option("-q, --quiet", "Suppress non-essential output")

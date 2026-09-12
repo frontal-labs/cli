@@ -1,232 +1,277 @@
+import { CliError, docsUrlFor } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
-import {
-  ApiError,
-  ConflictError,
-  ForbiddenError,
-  NetworkError,
-  NotFoundError,
-  RateLimitError,
-  TimeoutError,
-  UnauthorizedError,
-  ValidationError,
-} from "@/http/errors.js";
+import { redact, redactString } from "@/output/redact.js";
 import { theme } from "@/output/theme.js";
 
-interface MachineError {
+export interface ErrorReport {
   code: string;
+  docs: string;
+  exitCode: number;
+  fields?: { field: string; message: string }[];
+  fix?: string;
   message: string;
   requestId?: string;
+  retryAfter?: number;
   statusCode?: number;
 }
 
-interface HumanMessage {
-  suggestion?: string;
-  title: string;
+interface ApiErrorShape {
+  code?: unknown;
+  docs?: unknown;
+  fields?: unknown;
+  message?: unknown;
+  name?: unknown;
+  requestId?: unknown;
+  retryAfter?: unknown;
+  statusCode?: unknown;
 }
 
-function classifyError(err: unknown): {
-  exitCode: number;
-  machine: MachineError;
-  human: HumanMessage;
-} {
-  if (err instanceof UnauthorizedError) {
+const RETRY_HINT = "Wait and try again.";
+
+const FIX_BY_CODE: Record<string, string> = {
+  UNAUTHORIZED: "Run `frontal auth login` or set a valid FRONTAL_API_KEY.",
+  INVALID_API_KEY:
+    "Check FRONTAL_API_KEY — it must be a valid key starting with frt_.",
+  FORBIDDEN: "Check your role with `frontal auth whoami` or ask an admin.",
+  NOT_FOUND: "Verify the resource id belongs to this workspace/environment.",
+  VALIDATION_ERROR: "Fix the request payload; see the listed fields.",
+  RATE_LIMITED: "Back off and retry, or lower request concurrency.",
+  CONFLICT: "The resource changed underneath you; re-fetch and retry.",
+};
+
+function asApiError(err: unknown): ApiErrorShape | undefined {
+  if (err instanceof Error && typeof (err as ApiErrorShape).code === "string") {
+    return err as ApiErrorShape;
+  }
+  return;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
+function exitCodeForApiError(name: string, statusCode?: number): number {
+  switch (name) {
+    case "UnauthorizedError":
+      return EXIT_CODES.AUTH_ERROR;
+    case "ForbiddenError":
+      return EXIT_CODES.PERMISSION_ERROR;
+    case "NotFoundError":
+      return EXIT_CODES.NOT_FOUND;
+    case "ValidationError":
+      return EXIT_CODES.VALIDATION_ERROR;
+    case "RateLimitError":
+      return EXIT_CODES.RATE_LIMITED;
+    default:
+      break;
+  }
+  if (statusCode === 401) {
+    return EXIT_CODES.AUTH_ERROR;
+  }
+  if (statusCode === 403) {
+    return EXIT_CODES.PERMISSION_ERROR;
+  }
+  if (statusCode === 404) {
+    return EXIT_CODES.NOT_FOUND;
+  }
+  return EXIT_CODES.GENERAL_ERROR;
+}
+
+function fieldsFrom(value: unknown): ErrorReport["fields"] {
+  if (!Array.isArray(value)) {
+    return;
+  }
+  const fields: { field: string; message: string }[] = [];
+  for (const item of value) {
+    if (item && typeof item === "object") {
+      const record = item as Record<string, unknown>;
+      fields.push({
+        field: String(record.field ?? record.path ?? ""),
+        message: String(record.message ?? ""),
+      });
+    }
+  }
+  return fields.length > 0 ? fields : undefined;
+}
+
+function classifyApiError(err: ApiErrorShape): ErrorReport {
+  const name = String(err.name ?? "");
+  const code = String(err.code);
+  const statusCode = optionalNumber(err.statusCode);
+  const retryAfter = optionalNumber(err.retryAfter);
+
+  let fix = FIX_BY_CODE[code];
+  if (!fix && name === "RateLimitError") {
+    fix = retryAfter ? `Wait ${retryAfter}s and try again.` : RETRY_HINT;
+  }
+  if (!fix && statusCode !== undefined && statusCode >= 500) {
+    fix = "The Frontal API returned a server error. Retry shortly.";
+  }
+
+  return {
+    code,
+    message: String(err.message ?? "Request failed."),
+    statusCode,
+    requestId: optionalString(err.requestId),
+    docs: optionalString(err.docs) ?? docsUrlFor(code),
+    fix,
+    fields: fieldsFrom(err.fields),
+    retryAfter,
+    exitCode: exitCodeForApiError(name, statusCode),
+  };
+}
+
+function classifyZodError(err: Error): ErrorReport {
+  const issues = (err as { issues?: unknown }).issues;
+  return {
+    code: "VALIDATION_ERROR",
+    message: "Input validation failed.",
+    fields: Array.isArray(issues)
+      ? issues.map((issue) => ({
+          field: Array.isArray(issue.path) ? issue.path.join(".") : "",
+          message: String(issue.message ?? ""),
+        }))
+      : undefined,
+    fix: FIX_BY_CODE.VALIDATION_ERROR,
+    docs: docsUrlFor("VALIDATION_ERROR"),
+    exitCode: EXIT_CODES.VALIDATION_ERROR,
+  };
+}
+
+export function classifyError(
+  err: unknown,
+  context: { requestId?: string } = {}
+): ErrorReport {
+  if (err instanceof CliError) {
     return {
-      exitCode: EXIT_CODES.AUTH_ERROR,
-      machine: {
-        code: err.code,
-        message: err.message,
-        statusCode: err.statusCode,
-        requestId: err.requestId,
-      },
-      human: {
-        title: "Authentication failed. Run `frontal auth login`.",
-        suggestion: "Run 'frontal auth login' to authenticate.",
-      },
+      code: err.code,
+      message: err.message,
+      fix: err.fix,
+      docs: err.docs,
+      requestId: err.requestId ?? context.requestId,
+      exitCode: err.exitCode,
     };
   }
 
-  if (err instanceof ForbiddenError) {
-    return {
-      exitCode: EXIT_CODES.PERMISSION_ERROR,
-      machine: {
-        code: err.code,
-        message: err.message,
-        statusCode: err.statusCode,
-        requestId: err.requestId,
-      },
-      human: {
-        title: "Permission denied. Check your role/policy.",
-        suggestion: "Check your role with 'frontal auth whoami'.",
-      },
-    };
+  if (err instanceof Error && err.name === "ZodError") {
+    return classifyZodError(err);
   }
 
-  if (err instanceof NotFoundError) {
+  if (err instanceof Error && err.name === "NetworkError") {
     return {
-      exitCode: EXIT_CODES.NOT_FOUND,
-      machine: {
-        code: err.code,
-        message: err.message,
-        statusCode: err.statusCode,
-        requestId: err.requestId,
-      },
-      human: {
-        title: `Resource not found: ${err.message}`,
-        suggestion:
-          "Verify the resource ID. List resources with 'frontal <resource> list'.",
-      },
-    };
-  }
-
-  if (err instanceof ValidationError) {
-    return {
-      exitCode: EXIT_CODES.VALIDATION_ERROR,
-      machine: {
-        code: err.code,
-        message: err.message,
-        statusCode: err.statusCode,
-        requestId: err.requestId,
-      },
-      human: {
-        title: `Validation failed:${err.fields ? "" : ` ${err.message}`}`,
-        suggestion: err.fields ? undefined : undefined,
-      },
-    };
-  }
-
-  if (err instanceof RateLimitError) {
-    const retryMsg = err.retryAfter ? ` Retry after ${err.retryAfter}s.` : "";
-    return {
-      exitCode: EXIT_CODES.RATE_LIMITED,
-      machine: {
-        code: err.code,
-        message: err.message,
-        statusCode: err.statusCode,
-        requestId: err.requestId,
-      },
-      human: {
-        title: `Rate limit exceeded.${retryMsg}`,
-        suggestion: err.retryAfter
-          ? `Wait ${err.retryAfter}s and try again.`
-          : "Wait and try again.",
-      },
-    };
-  }
-
-  if (err instanceof ConflictError) {
-    return {
-      exitCode: EXIT_CODES.GENERAL_ERROR,
-      machine: {
-        code: err.code,
-        message: err.message,
-        statusCode: err.statusCode,
-        requestId: err.requestId,
-      },
-      human: { title: `Conflict: ${err.message}` },
-    };
-  }
-
-  if (err instanceof NetworkError) {
-    return {
+      code: "NETWORK_ERROR",
+      message: "Could not reach the Frontal API.",
+      fix: "Check your connection and the API URL (`frontal config list`).",
+      docs: docsUrlFor("NETWORK_ERROR"),
+      requestId: context.requestId,
       exitCode: EXIT_CODES.NETWORK_ERROR,
-      machine: { code: "NETWORK_ERROR", message: err.message },
-      human: {
-        title: "Could not reach the Frontal API.",
-        suggestion:
-          "Check your connection. Verify API URL with 'frontal config list'.",
-      },
     };
   }
 
-  if (err instanceof TimeoutError) {
+  if (err instanceof Error && err.name === "TimeoutError") {
     return {
+      code: "TIMEOUT",
+      message: err.message,
+      fix: "Try again; the API did not respond in time.",
+      docs: docsUrlFor("TIMEOUT"),
+      requestId: context.requestId,
       exitCode: EXIT_CODES.TIMEOUT_ERROR,
-      machine: { code: "TIMEOUT_ERROR", message: err.message },
-      human: {
-        title: err.message,
-        suggestion: "Request timed out. Try again or increase --timeout.",
-      },
     };
   }
 
-  if (err instanceof ApiError) {
-    return {
-      exitCode: EXIT_CODES.GENERAL_ERROR,
-      machine: {
-        code: err.code,
-        message: err.message,
-        statusCode: err.statusCode,
-        requestId: err.requestId,
-      },
-      human: {
-        title: `Server error (${err.statusCode}): ${err.message}`,
-      },
-    };
+  const apiError = asApiError(err);
+  if (apiError) {
+    const report = classifyApiError(apiError);
+    return { ...report, requestId: report.requestId ?? context.requestId };
   }
 
   if (err instanceof Error) {
     return {
+      code: "UNHANDLED_ERROR",
+      message: err.message,
+      docs: docsUrlFor("UNHANDLED_ERROR"),
+      requestId: context.requestId,
       exitCode: EXIT_CODES.GENERAL_ERROR,
-      machine: { code: "UNHANDLED_ERROR", message: err.message },
-      human: { title: err.message },
     };
   }
 
   return {
+    code: "UNEXPECTED_ERROR",
+    message: "An unexpected error occurred.",
+    docs: docsUrlFor("UNEXPECTED_ERROR"),
+    requestId: context.requestId,
     exitCode: EXIT_CODES.GENERAL_ERROR,
-    machine: {
-      code: "UNEXPECTED_ERROR",
-      message: "An unexpected error occurred.",
-    },
-    human: { title: "An unexpected error occurred." },
   };
 }
 
+export interface HandleErrorOptions {
+  /** Request id captured by the SDK transport, when the error has none. */
+  requestId?: string;
+}
+
+/**
+ * Prints an error (human or `--json`) and exits with a stable exit code.
+ * Every report carries `code`, `message`, `fix`, `docs` and `requestId`.
+ */
 export function handleError(
   err: unknown,
-  globalOpts?: Record<string, unknown>
+  globalOpts?: Record<string, unknown>,
+  options: HandleErrorOptions = {}
 ): never {
-  const debug = globalOpts?.debug as boolean;
-  const json = globalOpts?.json as boolean;
-  const { exitCode, machine, human } = classifyError(err);
+  const report = renderError(err, globalOpts, options);
+  process.exit(report.exitCode);
+}
 
-  if (!json) {
-    console.error(theme.error(human.title));
-    if (err instanceof ValidationError && err.fields) {
-      for (const f of err.fields) {
-        console.error(theme.error(`  - ${f.field}: ${f.message}`));
-      }
-    }
-    if (human.suggestion) {
-      console.error(theme.dim(`Suggestion: ${human.suggestion}`));
-    }
-  }
+export function renderError(
+  err: unknown,
+  globalOpts?: Record<string, unknown>,
+  options: HandleErrorOptions = {}
+): ErrorReport {
+  const debug = Boolean(globalOpts?.debug);
+  const json = Boolean(globalOpts?.json);
+  const report = classifyError(err, { requestId: options.requestId });
 
   if (json) {
     console.error(
       JSON.stringify({
-        error: {
-          code: machine.code,
-          message: machine.message,
-          statusCode: machine.statusCode,
-          requestId: machine.requestId,
-        },
+        error: redact({
+          code: report.code,
+          message: report.message,
+          fix: report.fix,
+          docs: report.docs,
+          requestId: report.requestId,
+          statusCode: report.statusCode,
+          fields: report.fields,
+          retryAfter: report.retryAfter,
+        }),
       })
     );
-    process.exit(exitCode);
+    return report;
+  }
+
+  console.error(theme.error(`${report.code}: ${redactString(report.message)}`));
+  for (const field of report.fields ?? []) {
+    console.error(theme.error(`  - ${field.field}: ${field.message}`));
+  }
+  if (report.fix) {
+    console.error(theme.dim(`Fix:  ${report.fix}`));
+  }
+  console.error(theme.dim(`Docs: ${report.docs}`));
+  if (report.requestId) {
+    console.error(theme.dim(`Request ID: ${report.requestId}`));
   }
 
   if (debug && err instanceof Error) {
     console.error();
-    if (err instanceof ApiError) {
-      if (err.requestId) {
-        console.error(theme.dim(`Request ID: ${err.requestId}`));
-      }
-      console.error(theme.dim(`Status Code: ${err.statusCode}`));
-      console.error(theme.dim(`Error Code:  ${err.code}`));
+    if (report.statusCode !== undefined) {
+      console.error(theme.dim(`Status Code: ${report.statusCode}`));
     }
-    console.error(theme.dim(err.stack ?? ""));
+    console.error(theme.dim(redactString(err.stack ?? "")));
   }
 
-  process.exit(exitCode);
+  return report;
 }

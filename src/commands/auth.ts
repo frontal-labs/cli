@@ -17,9 +17,12 @@ import {
 import { configManager } from "@/config/manager.js";
 import { resolveConfig } from "@/config/resolve.js";
 import { assertOperationSupported } from "@/contract/operations.js";
+import { CliError } from "@/errors/cli-error.js";
+import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { handleError } from "@/errors/handler.js";
-import { ApiClient } from "@/http/client.js";
-import { Formatter } from "@/output/formatter.js";
+import { runAction } from "@/lib/command.js";
+import { withExamples } from "@/lib/output.js";
+import { createSdkHandle } from "@/lib/sdk.js";
 import { theme } from "@/output/theme.js";
 import { openBrowser } from "@/utils/browser.js";
 import {
@@ -60,20 +63,17 @@ export function registerAuthCommands(program: Command): void {
     .requiredOption("--email <email>", "Email")
     .requiredOption("--password <password>", "Password")
     .option("--profile <name>", "Save to specific profile")
-    .action(async (opts, cmd) => {
-      try {
+    .action((opts, cmd) =>
+      runAction(cmd, async ({ fmt, globalOpts, sdk }) => {
         assertOperationSupported("POST", "/auth/login");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const fmt = Formatter.from(cmd.optsWithGlobals());
+        const { http } = await sdk({ anonymous: true });
 
-        const result = await api.post<Record<string, unknown>>("/auth/login", {
+        const result = await http.post<Record<string, unknown>>("/auth/login", {
           email: opts.email,
           password: opts.password,
         });
 
-        const profileName =
-          opts.profile ?? cmd.optsWithGlobals().profile ?? "default";
+        const profileName = opts.profile ?? globalOpts.profile ?? "default";
 
         const token = result.accessToken;
         const refreshToken = result.refreshToken;
@@ -89,31 +89,25 @@ export function registerAuthCommands(program: Command): void {
         configManager.setActiveProfile(profileName);
 
         fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 
   auth
     .command("signup")
     .description("Create a new account")
     .requiredOption("--email <email>", "Email address")
     .requiredOption("--password <password>", "Password")
-    .action(async (opts, cmd) => {
-      try {
+    .action((opts, cmd) =>
+      runAction(cmd, async ({ fmt, sdk }) => {
         assertOperationSupported("POST", "/auth/signup");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.post<Record<string, unknown>>("/auth/signup", {
-          email: opts.email,
-          password: opts.password,
-        });
+        const { http } = await sdk({ anonymous: true });
+        const result = await http.post<Record<string, unknown>>(
+          "/auth/signup",
+          { email: opts.email, password: opts.password }
+        );
         fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 
   auth
     .command("logout")
@@ -141,40 +135,47 @@ export function registerAuthCommands(program: Command): void {
       }
     });
 
-  auth
-    .command("whoami")
-    .description("Show current authentication status")
-    .action((_opts, cmd) => {
-      try {
-        const globalOpts = cmd.optsWithGlobals();
-        const config = resolveConfig(globalOpts);
-        const fmt = Formatter.from(globalOpts);
+  withExamples(
+    auth
+      .command("whoami")
+      .description("Show current authentication status")
+      .option("--local", "Do not call the API; show local status only")
+      .action((opts, cmd) =>
+        runAction(cmd, async ({ fmt, globalOpts, sdk }) => {
+          const config = resolveConfig(globalOpts);
 
-        let authMethod = "none";
-        if (config.accessToken) {
-          authMethod = "oauth";
-        } else if (config.apiKey) {
-          authMethod = "api-key";
-        }
+          let authMethod = "none";
+          if (config.apiKey) {
+            authMethod = "api-key";
+          } else if (config.accessToken) {
+            authMethod = "oauth";
+          }
 
-        fmt.object({
-          profile: configManager.getActiveProfileName(),
-          authMethod,
-          hasApiKey: Boolean(config.apiKey),
-          hasAccessToken: Boolean(config.accessToken),
-          tokenExpired: config.tokenExpiresAt
-            ? isTokenExpired(config.tokenExpiresAt, 0)
-            : undefined,
-          tokenExpiry: config.tokenExpiresAt
-            ? new Date(config.tokenExpiresAt * 1000).toISOString()
-            : undefined,
-          authUrl: config.authUrl,
-          baseUrl: config.baseUrl,
-        });
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+          const status: Record<string, unknown> = {
+            profile: config.profileName,
+            authMethod,
+            hasApiKey: Boolean(config.apiKey),
+            hasAccessToken: Boolean(config.accessToken),
+            tokenExpired: config.tokenExpiresAt
+              ? isTokenExpired(config.tokenExpiresAt, 0)
+              : undefined,
+            tokenExpiry: config.tokenExpiresAt
+              ? new Date(config.tokenExpiresAt * 1000).toISOString()
+              : undefined,
+            authUrl: config.authUrl,
+            baseUrl: config.baseUrl,
+          };
+
+          if (authMethod !== "none" && !opts.local) {
+            const { frontal } = await sdk();
+            status.account = await frontal.auth.account.getProfile();
+          }
+
+          fmt.object(status);
+        })
+      ),
+    ["frontal auth whoami", "frontal auth whoami --local --json"]
+  );
 
   auth
     .command("token")
@@ -189,9 +190,10 @@ export function registerAuthCommands(program: Command): void {
         }
 
         if (!config.apiKey) {
-          throw new Error(
-            "No credentials configured. Run `frontal auth login`."
-          );
+          throw new CliError("NO_CREDENTIALS", "No credentials configured.", {
+            fix: "Run `frontal auth login` or set FRONTAL_API_KEY.",
+            exitCode: EXIT_CODES.AUTH_ERROR,
+          });
         }
 
         process.stdout.write(config.apiKey);
@@ -203,15 +205,18 @@ export function registerAuthCommands(program: Command): void {
   auth
     .command("refresh")
     .description("Manually refresh OAuth tokens")
-    .action(async (_opts, cmd) => {
-      try {
-        const globalOpts = cmd.optsWithGlobals();
+    .action((_opts, cmd) =>
+      runAction(cmd, async ({ fmt, globalOpts }) => {
         const config = resolveConfig(globalOpts);
-        const profileName = globalOpts.profile ?? "default";
 
         if (!(config.refreshToken && config.authUrl)) {
-          throw new Error(
-            "No OAuth tokens to refresh. Run `frontal auth login`."
+          throw new CliError(
+            "NO_REFRESH_TOKEN",
+            "No OAuth tokens to refresh.",
+            {
+              fix: "Run `frontal auth login` to start a browser session.",
+              exitCode: EXIT_CODES.AUTH_ERROR,
+            }
           );
         }
 
@@ -220,21 +225,18 @@ export function registerAuthCommands(program: Command): void {
           refreshToken: config.refreshToken,
         });
 
-        configManager.setProfile(profileName, {
+        configManager.setProfile(config.profileName, {
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
           tokenExpiresAt: tokens.expiresAt,
         });
 
-        const fmt = Formatter.from(globalOpts);
         fmt.object({
           refreshed: true,
           expiresAt: new Date(tokens.expiresAt * 1000).toISOString(),
         });
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 
   const mfa = auth
     .command("mfa")
@@ -243,120 +245,90 @@ export function registerAuthCommands(program: Command): void {
   mfa
     .command("status")
     .description("Get MFA status")
-    .action(async (_opts, cmd) => {
-      try {
+    .action((_opts, cmd) =>
+      runAction(cmd, async ({ fmt, sdk }) => {
         assertOperationSupported("GET", "/auth/mfa/status");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const fmt = Formatter.from(cmd.optsWithGlobals());
+        const { http } = await sdk();
         const result =
-          await api.get<Record<string, unknown>>("/auth/mfa/status");
+          await http.get<Record<string, unknown>>("/auth/mfa/status");
         fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 
   mfa
     .command("setup")
     .description("Setup MFA")
-    .action(async (_opts, cmd) => {
-      try {
+    .action((_opts, cmd) =>
+      runAction(cmd, async ({ fmt, sdk }) => {
         assertOperationSupported("POST", "/auth/mfa/setup");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const fmt = Formatter.from(cmd.optsWithGlobals());
+        const { http } = await sdk();
         const result =
-          await api.post<Record<string, unknown>>("/auth/mfa/setup");
+          await http.post<Record<string, unknown>>("/auth/mfa/setup");
         fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 
   mfa
     .command("enable")
     .description("Enable MFA")
     .requiredOption("--code <code>", "Verification code")
-    .action(async (opts, cmd) => {
-      try {
+    .action((opts, cmd) =>
+      runAction(cmd, async ({ fmt, sdk }) => {
         assertOperationSupported("POST", "/auth/mfa/enable");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.post<Record<string, unknown>>(
+        const { http } = await sdk();
+        const result = await http.post<Record<string, unknown>>(
           "/auth/mfa/enable",
-          {
-            code: opts.code,
-          }
+          { code: opts.code }
         );
         fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 
   mfa
     .command("disable")
     .description("Disable MFA")
     .requiredOption("--code <code>", "Verification code")
-    .action(async (opts, cmd) => {
-      try {
+    .action((opts, cmd) =>
+      runAction(cmd, async ({ fmt, sdk }) => {
         assertOperationSupported("POST", "/auth/mfa/disable");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.post<Record<string, unknown>>(
+        const { http } = await sdk();
+        const result = await http.post<Record<string, unknown>>(
           "/auth/mfa/disable",
-          {
-            code: opts.code,
-          }
+          { code: opts.code }
         );
         fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 
   mfa
     .command("verify")
     .description("Verify MFA challenge")
     .requiredOption("--code <code>", "Verification code")
-    .action(async (opts, cmd) => {
-      try {
+    .action((opts, cmd) =>
+      runAction(cmd, async ({ fmt, sdk }) => {
         assertOperationSupported("POST", "/auth/mfa/verify");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.post<Record<string, unknown>>(
+        const { http } = await sdk();
+        const result = await http.post<Record<string, unknown>>(
           "/auth/mfa/verify",
-          {
-            code: opts.code,
-          }
+          { code: opts.code }
         );
         fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 
   mfa
     .command("backup-codes-regenerate")
     .description("Regenerate MFA backup codes")
-    .action(async (_opts, cmd) => {
-      try {
+    .action((_opts, cmd) =>
+      runAction(cmd, async ({ fmt, sdk }) => {
         assertOperationSupported("POST", "/auth/mfa/backup-codes/regenerate");
-        const config = resolveConfig(cmd.optsWithGlobals());
-        const api = new ApiClient(config);
-        const fmt = Formatter.from(cmd.optsWithGlobals());
-        const result = await api.post<Record<string, unknown>>(
+        const { http } = await sdk();
+        const result = await http.post<Record<string, unknown>>(
           "/auth/mfa/backup-codes/regenerate"
         );
         fmt.object(result);
-      } catch (err) {
-        handleError(err, cmd.optsWithGlobals());
-      }
-    });
+      })
+    );
 }
 
 async function loginWithApiKey(
@@ -369,12 +341,29 @@ async function loginWithApiKey(
     "https://api.frontal.dev/v1"
   );
 
-  const api = new ApiClient({ apiKey, baseUrl });
+  // Validate the key against the account endpoint before persisting it.
+  const { frontal } = await createSdkHandle({
+    credential: { kind: "api-key", apiKey },
+    baseUrl,
+    maxRetries: 0,
+  });
   try {
-    assertOperationSupported("GET", "/auth/mfa/status");
-    await api.get("/auth/mfa/status");
-  } catch {
-    // key might not have MFA scope, save anyway
+    await frontal.auth.account.getProfile();
+  } catch (err) {
+    if (err instanceof Error && err.name === "UnauthorizedError") {
+      throw new CliError("INVALID_API_KEY", "The API key was rejected.", {
+        fix: "Create a key in the Frontal dashboard and make sure it starts with frt_.",
+        exitCode: EXIT_CODES.AUTH_ERROR,
+        requestId: (err as { requestId?: string }).requestId,
+        cause: err,
+      });
+    }
+    // Any other failure (network, missing scope) should not block saving.
+    if (!(cmd.optsWithGlobals().json as boolean)) {
+      console.error(
+        theme.warn("Could not verify the key against the API; saving anyway.")
+      );
+    }
   }
 
   configManager.setProfile(profileName, { apiKey, baseUrl });
