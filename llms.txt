@@ -2,7 +2,7 @@
 
 > Command-line interface for the Frontal platform. Wraps `@frontal-labs/sdk@1.0.4`; no raw HTTP. Project config lives in `frontal.jsonc`. Machine-readable output with `--json`; errors go to stderr as `{"error":{code,message,fix,docs,requestId,statusCode}}` with stable exit codes (0 ok, 1 general, 2 validation, 3 auth, 4 permission, 5 not found, 6 config, 10 network, 11 timeout, 12 rate limited).
 
-Version: frontal-cli@0.1.0. Verify with `frontal --version`.
+Version: frontal-cli@0.1.2. Verify with `frontal --version`.
 
 ## Rules for agents
 
