@@ -20,7 +20,7 @@ For the API key and base URL:
 
 ```jsonc
 {
-  "$schema": "https://frontal.dev/schemas/frontal.jsonc",
+  "$schema": "https://frontal.dev/schemas/frontal.json",
   "name": "my-app",                  // lowercase letters, digits, dashes
   "env": "dev",                      // dev | staging | prod
   "entry": "src/index.ts",           // bundled by `frontal deploy`
@@ -52,6 +52,12 @@ Valid service keys: `agents`, `ai`, `audit`, `auth`, `billing`, `blob`, `connect
 `data`, `datasets`, `events`, `governance`, `graph`, `integrations`, `lineage`,
 `observability`, `ontology`, `pipelines`, `sandbox`, `schedules`, `webhooks`,
 `workers`, `workflows`.
+
+### JSON Schema
+
+`https://frontal.dev/schemas/frontal.json` (draft 2020-12) is generated from the CLI's Zod
+validator by `bun run generate:schema` into `schemas/frontal.json`; CI fails if it is stale.
+Point `$schema` at it for editor validation and completions.
 
 ### Environment overlays
 

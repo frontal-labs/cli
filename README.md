@@ -145,7 +145,7 @@ frontal rollback                                  # previous production artifact
 
 ```jsonc
 {
-  "$schema": "https://frontal.dev/schemas/frontal.jsonc",
+  "$schema": "https://frontal.dev/schemas/frontal.json",
   "name": "my-app",
   "env": "dev",                      // dev | staging | prod
   "apiUrl": "https://api.frontal.dev/v1",
@@ -160,7 +160,9 @@ frontal rollback                                  # previous production artifact
 }
 ```
 
-- Comments and trailing commas are allowed.
+- Comments and trailing commas are allowed. The `$schema` URL gives editors validation and
+  completions; the schema is generated from the CLI's own validator (`schemas/frontal.json`,
+  `bun run generate:schema`).
 - Unknown service keys fail validation with the list of valid services
   (`agents, ai, audit, auth, billing, blob, connectors, data, datasets, events, governance,
   graph, integrations, lineage, observability, ontology, pipelines, sandbox, schedules,

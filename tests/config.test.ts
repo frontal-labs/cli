@@ -174,3 +174,38 @@ describe("dotenv + secrets", () => {
     ).toEqual(["OPENAI_API_KEY"]);
   });
 });
+
+describe("JSON Schema (schemas/frontal.json)", () => {
+  it("is generated from the Zod schema and committed up to date", async () => {
+    const { buildFrontalJsonSchema } = await import("@/lib/json-schema.js");
+    const generated = await buildFrontalJsonSchema();
+    const committed = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, "..", "schemas", "frontal.json"),
+        "utf-8"
+      )
+    ) as Record<string, unknown>;
+    expect(committed).toEqual(generated);
+    expect(committed.$id).toBe("https://frontal.dev/schemas/frontal.json");
+    const { services } = committed.properties as Record<
+      string,
+      { propertyNames: { enum: string[] } }
+    >;
+    expect(services.propertyNames.enum).toContain("agents");
+    expect(committed.required).toEqual(["name"]);
+  });
+
+  it("accepts the init template and the fixture as JSON Schema instances", async () => {
+    const { default: Ajv } = await import("ajv/dist/2020.js");
+    const { readFileSync: read } = await import("node:fs");
+    const schema = JSON.parse(
+      read(join(import.meta.dirname, "..", "schemas", "frontal.json"), "utf-8")
+    );
+    const ajv = new Ajv({ allErrors: true, strict: false });
+    const validate = ajv.compile(schema);
+    expect(validate(parseJsonc(renderProjectConfig("demo")))).toBe(true);
+    expect(validate(parseJsonc(FIXTURE))).toBe(true);
+    expect(validate({ name: "x", services: { nope: {} } })).toBe(false);
+    expect(validate({ name: "Bad Name" })).toBe(false);
+  });
+});
