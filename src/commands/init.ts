@@ -163,9 +163,7 @@ export function registerInitCommand(program: Command): void {
   withExamples(
     program
       .command("init")
-      .description(
-        "Create a minimal Frontal project (frontal.jsonc, .env.example)"
-      )
+      .description("Create a new Frontal project (frontal.jsonc, .env.example)")
       .option(
         "--name <dir>",
         "Directory to create (defaults to the current directory)"

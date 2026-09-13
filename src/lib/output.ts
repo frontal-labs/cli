@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { formatExamples } from "@/output/help.js";
 import { redact } from "@/output/redact.js";
 
 /** Writes a JSON document to stdout with secrets removed. */
@@ -13,6 +14,5 @@ export function emitJsonLine(data: unknown): void {
 
 /** Appends an `Examples:` block to a command's `--help` output. */
 export function withExamples(cmd: Command, examples: string[]): Command {
-  const lines = examples.map((example) => `  $ ${example}`).join("\n");
-  return cmd.addHelpText("after", `\nExamples:\n${lines}\n`);
+  return cmd.addHelpText("after", formatExamples(examples));
 }

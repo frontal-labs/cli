@@ -135,9 +135,7 @@ export function registerTypesCommand(program: Command): void {
   withExamples(
     program
       .command("types")
-      .description(
-        "Generate FrontalEnv/FrontalProject typings from frontal.jsonc"
-      )
+      .description("Generate TypeScript typings from frontal.jsonc")
       .option("--out <file>", "Output file", DEFAULT_TYPES_OUT)
       .action((opts: { out?: string }, cmd) =>
         runAction(cmd, async ({ fmt, globalOpts }) => {

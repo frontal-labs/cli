@@ -32,7 +32,7 @@ import {
 } from "@/utils/interactive.js";
 
 export function registerAuthCommands(program: Command): void {
-  const auth = program.command("auth").description("Authentication commands");
+  const auth = program.command("auth").description("Sign in, API keys and MFA");
 
   auth
     .command("login")

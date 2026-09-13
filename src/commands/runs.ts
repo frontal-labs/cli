@@ -5,7 +5,7 @@ import { withExamples } from "@/lib/output.js";
 import { parseJsonInput } from "@/utils/json.js";
 
 export function registerRunsCommands(program: Command): void {
-  const runs = program.command("runs").description("Manage run resources");
+  const runs = program.command("runs").description("List and create runs");
 
   withExamples(
     runs

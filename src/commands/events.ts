@@ -9,7 +9,7 @@ import { parseJsonInput } from "@/utils/json.js";
 export function registerEventsCommands(program: Command): void {
   const events = program
     .command("events")
-    .description("Manage event resources");
+    .description("List, query and reprocess events");
 
   withExamples(
     events

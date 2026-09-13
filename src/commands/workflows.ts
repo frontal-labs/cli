@@ -8,7 +8,7 @@ import { parseJsonInput } from "@/utils/json.js";
 export function registerWorkflowsCommands(program: Command): void {
   const workflows = program
     .command("workflows")
-    .description("Manage workflow resources from public API");
+    .description("Workflows and their executions");
 
   withExamples(
     workflows

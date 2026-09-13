@@ -326,7 +326,7 @@ export function printPolicyReport(report: PolicyCheckReport): void {
 export function registerPolicyCommands(program: Command): void {
   const policy = program
     .command("policy")
-    .description("Governance checks for this project");
+    .description("Governance checks: policies, deploy access, compliance");
 
   withExamples(
     policy
