@@ -98,9 +98,6 @@ export function formatRootHelp(cmd: Command, helper: Help): string {
   const sections: string[] = [];
 
   sections.push(`  ${versionLine()}`);
-  sections.push(
-    `  ${theme.dim("Project tooling and API access for the Frontal platform.")}`
-  );
   sections.push("");
   sections.push(`  ${theme.header("Usage")}`);
   sections.push(

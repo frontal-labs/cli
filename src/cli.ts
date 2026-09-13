@@ -28,9 +28,7 @@ export function buildProgram(program = new Command()): Command {
   }
   program
     .name("frontal")
-    .description(
-      "Frontal CLI — project tooling and API access for the Frontal platform"
-    )
+    .description("Frontal CLI")
     .usage("[options] <command> [subcommand] [args]")
     .version(VERSION, "-V, --version", "Print the version number")
     .helpOption("-h, --help", "Show help for a command")
