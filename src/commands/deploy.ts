@@ -321,9 +321,7 @@ export function registerDeployCommands(program: Command): void {
   withExamples(
     program
       .command("deploy")
-      .description(
-        "Bundle the project and deploy it to a preview or production worker"
-      )
+      .description("Bundle and deploy to a preview or production worker")
       .option("--preview", "Deploy to the preview worker (default)")
       .option(
         "--prod",
@@ -362,9 +360,7 @@ export function registerDeployCommands(program: Command): void {
   withExamples(
     program
       .command("promote")
-      .description(
-        "Point production at a previously deployed preview (no rebuild)"
-      )
+      .description("Point production at a deployed preview (no rebuild)")
       .argument("<url>", "Preview URL (or deployment id) to promote")
       .action((url: string, _opts, cmd) =>
         runAction(cmd, async (ctx) => {
@@ -382,9 +378,7 @@ export function registerDeployCommands(program: Command): void {
   withExamples(
     program
       .command("rollback")
-      .description(
-        "Re-deploy the previous production artifact (or a specific one)"
-      )
+      .description("Re-deploy the previous production artifact")
       .argument(
         "[url]",
         "Deployment URL or id to roll back to (default: previous prod)"

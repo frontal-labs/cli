@@ -1,3 +1,4 @@
+import chalk from "chalk";
 import { Command } from "commander";
 import { registerAuthCommands } from "@/commands/auth.js";
 import { registerCompletionCommands } from "@/commands/completion.js";
@@ -13,19 +14,27 @@ import { registerMigrateCommand } from "@/commands/migrate.js";
 import { registerPolicyCommands } from "@/commands/policy.js";
 import { registerRunsCommands } from "@/commands/runs.js";
 import { registerTypesCommand } from "@/commands/types.js";
+import { registerVersionCommand } from "@/commands/version.js";
 import { registerWorkflowsCommands } from "@/commands/workflows.js";
 import { applyCommandExamples } from "@/lib/examples.js";
 import { installWatchMiddleware } from "@/middleware/watch.js";
+import { configureHelp } from "@/output/help.js";
 import { VERSION } from "@/version.js";
 
 /** Registers global options and every command on `program`. */
 export function buildProgram(program = new Command()): Command {
+  if (process.argv.includes("--no-color") || process.env.NO_COLOR) {
+    chalk.level = 0;
+  }
   program
     .name("frontal")
     .description(
       "Frontal CLI — project tooling and API access for the Frontal platform"
     )
-    .version(VERSION)
+    .usage("[options] <command> [subcommand] [args]")
+    .version(VERSION, "-V, --version", "Print the version number")
+    .helpOption("-h, --help", "Show help for a command")
+    .helpCommand("help [command]", "Show help for a command")
     .option(
       "-p, --profile <name>",
       "Config profile (default: active profile or FRONTAL_PROFILE)"
@@ -56,8 +65,10 @@ export function buildProgram(program = new Command()): Command {
   registerEventsCommands(program);
   registerMigrateCommand(program);
   registerCompletionCommands(program);
+  registerVersionCommand(program);
 
   applyCommandExamples(program);
+  configureHelp(program);
   installWatchMiddleware(program);
   return program;
 }

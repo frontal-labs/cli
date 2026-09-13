@@ -44,7 +44,7 @@ const COMMAND_MAPPING: {
 export function registerMigrateCommand(program: Command): void {
   program
     .command("migrate-legacy")
-    .description("Show v1->current command migration guidance")
+    .description("Map legacy v1 commands to the current CLI")
     .action((_opts, cmd) => {
       try {
         const fmt = Formatter.from(cmd.optsWithGlobals());

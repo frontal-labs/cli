@@ -8,7 +8,7 @@ Version: frontal-cli@0.1.2. Verify with `frontal --version`.
 
 - Prefer `--json` and read stdout; errors are on stderr. Never parse human output.
 - Credentials: `--api-key frt_…` or `FRONTAL_API_KEY`; `.env.local` in the project is read automatically. Never print keys — the CLI redacts them, do not work around that.
-- `frontal <command> --help` always contains an `Examples:` block.
+- `frontal --help` is grouped (Project / Deploy / Operate / Platform API / Account / Shell); `frontal <command> --help` always contains an `Examples:` block. Usage shape: `frontal [options] <command> [subcommand] [args]`.
 - Config files may contain comments and trailing commas (`frontal.jsonc`).
 - Set `FRONTAL_CONFIG_DIR` to a scratch directory in sandboxes so `~/.frontal` is untouched.
 
@@ -32,7 +32,7 @@ Version: frontal-cli@0.1.2. Verify with `frontal --version`.
 - `frontal config <set <k> <v>|get <k>|list|reset|profiles|use <profile>|telemetry>`: `~/.frontal/config.json` profiles.
 - `frontal workflows list [--limit --cursor]` / `create --body <json>` (validated against the SDK `WorkflowDefinitionSchema`) / `search --body` / `batch --body` / `run get <wf> <run>` / `run summary <wf> <run>` / `run timeline <wf> <run>` (SSE; `--json` emits NDJSON lines `{type,data,id}`).
 - `frontal runs <list|create --body>`; `frontal invocations create --body`; `frontal events <list|get <id>|query --body|usage --body|reprocess --body>`.
-- `frontal completion <bash|zsh|fish>`; `frontal migrate-legacy`.
+- `frontal completion <bash|zsh|fish>`; `frontal migrate-legacy`; `frontal version [--json]` (version + runtime: `{version, runtime: bun|node, runtimeVersion, platform, arch}`); `frontal --version` prints the bare version.
 
 ## Global flags
 

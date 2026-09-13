@@ -8,7 +8,7 @@ import { confirmAction } from "@/utils/interactive.js";
 export function registerConfigCommands(program: Command): void {
   const config = program
     .command("config")
-    .description("Manage CLI configuration");
+    .description("Profiles and CLI settings");
 
   config
     .command("set")

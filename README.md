@@ -30,8 +30,8 @@ brew tap frontal-labs/cli && brew install frontal-cli
 Check the install:
 
 ```bash
-frontal --version
-frontal --help
+frontal version          # Frontal CLI v0.1.2 + runtime (bun/node, platform)
+frontal --help           # grouped command overview with examples
 ```
 
 ## Quick start

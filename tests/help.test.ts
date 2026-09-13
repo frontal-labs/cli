@@ -1,9 +1,13 @@
 import { Command } from "commander";
 import { describe, expect, it } from "vitest";
 import { run } from "@/cli.js";
-import { runCli } from "./helpers/cli.js";
+import { lastJson, runCli } from "./helpers/cli.js";
 
 const HELP_BUDGET_MS = 500;
+const VERSION_LINE = /Frontal CLI v\d+\.\d+\.\d+/;
+const RUNTIME_LINE = /\((bun|node) v?\d/;
+const VERSION_PREFIX = /Frontal CLI v\d/;
+const RUNTIME_NAME = /^(bun|node)$/;
 
 function collectCommands(cmd: Command, prefix: string[] = []): string[][] {
   const out: string[][] = [];
@@ -45,6 +49,47 @@ describe("--help", () => {
       expect(result.stdout.join("\n"), path.join(" ")).toContain("Examples:");
     }
   }, 30_000);
+
+  it("groups commands and shows version, runtime, usage and examples", async () => {
+    const result = await runCli(["--help"]);
+    const out = result.stdout.join("\n");
+    for (const section of [
+      "Usage",
+      "Project",
+      "Deploy",
+      "Operate",
+      "Platform API",
+      "Account",
+      "Shell",
+      "Global options",
+      "Examples",
+      "Docs",
+    ]) {
+      expect(out, section).toContain(section);
+    }
+    expect(out).toContain("frontal [options] <command> [subcommand] [args]");
+    expect(out).toMatch(VERSION_LINE);
+    expect(out).toMatch(RUNTIME_LINE);
+  });
+
+  it("subcommand help carries a banner and a global-options pointer", async () => {
+    const result = await runCli(["dev", "--help"]);
+    const out = result.stdout.join("\n");
+    expect(out).toContain("frontal dev");
+    expect(out).toContain("Examples:");
+    expect(out).toContain("frontal --help");
+  });
+
+  it("version command reports the runtime", async () => {
+    const human = await runCli(["version"]);
+    expect(human.stdout.join("\n")).toMatch(VERSION_PREFIX);
+    const json = await runCli(["version", "--json"]);
+    expect(lastJson(json.stdout)).toMatchObject({
+      arch: process.arch,
+      platform: process.platform,
+      runtime: expect.stringMatching(RUNTIME_NAME),
+    });
+  });
 
   it("exports run()", () => {
     expect(typeof run).toBe("function");

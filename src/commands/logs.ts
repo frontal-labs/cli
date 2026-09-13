@@ -259,7 +259,7 @@ export function registerLogsCommand(program: Command): void {
   withExamples(
     program
       .command("logs")
-      .description("Query or tail platform logs for this project")
+      .description("Query or tail platform logs")
       .option("-f, --follow", "Stream new entries (SSE) until Ctrl+C")
       .option("--filter <query>", "Log query (default: project:<name>)")
       .option(

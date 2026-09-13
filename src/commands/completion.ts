@@ -6,7 +6,7 @@ import { generateZshCompletions } from "@/completions/zsh.js";
 export function registerCompletionCommands(program: Command): void {
   const completion = program
     .command("completion")
-    .description("Generate shell completion scripts");
+    .description("Shell completion scripts (bash, zsh, fish)");
 
   completion
     .command("bash")

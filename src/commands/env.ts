@@ -251,7 +251,7 @@ export function registerEnvCommands(program: Command): void {
   const env = program
     .command("env")
     .description(
-      "Sync environment variables between frontal.jsonc, .env.local and deployments"
+      "Sync variables between frontal.jsonc, .env.local and deployments"
     );
 
   withExamples(
