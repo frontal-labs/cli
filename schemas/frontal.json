@@ -1,0 +1,178 @@
+{
+  "$id": "https://frontal.dev/schemas/frontal.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Schema for frontal.jsonc (JSON with comments and trailing commas). Environment overlays use the same shape in frontal.<env>.jsonc.",
+  "title": "Frontal project configuration",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "description": "JSON Schema used by editors for validation and completions.",
+      "type": "string"
+    },
+    "agents": {
+      "description": "Agent ids owned by this project. `frontal rollback` reverts them to their previous version.",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "apiUrl": {
+      "description": "Frontal API base URL. Environment variables and flags take precedence (FRONTAL_API_URL, --api-url).",
+      "default": "https://api.frontal.dev/v1",
+      "type": "string",
+      "format": "uri"
+    },
+    "entry": {
+      "description": "Entry file bundled by `frontal deploy` (Bun.build, ESM). Defaults to src/index.ts.",
+      "default": "src/index.ts",
+      "type": "string",
+      "minLength": 1
+    },
+    "env": {
+      "description": "Default environment. Overridden per command with --env; selects the frontal.<env>.jsonc overlay. One of: dev, staging, prod.",
+      "default": "dev",
+      "type": "string",
+      "enum": ["dev", "staging", "prod"]
+    },
+    "name": {
+      "description": "Project name: lowercase letters, digits and dashes. Also the worker name used by `frontal deploy`.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "sdk": {
+      "description": "Optional overrides forwarded to the @frontal-labs/sdk client.",
+      "type": "object",
+      "properties": {
+        "headers": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "maxRetries": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "retryDelay": {
+          "default": 1000,
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "timeout": {
+          "default": 30000,
+          "type": "integer",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "secrets": {
+      "description": "Secrets that must be present in the environment. Only the names live here; values are read from .env.local or the shell.",
+      "default": {
+        "required": ["FRONTAL_API_KEY"]
+      },
+      "type": "object",
+      "properties": {
+        "required": {
+          "description": "Environment variable names that must be set.",
+          "default": ["FRONTAL_API_KEY"],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "services": {
+      "description": "Services this project uses, keyed by name. Valid keys: agents, ai, audit, auth, billing, blob, connectors, data, datasets, events, governance, graph, integrations, lineage, observability, ontology, pipelines, sandbox, schedules, webhooks, workers, workflows. `remote: true` proxies the service to the real API during `frontal dev`.",
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "agents",
+          "ai",
+          "audit",
+          "auth",
+          "billing",
+          "blob",
+          "connectors",
+          "data",
+          "datasets",
+          "events",
+          "governance",
+          "graph",
+          "integrations",
+          "lineage",
+          "observability",
+          "ontology",
+          "pipelines",
+          "sandbox",
+          "schedules",
+          "webhooks",
+          "workers",
+          "workflows"
+        ],
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "remote": {
+            "description": "Proxy this service to the remote API during `frontal dev`.",
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "vars": {
+      "description": "Non-secret configuration written to .env.local by `frontal env pull` and shipped with deployments. Keys are UPPER_SNAKE_CASE.",
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Z_][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "$schema": "https://frontal.dev/schemas/frontal.json",
+      "apiUrl": "https://api.frontal.dev/v1",
+      "env": "dev",
+      "name": "my-app",
+      "secrets": {
+        "required": ["FRONTAL_API_KEY"]
+      },
+      "services": {
+        "agents": {
+          "remote": false
+        },
+        "ai": {
+          "remote": false
+        },
+        "graph": {
+          "remote": false
+        }
+      },
+      "vars": {}
+    }
+  ]
+}

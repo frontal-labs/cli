@@ -1,6 +1,6 @@
 {
   // Fixture used by tests/types.test.ts and tests/config.test.ts
-  "$schema": "https://frontal.dev/schemas/frontal.jsonc",
+  "$schema": "https://frontal.dev/schemas/frontal.json",
   "name": "fixture-app",
   "env": "dev",
   "apiUrl": "https://api.test.frontal.dev/v1",

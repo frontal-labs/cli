@@ -5,7 +5,7 @@ import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 
 export const PROJECT_CONFIG_FILE = "frontal.jsonc";
-export const PROJECT_SCHEMA_URL = "https://frontal.dev/schemas/frontal.jsonc";
+export const PROJECT_SCHEMA_URL = "https://frontal.dev/schemas/frontal.json";
 export const PROJECT_STATE_DIR = ".frontal";
 
 export const ENV_NAMES = ["dev", "staging", "prod"] as const;

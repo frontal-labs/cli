@@ -41,7 +41,7 @@ Version: frontal-cli@0.1.2. Verify with `frontal --version`.
 ## frontal.jsonc
 
 ```jsonc
-{ "$schema": "https://frontal.dev/schemas/frontal.jsonc", "name": "my-app", "env": "dev", "entry": "src/index.ts",
+{ "$schema": "https://frontal.dev/schemas/frontal.json", "name": "my-app", "env": "dev", "entry": "src/index.ts",
   "apiUrl": "https://api.frontal.dev/v1",
   "services": { "ai": { "remote": false }, "agents": { "remote": false }, "graph": { "remote": false } },
   "vars": {}, "secrets": { "required": ["FRONTAL_API_KEY"] } }
