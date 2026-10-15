@@ -402,7 +402,11 @@ function handleRequest(req, res) {
   const keyFromQuery = queryKey(req.url);
   if (req.method === 'GET' && pathname === '/' && keyFromQuery && timingSafeEqualStr(keyFromQuery, TOKEN)) {
     res.writeHead(200, securityHeaders({ 'Content-Type': 'text/html; charset=utf-8' }));
-    res.end(bootstrapPage(keyFromQuery));
+    // NOTE (local patch vs upstream obra/superpowers): the guard above
+    // proves keyFromQuery === TOKEN, so render the server-side constant.
+    // Echoing the query value trips CodeQL js/reflected-xss even though
+    // an attacker without TOKEN cannot reach this sink.
+    res.end(bootstrapPage(TOKEN));
   } else if (req.method === 'GET' && pathname === '/') {
     const screenFile = getNewestScreen();
     let html = screenFile

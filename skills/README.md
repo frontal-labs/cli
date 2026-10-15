@@ -96,3 +96,14 @@ namespaced dirs:
 - `deno-deploy`, `deno-frontend`, `deno-sandbox`: Deno-platform-specific.
 - `google-agents-cli-publish`: Gemini registry-specific.
 - `semgrep/skills/llm-security`: no LLM-app code in this repo.
+
+## Local patches
+
+Deviations from upstream, re-apply after a re-mirror (`rm -rf skills`
+flow above preserves only the three namespaced dirs, not these):
+
+- `brainstorming/scripts/server.cjs`: render the server-side `TOKEN`
+  instead of echoing the raw `?key=` query value into `bootstrapPage`.
+  The `timingSafeEqualStr` guard proves they are equal, so this is
+  behavior-identical; it keeps CodeQL `js/reflected-xss` quiet on
+  vendored code an attacker without the token cannot exploit.
