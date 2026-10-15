@@ -1,0 +1,67 @@
+# Dockerfile for Frontal CLI
+
+# Build stage
+FROM oven/bun:1.3.8-slim AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json bun.lock ./
+
+# Install all dependencies (build tooling is a devDependency)
+RUN bun install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build the project, then prune to production dependencies
+RUN bun run build && bun install --frozen-lockfile --production
+
+# Production stage
+FROM node:22-alpine AS production
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S frontal -u 1001
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder --chown=frontal:nodejs /app/dist ./dist
+COPY --from=builder --chown=frontal:nodejs /app/package.json ./
+COPY --from=builder --chown=frontal:nodejs /app/node_modules ./node_modules
+
+# Expose the CLI as `frontal`
+RUN ln -s /app/dist/index.js /usr/local/bin/frontal
+
+# Create directories for CLI usage
+RUN mkdir -p /home/frontal/.frontal && \
+    chown -R frontal:nodejs /home/frontal/.frontal
+
+# Switch to non-root user
+USER frontal
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV HOME=/home/frontal
+
+# Expose volume for configuration
+VOLUME ["/home/frontal/.frontal"]
+
+# Set entrypoint
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["frontal"]
+
+# Labels
+LABEL maintainer="Frontal Labs <team@frontal.dev>"
+LABEL version="0.1.2"
+LABEL description="Frontal CLI - Official command-line interface for Frontal platform"
+LABEL org.opencontainers.image.source="https://github.com/frontal-labs/cli"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD frontal --version || exit 1

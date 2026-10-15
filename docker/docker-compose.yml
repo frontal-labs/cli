@@ -1,0 +1,31 @@
+services:
+  frontal:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: frontal/cli:latest
+    container_name: frontal
+    environment:
+      - NODE_ENV=production
+      - FRONTAL_API_KEY=${FRONTAL_API_KEY}
+      - FRONTAL_API_URL=${FRONTAL_API_URL:-https://api.frontal.dev/v1}
+      - FRONTAL_ORG=${FRONTAL_ORG}
+      - FRONTAL_WORKSPACE=${FRONTAL_WORKSPACE}
+    volumes:
+      - frontal-config:/home/frontal/.frontal
+      # Resolved relative to the repo root (compose file lives in docker/).
+      - ../workspace:/workspace
+    working_dir: /workspace
+    entrypoint: ["dumb-init", "--"]
+    command: ["frontal"]
+    restart: unless-stopped
+    networks:
+      - frontal-network
+
+volumes:
+  frontal-config:
+    driver: local
+
+networks:
+  frontal-network:
+    driver: bridge

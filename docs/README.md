@@ -12,7 +12,7 @@ Frontal CLI lets you work with the Frontal platform from your terminal: scaffold
 - **SDK transport**: every call goes through `@frontal-labs/sdk`; errors carry a code, fix hint, docs link and request id
 - **Authentication**: browser OAuth (PKCE) or API keys, multiple profiles
 - **Workflows, runs, invocations, events**: typed access to the public API, SSE streaming
-- **Agent-friendly**: `--json` everywhere, stable exit codes, secrets always redacted, `llms.txt`
+- **Agent-friendly**: `--json` everywhere, stable exit codes, secrets always redacted
 
 ## Quick Start
 

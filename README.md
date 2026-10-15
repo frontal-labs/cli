@@ -1,6 +1,8 @@
+# Frontal CLI
+
 ![Frontal Banner](./banner.png)
 
-# Frontal CLI
+**Command-line interface for Frontal.***
 
 The official command-line interface for the [Frontal](https://frontal.dev) platform.
 Every API call goes through [`@frontal-labs/sdk`](https://github.com/frontal-labs/sdk-typescript);
@@ -36,7 +38,8 @@ frontal --help           # grouped command overview with examples
 
 ## Quick start
 
-`init` creates a minimal project. It never overwrites existing files unless you pass `--force`.
+`init` creates a minimal project. It never overwrites existing files unless you pass `--force`
+(`package.json` and `src/.gitkeep` are only ever created, never replaced; `.gitignore` entries are merged).
 
 ```bash
 frontal init --name my-app
@@ -45,7 +48,9 @@ cat frontal.jsonc
 ```
 
 `types` turns `frontal.jsonc` into typings for your app — `FrontalEnv` (vars + secrets),
-`FrontalServices` (the SDK client for every enabled service) and `FrontalProject`:
+`FrontalServices` (the SDK client for every enabled service), `FrontalProject`,
+plus `FrontalVars` / `FrontalSecrets` and the `FrontalEnvName` / `FrontalServiceName` /
+`FrontalKnownService` unions (with a `NodeJS.ProcessEnv` augmentation):
 
 ```bash
 cd my-app
@@ -73,7 +78,7 @@ curl -s -X POST localhost:8788/v1/agents -H 'content-type: application/json' \
 kill $DEV_PID
 ```
 
-Point the SDK at it with `baseUrl: "http://localhost:8787/v1"` (any `frt_…` key works locally).
+Point the SDK at it with `baseUrl: "http://localhost:8788/v1"` (any `frt_…` key works locally).
 
 | Flag | Effect |
 |---|---|
@@ -86,7 +91,8 @@ Point the SDK at it with `baseUrl: "http://localhost:8787/v1"` (any `frt_…` ke
 
 Built-in local services: `agents` (CRUD, versions, rollback, runs, SSE run stream),
 `graph` (entities, relationships, query with filter operators, neighborhood, path),
-`datasets`, `blob` (upload/download/list/copy/move), `observability` (logs query +
+`datasets`, `blob` (upload/download/list/copy/move), `workers` (CRUD),
+`auth` (account profile, MFA status), `observability` (logs query +
 live `logs/stream` fed by the server's own request log), `governance` (policies,
 `access/check`, compliance score). `GET /health` is always local and unauthenticated;
 every response carries an `X-Request-Id`. Ctrl+C shuts down cleanly.
@@ -94,7 +100,8 @@ every response carries an `X-Request-Id`. Ctrl+C shuts down cleanly.
 ## Environment, logs and policies
 
 `env pull` writes `.env.local` from `frontal.jsonc` (`vars`, `secrets.required`, `apiUrl`)
-and your active credential — never overwriting an existing file without `--force`, and
+and your active API-key credential (`--api-key`, `FRONTAL_API_KEY`, or profile key;
+OAuth sessions do not seed the file) — never overwriting an existing file without `--force`, and
 never printing secret values. `logs` and `policy check` work against the local dev server
 too, so the whole loop runs without an account:
 
@@ -122,8 +129,9 @@ frontal policy check --strict --env prod   # warnings become errors; exit 1 on d
 `deploy` bundles the project's `entry` (default `src/index.ts`, via `bun build`) into a
 single ESM file and uploads it as a worker: `<name>-preview` for `--preview` (the default),
 `<name>` for `--prod` (confirmation required unless `--yes`). The URL is
-`<apiUrl>/workers/<name>`. Every deployment is recorded under `.frontal/state/deploys/`
-with an immutable copy of the artifact, so `promote` and `rollback` re-send exactly what
+`<apiUrl>/workers/<name>`. Deployment records are kept under `.frontal/state/deploys/`
+and each build is stored as an immutable copy under `.frontal/artifacts/<sha>/`,
+so `promote` and `rollback` re-send exactly what
 was deployed — no rebuild. `--dry-run` bundles and writes a manifest (the local state
 *schema* only, never row data) without touching the network:
 
@@ -190,7 +198,7 @@ Set `FRONTAL_CONFIG_DIR` to relocate the profile store (CI, tests).
 
 | Command | Purpose |
 |---|---|
-| `frontal init [--name <dir>] [--force]` | Create `frontal.jsonc`, `.env.example`, `.gitignore` entries, `src/` |
+| `frontal init [--name <dir>] [--force]` | Create `frontal.jsonc`, `.env.example`, `package.json` (if missing, never overwritten), `src/.gitkeep`, `.gitignore` entries |
 | `frontal dev [--port] [--scenario] [--remote] [--persist-to]` | Local Frontal API backed by `.frontal/state` |
 | `frontal types [--out <file>]` | Generate `FrontalEnv` / `FrontalServices` / `FrontalProject` typings |
 | `frontal deploy [--preview\|--prod] [--yes] [--dry-run --outdir <dir>]` | Bundle + upload a worker; print its URL |
@@ -207,8 +215,6 @@ Set `FRONTAL_CONFIG_DIR` to relocate the profile store (CI, tests).
 | `frontal completion <bash\|zsh\|fish>` | Shell completions |
 | `frontal migrate-legacy` | v1 → current command mapping |
 
-See [llms.txt](./llms.txt) for a machine-readable summary of every command.
-
 Every command has an `Examples:` section in `--help`:
 
 ```bash
@@ -219,13 +225,14 @@ frontal workflows list --help
 
 | Flag | Effect |
 |---|---|
-| `--json` / `--yaml` | Machine-readable output (secrets are always redacted) |
-| `--env <dev\|staging\|prod>` | Select the environment overlay and `X-Frontal-Environment` |
+| `--json` / `--yaml` (`-j, --json`) | Machine-readable output (secrets are always redacted) |
+| `--env <dev\|staging\|prod>` | Select the environment overlay |
 | `--api-key <key>`, `--api-url <url>` | Override credentials / base URL for one call |
 | `-p, --profile <name>` | Use a named profile |
 | `-q, --quiet`, `-v, --verbose`, `--debug` | Output verbosity (`--verbose` logs every request) |
 | `-y, --yes` | Skip confirmation prompts (CI) |
-| `--watch [seconds]`, `--until field=value` | Re-run a read command until a condition holds |
+| `--no-color` | Disable colors |
+| `--watch [seconds]`, `--until field=value` | Re-run a read command until a condition holds (not supported for `dev`, `deploy`, `promote`, `rollback`, `logs`, `policy`, `env`, `init`, `types`, `auth`, `config`, `completion`) |
 
 ### Examples
 
@@ -264,7 +271,7 @@ frontal workflows list --api-url http://127.0.0.1:9/v1 --json || echo "exit code
 |---|---|
 | `FRONTAL_API_KEY` | API key (`frt_…`) |
 | `FRONTAL_API_URL` | API base URL (default `https://api.frontal.dev/v1`) |
-| `FRONTAL_ENV` | `development` / `test` / `production` for the SDK; the CLI maps `--env dev\|staging\|prod` |
+| `FRONTAL_ENV` | SDK environment for the client; the CLI maps `--env dev\|staging\|prod` (`dev` → `development`, `prod` → `production`, `staging` unchanged; `development` / `test` / `production` pass through) |
 | `FRONTAL_DEBUG` | `1` to log every request (same as `--verbose`) |
 | `FRONTAL_PROFILE` | Profile name (same as `--profile`) |
 | `FRONTAL_CONFIG_DIR` | Location of the profile store (default `~/.frontal`) |

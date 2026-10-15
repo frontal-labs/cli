@@ -1,0 +1,167 @@
+{
+  // Tasks mirroring package.json scripts. Run via Cmd/Ctrl+Shift+P > "Run Task".
+  // Package manager: bun@1.3.8 (see packageManager + engines in package.json).
+  "version": "2.0.0",
+  "options": {
+    "cwd": "${workspaceFolder}"
+  },
+  "tasks": [
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "bun run build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "dev: --help",
+      "type": "shell",
+      "command": "bun run dev -- --help",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "type-check",
+      "type": "shell",
+      "command": "bun run type-check",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "lint",
+      "type": "shell",
+      "command": "bun run lint",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "check (full)",
+      "type": "shell",
+      "command": "bun run check",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "fix (ultracite)",
+      "type": "shell",
+      "command": "bun run fix",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "format",
+      "type": "shell",
+      "command": "bun run format",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "bun run test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "test: current file",
+      "type": "shell",
+      "command": "bunx vitest run ${file} --no-coverage",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "test: coverage",
+      "type": "shell",
+      "command": "bun run test:coverage",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "test: readme blocks",
+      "type": "shell",
+      "command": "bun run test:readme",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "dependsOn": ["build"]
+    },
+    {
+      "label": "generate: schema + ops + validate",
+      "type": "shell",
+      "command": "bun run generate:schema && bun run generate:openapi-ops && bun run validate:bindings",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "clean",
+      "type": "shell",
+      "command": "bun run clean",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    }
+  ]
+}
