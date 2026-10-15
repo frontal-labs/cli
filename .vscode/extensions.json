@@ -1,0 +1,29 @@
+{
+  // Recommended extensions for the Frontal CLI workspace.
+  // VS Code prompts contributors to install these on first open.
+  "recommendations": [
+    // Formatting + linting (single source of truth, Ultracite preset)
+    "biomejs.biome",
+    // Respects .editorconfig (2-space, LF, final newline)
+    "EditorConfig.EditorConfig",
+    // Vitest explorer — matches tests/**/*.test.ts in vitest.config.ts
+    "vitest.explorer",
+    // TOML (bunfig.toml)
+    "tamasfe.even-better-toml",
+    // YAML (GitHub Actions, Changesets)
+    "redhat.vscode-yaml",
+    // GitHub Actions syntax + validation (.github/)
+    "github.vscode-github-actions",
+    // Docker (docker/)
+    "ms-azuretools.vscode-docker",
+    // Conventional Commits (commitlint.config.cjs)
+    "vivaxy.vscode-conventional-commits",
+    // Spell checking for docs / CLI help text
+    "streetsidesoftware.code-spell-checker"
+  ],
+  "unwantedRecommendations": [
+    // Repo standardizes on Biome, not ESLint/Prettier — avoid conflicting fixers
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode"
+  ]
+}

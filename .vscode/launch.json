@@ -1,0 +1,69 @@
+{
+  // Debug configurations for the Frontal CLI.
+  // Entrypoints: bin/frontal.ts (dev, Bun shebang) and src/index.ts (built via tsup).
+  // Tests: Vitest 5, files under tests/**/*.test.ts (see vitest.config.ts).
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug CLI (dev, Bun)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "bun",
+      "program": "${workspaceFolder}/bin/frontal.ts",
+      "args": ["${input:cliArgs}"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "env": {
+        // Mirrors the `dev` script: FRONTAL_CLI_VERSION=<package.json version>
+        "FRONTAL_CLI_VERSION": "0.1.2"
+      }
+    },
+    {
+      "name": "Debug CLI (built dist)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/index.js",
+      "args": ["${input:cliArgs}"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "preLaunchTask": "build"
+    },
+    {
+      "name": "Debug Current Test File (Vitest)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "${file}", "--no-coverage"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Debug All Tests (Vitest)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "--no-coverage"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Attach to Process",
+      "type": "node",
+      "request": "attach",
+      "processId": "${command:PickProcess}",
+      "restart": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "cliArgs",
+      "type": "promptString",
+      "description": "CLI arguments after `frontal` (e.g. --help, deploy --help)",
+      "default": "--help"
+    }
+  ]
+}

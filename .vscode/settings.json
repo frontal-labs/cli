@@ -1,0 +1,177 @@
+{
+  // ---------------------------------------------------------------------------
+  // Frontal CLI — Workspace settings
+  // Stack: TypeScript (bundler resolution, strict), Bun 1.3.8, tsup, Vitest 5,
+  // Biome 2 (via Ultracite), EditorConfig (2-space, LF, 80-col).
+  // See: package.json, tsconfig.json, biome.jsonc, vitest.config.ts, tsup.config.ts
+  // ---------------------------------------------------------------------------
+
+  // ---------- Editor core (mirrors .editorconfig + biome.jsonc) ----------
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "editor.trimAutoWhitespace": true,
+  "editor.trimTrailingWhitespace": true,
+  "editor.insertFinalNewline": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  "editor.formatOnType": false,
+  "editor.rulers": [80],
+  "editor.wordWrap": "off",
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.guides.indentation": true,
+  "editor.codeLens": true,
+  "editor.inlayHints.enabled": "on",
+  "editor.suggest.showStatusBar": true,
+  "editor.quickSuggestions": {
+    "other": "on",
+    "comments": "off",
+    "strings": "on"
+  },
+  "editor.acceptSuggestionOnCommitCharacter": true,
+
+  // Biome is the single formatter/linter (Ultracite preset). Apply safe fixes
+  // + organize imports on every save.
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+
+  // Per-language formatter pinning (overrides mixed-language files).
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.biome": "explicit",
+      "source.organizeImports.biome": "explicit"
+    }
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  },
+
+  // ---------- Files / search (keep explorer + search fast, match .gitignore) ----------
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/coverage": true,
+    "**/.nyc_output": true,
+    "**/*.tsbuildinfo": true,
+    "**/*.bun-build": true,
+    "**/.bun": true,
+    "**/.frontal": true,
+    "**/tmp": true,
+    "**/temp": true,
+    "**/.tmp": true,
+    "**/test-results": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/coverage/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bun.lock": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/coverage": true,
+    "**/*.tsbuildinfo": true,
+    "**/src/generated": true
+  },
+  "search.useIgnoreFiles": true,
+  "search.followSymlinks": false,
+
+  // ---------- TypeScript / JavaScript (matches tsconfig.json) ----------
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.suggest.completeFunctionCalls": true,
+  "typescript.suggest.includeCompletionsForImportStatements": true,
+  "typescript.suggest.autoImports": true,
+  "typescript.preferences.importModuleSpecifier": "shortest",
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.preferences.quoteStyle": "double",
+  "typescript.preferences.useAliasesForRenames": true,
+  "typescript.preferences.renameShorthandProperties": true,
+  "typescript.inlayHints.parameterNames.enabled": "literals",
+  "typescript.inlayHints.parameterTypes.enabled": false,
+  "typescript.inlayHints.variableTypes.enabled": false,
+  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
+  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "typescript.inlayHints.enumMemberValues.enabled": true,
+  "typescript.tsc.autoDetect": "off",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "javascript.suggest.completeFunctionCalls": true,
+  "javascript.preferences.quoteStyle": "double",
+
+  // Path alias `@/* -> ./src/*` (tsconfig paths). Keeps auto-imports consistent.
+  "typescript.preferences.autoImportFileExcludePatterns": ["**/dist/**"],
+
+  // ---------- Biome ----------
+  "biome.enabled": true,
+
+  // ---------- Vitest (matches vitest.config.ts) ----------
+  "vitest.enable": true,
+  "vitest.include": ["tests/**/*.test.ts"],
+  "vitest.exclude": ["**/node_modules/**", "**/dist/**", "tests/live/**"],
+  "testing.openTesting": "neverOpen",
+  "testing.automaticallyOpenPeekView": "failure",
+
+  // ---------- JSON / YAML / TOML ----------
+  "json.format.enable": false,
+  "json.schemas": [
+    {
+      "fileMatch": ["schemas/frontal.json"],
+      "url": "http://json-schema.org/draft-07/schema#"
+    }
+  ],
+  "yaml.schemas": {},
+  "evenBetterToml.formatter.alignEntries": false,
+
+  // ---------- Markdown / misc ----------
+  "markdown.preview.breaks": false,
+  "markdown.updateLinksOnFileMove.enabled": "promote",
+  "editorconfig.generateAuto": false,
+
+  // ---------- Terminal / tasks ----------
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.env.osx": {},
+  "task.allowAutomaticTasks": "on",
+
+  // ---------- npm / package manager ----------
+  "npm.packageManager": "bun",
+
+  // ---------- Git / GitHub ----------
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "githubPullRequests.ignoredPullRequestBranches": ["main"],
+
+  // ---------- Workbench ----------
+  "workbench.tree.indent": 12,
+  "explorer.compactFolders": false,
+  "explorer.confirmDelete": true,
+  "breadcrumbs.enabled": true
+}
