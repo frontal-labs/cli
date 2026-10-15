@@ -57,10 +57,10 @@ CMD ["frontal"]
 
 # Labels
 LABEL maintainer="Frontal Labs <team@frontal.dev>"
-LABEL version="0.1.0"
+LABEL version="0.1.2"
 LABEL description="Frontal CLI - Official command-line interface for Frontal platform"
-LABEL org.opencontainers.image.source="https://github.com/frontal-labs/frontal-cli"
-LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.source="https://github.com/frontal-labs/cli"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

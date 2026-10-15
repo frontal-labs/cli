@@ -1,0 +1,21 @@
+# Build context is the repo root — keep it lean. The builder stage runs
+# `bun install` + `bun run build` itself, so none of this is needed.
+node_modules/
+dist/
+build/
+coverage/
+.git/
+.github/
+.husky/
+.changeset/
+.vscode/
+.idea/
+.frontal/
+skills/
+.agents/
+tmp/
+temp/
+*.log
+.env
+.env*.local
+workspace/

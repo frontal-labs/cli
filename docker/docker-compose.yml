@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
   frontal:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     image: frontal/cli:latest
     container_name: frontal
     environment:
@@ -15,7 +13,8 @@ services:
       - FRONTAL_WORKSPACE=${FRONTAL_WORKSPACE}
     volumes:
       - frontal-config:/home/frontal/.frontal
-      - ./workspace:/workspace
+      # Resolved relative to the repo root (compose file lives in docker/).
+      - ../workspace:/workspace
     working_dir: /workspace
     entrypoint: ["dumb-init", "--"]
     command: ["frontal"]
