@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Get staged .ts files
-STAGED_TS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.tsx?$' || true)
+# Get staged .ts files (exclude vendored skills/ and .agents/ mirrors)
+STAGED_TS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.tsx?$' | grep -vE '^skills/|^.agents/' || true)
 
 if [ -n "$STAGED_TS" ]; then
   echo "$STAGED_TS" | xargs bunx --no -- biome check --no-errors-on-unmatched --files-ignore-unknown=true
