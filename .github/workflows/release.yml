@@ -38,7 +38,7 @@ jobs:
       # (npm via OIDC, GitHub Packages, GitHub Release with binaries).
       - name: Create Release Pull Request or tag the release
         id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
           version: bun run version-packages
           publish: bun run build && changeset tag
