@@ -2,7 +2,7 @@
 
 ![Frontal Banner](./banner.png)
 
-**Command-line interface for Frontal.***
+**Command-line interface for Frontal.**
 
 The official command-line interface for the [Frontal](https://frontal.dev) platform.
 Every API call goes through [`@frontal-labs/sdk`](https://github.com/frontal-labs/sdk-typescript);
@@ -282,7 +282,7 @@ frontal workflows list --api-url http://127.0.0.1:9/v1 --json || echo "exit code
 bun install
 bun run dev -- --help          # run from source
 bun run build                  # dist/index.js (npm bin, Node ≥ 18)
-bun run build:binary           # dist/frontal single executable (bun build --compile)
+bun run build:binary           # dist/cli single executable (bun build --compile)
 bun run type-check && bun run test && bun run lint
 bun run test:readme            # execute the bash blocks in this README
 ```

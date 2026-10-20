@@ -16,7 +16,7 @@
     "frontal": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist/index.js"
   ],
   "scripts": {
     "build": "bun run generate:openapi-ops && bun run validate:bindings && tsup && chmod +x dist/index.js",

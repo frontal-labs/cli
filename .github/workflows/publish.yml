@@ -39,6 +39,15 @@ jobs:
           bun run build
           bun run build:binaries
 
+      - name: Verify release binaries
+        run: |
+          test -x dist/binaries/cli
+          test -x dist/binaries/cli-aarch64-apple-darwin
+          test -x dist/binaries/cli-aarch64-unknown-linux-gnu
+          test -f dist/binaries/cli-x86_64-pc-windows-msvc
+          test -x dist/binaries/cli-x86_64-apple-darwin
+          test -x dist/binaries/cli-x86_64-unknown-linux-gnu
+
       - name: Verify the tag matches package.json
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
@@ -109,11 +118,17 @@ jobs:
             ```
 
             ### Single binary
-            Download `frontal-<os>-<arch>` below, `chmod +x` it and put it on your PATH.
+            Download the asset for your platform below, rename it to `cli` if needed,
+            `chmod +x` it on macOS/Linux, and put it on your PATH.
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           files: |
             dist/index.js
-            dist/binaries/*
+            dist/binaries/cli
+            dist/binaries/cli-aarch64-apple-darwin
+            dist/binaries/cli-aarch64-unknown-linux-gnu
+            dist/binaries/cli-x86_64-pc-windows-msvc
+            dist/binaries/cli-x86_64-apple-darwin
+            dist/binaries/cli-x86_64-unknown-linux-gnu
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

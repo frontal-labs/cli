@@ -143,8 +143,8 @@ The npm bundle is written to `dist/index.js` (runs on Node ≥ 18). For a
 self-contained executable:
 
 ```bash
-bun run build:binary      # dist/frontal for the current platform
-bun run build:binaries    # dist/binaries/frontal-<os>-<arch> for all platforms
+bun run build:binary      # dist/cli for the current platform
+bun run build:binaries    # dist/binaries/cli plus named release targets
 ```
 
 ## Environment Variables

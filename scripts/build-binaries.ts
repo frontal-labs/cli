@@ -1,20 +1,30 @@
 #!/usr/bin/env bun
 /**
- * Compiles single-file executables. Default: every supported platform into
- * dist/binaries/. `--current`: only the host platform, to dist/frontal.
+ * Compiles single-file executables. Default: the generic `cli` executable
+ * plus every supported release target into dist/binaries/.
+ * `--current`: only the host platform, to dist/cli.
  * The package.json version is injected as __FRONTAL_VERSION__.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const TARGETS = [
-  "bun-linux-x64",
-  "bun-linux-arm64",
-  "bun-darwin-x64",
-  "bun-darwin-arm64",
-  "bun-windows-x64",
+  { bunTarget: "bun-darwin-arm64", releaseName: "cli-aarch64-apple-darwin" },
+  {
+    bunTarget: "bun-linux-arm64",
+    releaseName: "cli-aarch64-unknown-linux-gnu",
+  },
+  {
+    bunTarget: "bun-windows-x64",
+    releaseName: "cli-x86_64-pc-windows-msvc",
+  },
+  { bunTarget: "bun-darwin-x64", releaseName: "cli-x86_64-apple-darwin" },
+  {
+    bunTarget: "bun-linux-x64",
+    releaseName: "cli-x86_64-unknown-linux-gnu",
+  },
 ] as const;
 
 const currentOnly = process.argv.includes("--current");
@@ -22,16 +32,18 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const { version } = JSON.parse(
   readFileSync(join(root, "package.json"), "utf-8")
 ) as { version: string };
-const TARGET_PREFIX = /^bun-/;
 const outDir = join(root, "dist", "binaries");
 mkdirSync(outDir, { recursive: true });
 
 const builds: { outfile: string; target?: string }[] = currentOnly
-  ? [{ outfile: join(root, "dist", "frontal") }]
-  : TARGETS.map((target) => ({
-      outfile: join(outDir, `frontal-${target.replace(TARGET_PREFIX, "")}`),
-      target,
-    }));
+  ? [{ outfile: join(root, "dist", "cli") }]
+  : [
+      { outfile: join(outDir, "cli") },
+      ...TARGETS.map(({ bunTarget, releaseName }) => ({
+        outfile: join(outDir, releaseName),
+        target: bunTarget,
+      })),
+    ];
 
 for (const { target, outfile } of builds) {
   const proc = spawnSync(
@@ -52,9 +64,10 @@ for (const { target, outfile } of builds) {
     console.error(`build failed for ${target ?? "current platform"}`);
     process.exit(proc.status ?? 1);
   }
+  if (target === "bun-windows-x64" && existsSync(`${outfile}.exe`)) {
+    renameSync(`${outfile}.exe`, outfile);
+  }
 }
 console.log(
-  currentOnly
-    ? "binary written to dist/frontal"
-    : `binaries written to ${outDir}`
+  currentOnly ? "binary written to dist/cli" : `binaries written to ${outDir}`
 );

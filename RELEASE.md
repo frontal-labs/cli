@@ -105,6 +105,20 @@ This project follows [Semantic Versioning](https://semver.org/):
 - Install: `npm install -g @frontal-labs/cli --registry=https://npm.pkg.github.com`
 - Auth: GITHUB_TOKEN (auto-provisioned per workflow run)
 
+### GitHub Release binaries
+
+Each `v*` tag publishes these standalone assets:
+
+- `cli` (the release runner's native executable)
+- `cli-aarch64-apple-darwin`
+- `cli-aarch64-unknown-linux-gnu`
+- `cli-x86_64-pc-windows-msvc`
+- `cli-x86_64-apple-darwin`
+- `cli-x86_64-unknown-linux-gnu`
+
+The target names follow Rust-style platform triples; Bun's supported compile
+targets are mapped to these names by `scripts/build-binaries.ts`.
+
 ### Development
 
 - Available via `npm install frontal-cli@next`
