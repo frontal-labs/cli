@@ -95,7 +95,7 @@ jobs:
       # non-blocking until that publisher is configured.
       - name: Publish to npm
         continue-on-error: true
-        run: npm publish --access public --provenance
+        run: npm publish --ignore-scripts --access public --provenance
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
