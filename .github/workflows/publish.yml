@@ -76,7 +76,12 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
-          npm publish --ignore-scripts
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@frontal-labs/cli@${VERSION}" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "@frontal-labs/cli@${VERSION} is already published; skipping duplicate publish"
+          else
+            npm publish --ignore-scripts
+          fi
 
           node -e "
             const fs = require('fs');
