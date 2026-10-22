@@ -43,6 +43,16 @@
     "validate:bindings": "node ./scripts/validate-command-bindings.mjs",
     "version-packages": "changeset version"
   },
+  "overrides": {
+    "esbuild": "0.25.0",
+    "fast-uri": "3.1.8",
+    "js-yaml": "4.3.2",
+    "nanoid": "3.3.18",
+    "postcss": "8.5.31",
+    "shell-quote": "1.11.0",
+    "source-map-js": "1.2.2",
+    "vite": "6.4.3"
+  },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
     "@frontal-labs/core": "1.0.4",
