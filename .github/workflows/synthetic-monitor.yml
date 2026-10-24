@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
@@ -80,7 +80,7 @@ jobs:
 
     steps:
       - name: Checkout scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/scripts
