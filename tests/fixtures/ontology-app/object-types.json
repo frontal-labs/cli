@@ -15,11 +15,14 @@
       "tags": { "type": "array", "items": "string" },
       "profile": { "type": "json" },
       "embedding": { "type": "vector", "dimensions": 3 },
-      "createdAt": { "type": "timestamp", "required": true, "auto": true }
+      "createdAt": { "type": "timestamp", "required": true, "auto": true },
+      "displayName": { "type": "string", "computed": true },
+      "external-ref": { "type": "string" }
     },
     "relationships": {
       "company": { "type": "belongsTo", "targetEntity": "Company" },
-      "orders": { "type": "hasMany", "targetEntity": "Order" }
+      "orders": { "type": "hasMany", "targetEntity": "Order" },
+      "primaryAddress": { "type": "hasOne", "targetEntity": "Address" }
     }
   },
   {
@@ -28,6 +31,24 @@
     "fields": {
       "name": { "type": "string", "required": true },
       "industry": { "type": "enum", "enum": ["software", "retail"] }
+    }
+  },
+  {
+    "name": "Address",
+    "version": 1,
+    "fields": {
+      "street": { "type": "string", "required": true },
+      "city": { "type": "string" }
+    }
+  },
+  {
+    "name": "Order",
+    "version": 1,
+    "fields": {
+      "total": { "type": "float", "required": true }
+    },
+    "relationships": {
+      "customer": { "type": "belongsTo", "targetEntity": "Customer" }
     }
   },
   {

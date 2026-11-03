@@ -5,7 +5,7 @@ import { DEFAULT_BASE_URL } from "@/config/resolve.js";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { runAction } from "@/lib/command.js";
-import { SDK_MIN_VERSION } from "@/lib/ontology/generate.js";
+import { SDK_MIN_VERSION } from "@/lib/ontology/constants.js";
 import { withExamples } from "@/lib/output.js";
 import {
   LEGACY_PROJECT_CONFIG_FILE,
@@ -24,6 +24,8 @@ const GITIGNORE_ENTRIES = [
   `${PROJECT_STATE_DIR}/build/`,
   `${PROJECT_STATE_DIR}/artifacts/`,
   `${PROJECT_STATE_DIR}/cache/`,
+  // Temp files from an interrupted `frontal sync`; never committed.
+  `${PROJECT_STATE_DIR}/.*.tmp`,
   ".env",
   ".env.local",
 ];

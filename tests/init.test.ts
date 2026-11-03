@@ -55,7 +55,7 @@ describe("initProject", () => {
       "FRONTAL_API_KEY=\n"
     );
     expect(readFileSync(join(result.dir, ".gitignore"), "utf-8")).toContain(
-      ".frontal/state/\n.frontal/build/\n.frontal/artifacts/\n.frontal/cache/\n.env\n.env.local"
+      ".frontal/state/\n.frontal/build/\n.frontal/artifacts/\n.frontal/cache/\n.frontal/.*.tmp\n.env\n.env.local"
     );
     expect(
       JSON.parse(readFileSync(join(result.dir, "package.json"), "utf-8"))
@@ -137,7 +137,7 @@ describe("initProject", () => {
     expect(result.updated).toEqual([".gitignore"]);
     const content = readFileSync(join(dir, ".gitignore"), "utf-8");
     expect(content).toBe(
-      "node_modules\n.env\n\n# Frontal\n.frontal/state/\n.frontal/build/\n.frontal/artifacts/\n.frontal/cache/\n.env.local\n"
+      "node_modules\n.env\n\n# Frontal\n.frontal/state/\n.frontal/build/\n.frontal/artifacts/\n.frontal/cache/\n.frontal/.*.tmp\n.env.local\n"
     );
   });
 

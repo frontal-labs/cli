@@ -1,15 +1,14 @@
 import { join } from "node:path";
 import type { Command } from "commander";
-import { assertOperationSupported } from "@/contract/operations.js";
-import { CliError } from "@/errors/cli-error.js";
-import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { type CommandContext, runAction } from "@/lib/command.js";
 import { loadProjectConfig } from "@/lib/config.js";
+import { outOfDate } from "@/lib/ontology/errors.js";
+import { fetchObjectTypes } from "@/lib/ontology/remote.js";
 import {
   checkOntology,
-  collectPages,
+  type FileChange,
+  type LocalSnapshot,
   type OntologyContext,
-  type PageLike,
   type StatusOutcome,
   type SyncOutcome,
   statusOntology,
@@ -21,22 +20,13 @@ import type { SdkHandle } from "@/lib/sdk.js";
 import { theme } from "@/output/theme.js";
 import { VERSION } from "@/version.js";
 
-const OBJECT_TYPES_PATH = "/ontology/objects/object-types";
-
-/** Lists every object type through the SDK's paged ontology namespace. */
-async function fetchObjectTypes(handle: SdkHandle): Promise<unknown[]> {
-  assertOperationSupported("GET", OBJECT_TYPES_PATH);
-  const first = await handle.frontal.ontology.objects.listObjectTypes();
-  return collectPages(first as PageLike<Record<string, unknown>>);
-}
-
+/** Project facts every ontology command reports. */
 interface ProjectInfo {
   context: OntologyContext;
-  env: string;
+  environment: string;
   name: string;
 }
 
-/** Resolves the project and the `.frontal/` directory the command operates on. */
 async function projectInfo(ctx: CommandContext): Promise<ProjectInfo> {
   const project = await loadProjectConfig({ env: ctx.globalOpts.env });
   return {
@@ -44,65 +34,66 @@ async function projectInfo(ctx: CommandContext): Promise<ProjectInfo> {
       frontalDir: join(project.root, PROJECT_STATE_DIR),
       generatorVersion: VERSION,
     },
-    env: project.config.env,
+    environment: project.config.env,
     name: project.config.name,
   };
 }
 
-/** Offline CI check: exits non-zero when committed generated files are stale. */
-function runCheck(ctx: CommandContext, info: ProjectInfo): void {
-  const outcome = checkOntology(info.context);
-  if (ctx.globalOpts.json) {
-    ctx.fmt.raw(outcome);
-  }
-  if (outcome.stale.length > 0) {
-    throw new CliError(
-      "ONTOLOGY_OUT_OF_DATE",
-      `Generated files do not match .frontal/ontology.json: ${outcome.stale.join(", ")}.`,
-      {
-        exitCode: EXIT_CODES.VALIDATION_ERROR,
-        fix: "Run `frontal sync` locally and commit the .frontal/ changes.",
-      }
-    );
-  }
-  if (!ctx.globalOpts.json) {
-    console.log(
-      `${theme.success("ok")}  generated files match ontology ${outcome.schemaHash}`
-    );
+/** Label column width for aligned per-file output. */
+const LABEL_WIDTH = 10;
+
+function label(text: string): string {
+  return text.padEnd(LABEL_WIDTH);
+}
+
+function sourceOf(handle: SdkHandle): () => Promise<unknown[]> {
+  return () => fetchObjectTypes(handle);
+}
+
+function fileLabel(outcome: FileChange["outcome"]): string {
+  switch (outcome) {
+    case "created":
+      return theme.success(label("created"));
+    case "updated":
+      return theme.warn(label("updated"));
+    case "unchanged":
+      return theme.dim(label("unchanged"));
+    default: {
+      const exhaustive: never = outcome;
+      return exhaustive;
+    }
   }
 }
 
-function printSyncResult(outcome: SyncOutcome): void {
-  for (const warning of outcome.warnings) {
-    console.log(`${theme.warn("warn")}    ${warning}`);
-  }
-  const changed = Object.entries(outcome.files).filter(
-    ([, state]) => state !== "unchanged"
-  );
-  if (changed.length === 0) {
+function printSync(outcome: SyncOutcome, changed: boolean): void {
+  for (const removed of outcome.removedTemporaries) {
     console.log(
-      `${theme.success("ok")}  local types are already synchronised (${outcome.schemaHash})`
+      `${theme.dim(label("cleaned"))}${join(PROJECT_STATE_DIR, removed)}`
+    );
+  }
+  for (const file of outcome.files) {
+    console.log(
+      `${fileLabel(file.outcome)}${join(PROJECT_STATE_DIR, file.file)}`
+    );
+  }
+  for (const warning of outcome.warnings) {
+    console.log(`${theme.warn(label("warn"))}${warning}`);
+  }
+  if (!changed) {
+    console.log(
+      `${theme.success("ok")} Local types are already synchronised (${outcome.schemaHash}).`
     );
     return;
-  }
-  for (const [key, state] of changed) {
-    console.log(`${theme.success(state)}  ${key}`);
   }
   console.log(
     `${theme.success("synced")} ${outcome.entityCount} entities (${outcome.schemaHash})`
   );
-}
-
-async function runSync(ctx: CommandContext, info: ProjectInfo): Promise<void> {
-  const handle = await ctx.sdk();
-  const outcome = await syncOntology(info.context, () =>
-    fetchObjectTypes(handle)
+  console.log("");
+  console.log(theme.bold("Next:"));
+  console.log(
+    `  commit ${PROJECT_STATE_DIR}/ so CI can compile without credentials`
   );
-  if (ctx.globalOpts.json) {
-    ctx.fmt.raw(outcome);
-    return;
-  }
-  printSyncResult(outcome);
+  console.log(`  import { createFrontal } from "${PROJECT_STATE_DIR}/client"`);
 }
 
 function printStatus(
@@ -110,21 +101,84 @@ function printStatus(
   info: ProjectInfo,
   status: string
 ): void {
-  const localLine =
-    outcome.localHash ?? `unavailable (${outcome.localProblem ?? "unknown"})`;
   console.log(`Frontal Project: ${info.name}`);
-  console.log(`Environment: ${info.env}`);
+  console.log(`Environment: ${info.environment}`);
   console.log("");
-  console.log(`Local ontology:  ${localLine}`);
+  console.log(`Local ontology:  ${describeLocal(outcome.local)}`);
   console.log(
-    `Remote ontology: ${outcome.remoteHash} (${outcome.remoteEntityCount} entities)`
+    `Remote ontology: ${outcome.remote.schemaHash} (${outcome.remote.entityCount} entities)`
   );
   console.log("");
   console.log(`Status: ${status}`);
   if (!outcome.upToDate) {
     console.log("");
-    console.log("Run `frontal sync` to update generated types.");
+    console.log("Run frontal sync to update generated types.");
   }
+}
+
+function describeLocal(local: LocalSnapshot): string {
+  switch (local.state) {
+    case "synced":
+      return `${local.schemaHash} (${local.entityCount} entities)`;
+    case "missing":
+      return "not synced yet";
+    case "unreadable":
+      return `unreadable (${local.problem})`;
+    default: {
+      const exhaustive: never = local;
+      return exhaustive;
+    }
+  }
+}
+
+/** Offline CI check. Prints the report in both modes; exits non-zero when stale. */
+function runCheck(ctx: CommandContext, info: ProjectInfo): void {
+  const outcome = checkOntology(info.context);
+  const ok = outcome.stale.length === 0;
+  if (ctx.globalOpts.json) {
+    ctx.fmt.raw({ ...outcome, ok });
+  }
+  if (!ok) {
+    throw outOfDate(outcome.stale);
+  }
+  if (!ctx.globalOpts.json) {
+    console.log(
+      `${theme.success("ok")} generated files match ontology ${outcome.schemaHash} (${outcome.entityCount} entities)`
+    );
+  }
+}
+
+async function runSync(ctx: CommandContext, info: ProjectInfo): Promise<void> {
+  const handle = await ctx.sdk();
+  const outcome = await syncOntology(info.context, sourceOf(handle));
+  const changed =
+    outcome.files.some((file) => file.outcome !== "unchanged") ||
+    outcome.removedTemporaries.length > 0;
+  if (ctx.globalOpts.json) {
+    ctx.fmt.raw({ ...outcome, changed });
+    return;
+  }
+  printSync(outcome, changed);
+}
+
+async function runStatus(
+  ctx: CommandContext,
+  info: ProjectInfo
+): Promise<void> {
+  const handle = await ctx.sdk();
+  const outcome = await statusOntology(info.context, sourceOf(handle));
+  const status = outcome.upToDate ? "UP TO DATE" : "OUTDATED";
+  if (ctx.globalOpts.json) {
+    ctx.fmt.raw({
+      environment: info.environment,
+      local: outcome.local,
+      project: info.name,
+      remote: outcome.remote,
+      status,
+    });
+    return;
+  }
+  printStatus(outcome, info, status);
 }
 
 export function registerSyncCommands(program: Command): void {
@@ -136,7 +190,7 @@ export function registerSyncCommands(program: Command): void {
       )
       .option(
         "--check",
-        "Offline: fail if committed generated files do not match .frontal/ontology.json"
+        "Offline: fail when committed generated files do not match .frontal/ontology.json"
       )
       .action((opts: { check?: boolean }, cmd) =>
         runAction(cmd, async (ctx) => {
@@ -158,20 +212,11 @@ export function registerSyncCommands(program: Command): void {
   withExamples(
     program
       .command("status")
-      .description("Compare the local ontology snapshot with Frontal")
+      .description("Compare the committed ontology snapshot with Frontal")
       .action((_opts: unknown, cmd) =>
         runAction(cmd, async (ctx) => {
           const info = await projectInfo(ctx);
-          const handle = await ctx.sdk();
-          const outcome = await statusOntology(info.context, () =>
-            fetchObjectTypes(handle)
-          );
-          const status = outcome.upToDate ? "UP TO DATE" : "OUTDATED";
-          if (ctx.globalOpts.json) {
-            ctx.fmt.raw({ ...outcome, status });
-            return;
-          }
-          printStatus(outcome, info, status);
+          await runStatus(ctx, info);
         })
       ),
     ["frontal status", "frontal status --json"]

@@ -1,229 +1,226 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CliError } from "@/errors/cli-error.js";
-import { EXIT_CODES } from "@/errors/exit-codes.js";
+import { versionSchema } from "@/lib/ontology/backend.js";
+import {
+  ONTOLOGY_FILES,
+  type OntologyFileKey,
+  WRITE_ORDER,
+} from "@/lib/ontology/constants.js";
 import {
   buildDocument,
-  type OntologyDocumentData,
+  type OntologyDocument,
   parseDocument,
   renderDocument,
 } from "@/lib/ontology/document.js";
-import { type GeneratedFiles, generateFiles } from "@/lib/ontology/generate.js";
 import {
-  type NormalizedOntology,
-  normalizeOntology,
-} from "@/lib/ontology/model.js";
-import { type WriteOutcome, writeFileAtomic } from "@/lib/ontology/write.js";
+  missingSnapshot,
+  ONTOLOGY_ERROR_CODES,
+  type StaleFile,
+} from "@/lib/ontology/errors.js";
+import { generateFiles } from "@/lib/ontology/generate.js";
+import type { NormalizedOntology } from "@/lib/ontology/model.js";
+import { normalizeOntology } from "@/lib/ontology/normalize.js";
+import {
+  removeStaleTemporaries,
+  type WriteOutcome,
+  type Writer,
+  writeFileAtomic,
+} from "@/lib/ontology/write.js";
 
-/** Generated file names inside the `.frontal/` directory. */
-export const ONTOLOGY_FILES = {
-  client: "client.ts",
-  document: "ontology.json",
-  types: "ontology.d.ts",
-  version: "version.json",
-} as const;
-
-/** Safety bound for paging through the object-type list. */
-const MAX_PAGES = 1000;
-
-/** Structural subset of the SDK's PageResult, so tests can supply fake pages. */
-export interface PageLike<T> {
-  data: T[];
-  nextPage: () => Promise<PageLike<T> | null>;
-  pagination: { hasMore: boolean };
-}
-
-const pagesExceeded = (): CliError =>
-  new CliError(
-    "ONTOLOGY_PAGINATION",
-    `Object-type list exceeded ${MAX_PAGES} pages.`,
-    { exitCode: EXIT_CODES.GENERAL_ERROR }
-  );
-
-/**
- * Reads pages in sequence (each cursor depends on the previous page), bounded
- * by MAX_PAGES. Recursive so no await sits inside a loop.
- */
-async function readPages<T>(
-  page: PageLike<T>,
-  items: T[],
-  pagesLeft: number
-): Promise<T[]> {
-  for (const item of page.data) {
-    items.push(item);
-  }
-  if (!page.pagination.hasMore) {
-    return items;
-  }
-  if (pagesLeft <= 1) {
-    throw pagesExceeded();
-  }
-  const next = await page.nextPage();
-  if (next === null) {
-    throw new CliError(
-      "ONTOLOGY_PAGINATION",
-      "Frontal ended the object-type list early (hasMore was true but no next page was returned).",
-      {
-        exitCode: EXIT_CODES.NETWORK_ERROR,
-        fix: "Retry `frontal sync`. If it persists, report the request id.",
-      }
-    );
-  }
-  return readPages(next, items, pagesLeft - 1);
-}
-
-/** Collects every item across pages, bounded by MAX_PAGES. */
-export function collectPages<T>(first: PageLike<T>): Promise<T[]> {
-  return readPages(first, [], MAX_PAGES);
-}
-
-/** Fetches every raw object type from Frontal. Injected so tests need no network. */
-export type ObjectTypeFetcher = () => Promise<unknown[]>;
-
+/** Where the generated files live and which CLI version writes them. */
 export interface OntologyContext {
   /** Absolute path of the project's `.frontal/` directory. */
   frontalDir: string;
   generatorVersion: string;
 }
 
+/** Produces the raw object types. Injected so tests and status need no network. */
+export type ObjectTypeSource = () => Promise<unknown[]>;
+
+export interface FileChange {
+  file: string;
+  outcome: WriteOutcome;
+}
+
 export interface SyncOutcome {
   entityCount: number;
-  files: Record<keyof typeof ONTOLOGY_FILES, WriteOutcome>;
+  /** One entry per generated file, in write order. */
+  files: FileChange[];
+  /** Temp files from an interrupted earlier sync that were deleted. */
+  removedTemporaries: string[];
   schemaHash: string;
   warnings: string[];
 }
 
-/** Expected content of every generated file, in write order. */
-function expectedFiles(
-  data: OntologyDocumentData,
-  model: NormalizedOntology,
-  generatorVersion: string
-): Record<keyof typeof ONTOLOGY_FILES, string> {
-  const generated: GeneratedFiles = generateFiles(model, {
-    generatorVersion,
-    schemaHash: data.schemaHash,
-  });
-  return {
-    client: generated.clientTs,
-    document: renderDocument(data),
-    types: generated.ontologyDts,
-    version: generated.versionJson,
-  };
+/** Validated model and document for one snapshot of the backend. */
+export interface Snapshot {
+  document: OntologyDocument;
+  model: NormalizedOntology;
 }
 
 /**
- * Fetches, validates, generates and writes the ontology files. Validation
- * happens before any write, so malformed input leaves the project untouched.
- * `ontology.json` is written last: it is the commit marker that `check` and
- * `status` read, so an interrupted sync is never reported as up to date.
+ * Validates raw object types once and builds both the model and the document.
+ * Throws `ONTOLOGY_INVALID` before anything is written.
+ */
+export function snapshotOf(raw: readonly unknown[]): Snapshot {
+  const model = normalizeOntology(raw);
+  return { document: buildDocument(raw), model };
+}
+
+/** Expected bytes of every generated file for a snapshot. */
+function expectedContents(
+  snapshot: Snapshot,
+  generatorVersion: string
+): Record<OntologyFileKey, string> {
+  const generated = generateFiles(snapshot.model, {
+    generatorVersion,
+    schemaHash: snapshot.document.schemaHash,
+  });
+  return { ...generated, document: renderDocument(snapshot.document) };
+}
+
+/**
+ * Fetches, validates, generates and writes every file. Validation happens
+ * before any write, so malformed input leaves `.frontal/` untouched.
+ * `ontology.json` is written last (see WRITE_ORDER).
  */
 export async function syncOntology(
   context: OntologyContext,
-  fetchObjectTypes: ObjectTypeFetcher
+  source: ObjectTypeSource,
+  write: Writer = writeFileAtomic
 ): Promise<SyncOutcome> {
-  const raw = await fetchObjectTypes();
-  const data = buildDocument(raw);
-  const model = normalizeOntology(raw);
-  const contents = expectedFiles(data, model, context.generatorVersion);
+  const removedTemporaries = removeStaleTemporaries(context.frontalDir);
+  const snapshot = snapshotOf(await source());
+  const contents = expectedContents(snapshot, context.generatorVersion);
 
-  const order: (keyof typeof ONTOLOGY_FILES)[] = [
-    "types",
-    "client",
-    "version",
-    "document",
-  ];
-  const files = {} as Record<keyof typeof ONTOLOGY_FILES, WriteOutcome>;
-  for (const key of order) {
-    files[key] = writeFileAtomic(
+  const files: FileChange[] = WRITE_ORDER.map((key) => ({
+    file: ONTOLOGY_FILES[key],
+    outcome: write(
       join(context.frontalDir, ONTOLOGY_FILES[key]),
       contents[key]
-    );
-  }
+    ),
+  }));
 
   return {
-    entityCount: model.entities.length,
+    entityCount: snapshot.model.entities.length,
     files,
-    schemaHash: data.schemaHash,
-    warnings: model.warnings,
+    removedTemporaries,
+    schemaHash: snapshot.document.schemaHash,
+    warnings: snapshot.model.warnings,
   };
 }
 
+/** Reads and verifies the committed `ontology.json`. */
+function readCommittedDocument(frontalDir: string): OntologyDocument {
+  const path = join(frontalDir, ONTOLOGY_FILES.document);
+  if (!existsSync(path)) {
+    throw missingSnapshot();
+  }
+  return parseDocument(readFileSync(path, "utf-8"));
+}
+
+/** Reads a committed file, or undefined when it does not exist. */
+function readOptional(path: string): string | undefined {
+  return existsSync(path) ? readFileSync(path, "utf-8") : undefined;
+}
+
+/** `version.json` is stale in a specific way when its hash disagrees with `ontology.json`. */
+function versionHashDisagrees(text: string, schemaHash: string): boolean {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return false;
+  }
+  const parsed = versionSchema.safeParse(json);
+  return parsed.success && parsed.data.schemaHash !== schemaHash;
+}
+
 export interface CheckOutcome {
+  entityCount: number;
   schemaHash: string;
-  /** Generated files that are missing or differ from what the committed ontology.json produces. */
-  stale: string[];
+  stale: StaleFile[];
 }
 
 /**
  * Offline check: regenerates from the committed `ontology.json` and compares
- * against the committed generated files. Never touches the network.
+ * each generated file byte for byte. Never touches the network.
  */
 export function checkOntology(context: OntologyContext): CheckOutcome {
-  const documentPath = join(context.frontalDir, ONTOLOGY_FILES.document);
-  if (!existsSync(documentPath)) {
-    throw new CliError(
-      "ONTOLOGY_MISSING",
-      ".frontal/ontology.json not found.",
-      {
-        exitCode: EXIT_CODES.VALIDATION_ERROR,
-        fix: "Run `frontal sync` and commit the .frontal/ directory.",
-      }
-    );
-  }
-  const data = parseDocument(readFileSync(documentPath, "utf-8"));
-  const model = normalizeOntology(data.objectTypes);
-  const contents = expectedFiles(data, model, context.generatorVersion);
+  const document = readCommittedDocument(context.frontalDir);
+  const model = normalizeOntology(document.objectTypes);
+  const snapshot: Snapshot = { document, model };
+  const contents = expectedContents(snapshot, context.generatorVersion);
 
-  const stale: string[] = [];
-  for (const key of Object.keys(
-    ONTOLOGY_FILES
-  ) as (keyof typeof ONTOLOGY_FILES)[]) {
-    const file = join(context.frontalDir, ONTOLOGY_FILES[key]);
-    const onDisk = existsSync(file) ? readFileSync(file, "utf-8") : undefined;
-    if (onDisk !== contents[key]) {
-      stale.push(ONTOLOGY_FILES[key]);
+  const stale: StaleFile[] = [];
+  for (const key of WRITE_ORDER) {
+    if (key === "document") {
+      continue;
+    }
+    const file = ONTOLOGY_FILES[key];
+    const onDisk = readOptional(join(context.frontalDir, file));
+    if (onDisk === undefined) {
+      stale.push({ file, reason: "missing" });
+    } else if (onDisk !== contents[key]) {
+      const hashMismatch =
+        key === "version" && versionHashDisagrees(onDisk, document.schemaHash);
+      stale.push({ file, reason: hashMismatch ? "hash-mismatch" : "differs" });
     }
   }
-  return { schemaHash: data.schemaHash, stale };
+  return {
+    entityCount: model.entities.length,
+    schemaHash: document.schemaHash,
+    stale,
+  };
 }
 
+/** The committed snapshot as `status` sees it. */
+export type LocalSnapshot =
+  | { state: "synced"; schemaHash: string; entityCount: number }
+  | { state: "missing" }
+  | { state: "unreadable"; problem: string };
+
 export interface StatusOutcome {
-  /** Hash of the committed ontology.json, or undefined when missing or corrupt. */
-  localHash?: string;
-  /** Why the local snapshot could not be used, when it exists but is unusable. */
-  localProblem?: string;
-  remoteEntityCount: number;
-  remoteHash: string;
+  local: LocalSnapshot;
+  remote: { entityCount: number; schemaHash: string };
   upToDate: boolean;
 }
 
-/** Compares the committed snapshot with the remote ontology (one fetch). */
+function readLocal(frontalDir: string): LocalSnapshot {
+  try {
+    const document = readCommittedDocument(frontalDir);
+    return {
+      entityCount: document.objectTypes.length,
+      schemaHash: document.schemaHash,
+      state: "synced",
+    };
+  } catch (err) {
+    if (err instanceof CliError && err.code === ONTOLOGY_ERROR_CODES.missing) {
+      return { state: "missing" };
+    }
+    if (err instanceof CliError) {
+      return { problem: err.message, state: "unreadable" };
+    }
+    throw err;
+  }
+}
+
+/** Compares the committed snapshot with Frontal. Makes one remote read. */
 export async function statusOntology(
   context: OntologyContext,
-  fetchObjectTypes: ObjectTypeFetcher
+  source: ObjectTypeSource
 ): Promise<StatusOutcome> {
-  const remote = buildDocument(await fetchObjectTypes());
-  const remoteEntityCount = normalizeOntology(remote.objectTypes).entities
-    .length;
-
-  const documentPath = join(context.frontalDir, ONTOLOGY_FILES.document);
-  let localHash: string | undefined;
-  let localProblem: string | undefined;
-  if (existsSync(documentPath)) {
-    try {
-      localHash = parseDocument(readFileSync(documentPath, "utf-8")).schemaHash;
-    } catch (err) {
-      localProblem = err instanceof Error ? err.message : String(err);
-    }
-  } else {
-    localProblem = "not synced yet";
-  }
-
+  const snapshot = snapshotOf(await source());
+  const local = readLocal(context.frontalDir);
   return {
-    localHash,
-    localProblem,
-    remoteEntityCount,
-    remoteHash: remote.schemaHash,
-    upToDate: localHash === remote.schemaHash,
+    local,
+    remote: {
+      entityCount: snapshot.model.entities.length,
+      schemaHash: snapshot.document.schemaHash,
+    },
+    upToDate:
+      local.state === "synced" &&
+      local.schemaHash === snapshot.document.schemaHash,
   };
 }

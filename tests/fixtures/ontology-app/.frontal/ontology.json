@@ -3,6 +3,19 @@
   "objectTypes": [
     {
       "fields": {
+        "city": {
+          "type": "string"
+        },
+        "street": {
+          "required": true,
+          "type": "string"
+        }
+      },
+      "name": "Address",
+      "version": 1
+    },
+    {
+      "fields": {
         "industry": {
           "enum": [
             "software",
@@ -28,6 +41,10 @@
           "required": true,
           "type": "timestamp"
         },
+        "displayName": {
+          "computed": true,
+          "type": "string"
+        },
         "email": {
           "required": true,
           "type": "string"
@@ -35,6 +52,9 @@
         "embedding": {
           "dimensions": 3,
           "type": "vector"
+        },
+        "external-ref": {
+          "type": "string"
         },
         "nickname": {
           "type": "text"
@@ -69,9 +89,29 @@
         "orders": {
           "targetEntity": "Order",
           "type": "hasMany"
+        },
+        "primaryAddress": {
+          "targetEntity": "Address",
+          "type": "hasOne"
         }
       },
       "version": 3
+    },
+    {
+      "fields": {
+        "total": {
+          "required": true,
+          "type": "float"
+        }
+      },
+      "name": "Order",
+      "relationships": {
+        "customer": {
+          "targetEntity": "Customer",
+          "type": "belongsTo"
+        }
+      },
+      "version": 1
     },
     {
       "fields": {
@@ -84,7 +124,7 @@
       "name": "legacy-account"
     }
   ],
-  "schemaHash": "sha256:b6dd0fa1d00978df5c2b54edf686362953abe26c9ae51ae8adfec4fb3046928d",
+  "schemaHash": "sha256:72e1fda13d182df55fb417af91bd7cc12418f6d21c14aae25274eeabe2f64496",
   "source": {
     "endpoint": "/v1/ontology/objects/object-types",
     "service": "ontology/objects"

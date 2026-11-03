@@ -1,11 +1,13 @@
 {
   "contractVersion": 1,
   "entities": {
+    "Address": 1,
     "Company": 1,
     "Customer": 3,
+    "Order": 1,
     "legacy-account": null
   },
   "generatorVersion": "0.1.2",
-  "schemaHash": "sha256:b6dd0fa1d00978df5c2b54edf686362953abe26c9ae51ae8adfec4fb3046928d",
+  "schemaHash": "sha256:72e1fda13d182df55fb417af91bd7cc12418f6d21c14aae25274eeabe2f64496",
   "sdkRange": ">=2.1.0 <3.0.0"
 }
