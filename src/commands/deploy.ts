@@ -236,7 +236,7 @@ export interface AgentRollback {
 }
 
 /**
- * Rolls back every agent listed under `agents` in frontal.jsonc to its
+ * Rolls back every agent listed under `agents` in .frontal/config.jsonc to its
  * previous version (`POST /agents/{id}/rollback`). Failures are reported
  * per agent rather than aborting the worker rollback.
  */

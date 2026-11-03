@@ -4,9 +4,12 @@ import { DEFAULT_BASE_URL } from "@/config/resolve.js";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 
-export const PROJECT_CONFIG_FILE = "frontal.jsonc";
-export const PROJECT_SCHEMA_URL = "https://frontal.dev/schemas/frontal.json";
 export const PROJECT_STATE_DIR = ".frontal";
+/** Project config, relative to the project root (preferred location). */
+export const PROJECT_CONFIG_FILE = `${PROJECT_STATE_DIR}/config.jsonc`;
+/** Pre-`.frontal/` config location, still read as a fallback. */
+export const LEGACY_PROJECT_CONFIG_FILE = "frontal.jsonc";
+export const PROJECT_SCHEMA_URL = "https://frontal.dev/schemas/frontal.json";
 
 export const ENV_NAMES = ["dev", "staging", "prod"] as const;
 export type EnvName = (typeof ENV_NAMES)[number];
@@ -68,11 +71,47 @@ export function parseJsonc(text: string): unknown {
   return JSON.parse(restored);
 }
 
-/** Walks up from `start` until a `frontal.jsonc` is found. */
+/**
+ * Config path relative to `root`: `.frontal/config.jsonc` when present,
+ * otherwise the legacy root `frontal.jsonc`. Undefined when neither exists.
+ */
+export function projectConfigRelPath(root: string): string | undefined {
+  if (existsSync(join(root, PROJECT_CONFIG_FILE))) {
+    return PROJECT_CONFIG_FILE;
+  }
+  if (existsSync(join(root, LEGACY_PROJECT_CONFIG_FILE))) {
+    return LEGACY_PROJECT_CONFIG_FILE;
+  }
+}
+
+/**
+ * Env overlay candidates (relative to root), in lookup order. Overlays pair
+ * with the base location first; a legacy `frontal.<env>.jsonc` is still read
+ * so moving the base config does not silently drop an existing overlay.
+ */
+export function envOverlayCandidates(baseRel: string, env: string): string[] {
+  const legacy = `frontal.${env}.jsonc`;
+  return baseRel === LEGACY_PROJECT_CONFIG_FILE
+    ? [legacy]
+    : [`${PROJECT_STATE_DIR}/config.${env}.jsonc`, legacy];
+}
+
+/** The first existing env overlay for `env`, relative to root. */
+export function findEnvOverlayRelPath(
+  root: string,
+  baseRel: string,
+  env: string
+): string | undefined {
+  return envOverlayCandidates(baseRel, env).find((rel) =>
+    existsSync(join(root, rel))
+  );
+}
+
+/** Walks up from `start` until a project config is found. */
 export function findProjectRoot(start = process.cwd()): string | undefined {
   let dir = resolve(start);
   for (;;) {
-    if (existsSync(join(dir, PROJECT_CONFIG_FILE))) {
+    if (projectConfigRelPath(dir) !== undefined) {
       return dir;
     }
     const parent = dirname(dir);
@@ -144,7 +183,7 @@ export interface LoadProjectOptions {
 }
 
 /**
- * Reads and merges `frontal.jsonc` (+ `frontal.<env>.jsonc`) without
+ * Reads and merges the project config (+ its env overlay) without
  * validating. Used by the SDK factory, which must stay SDK-import free.
  */
 export function loadRawProjectConfig(
@@ -154,7 +193,7 @@ export function loadRawProjectConfig(
   if (!root) {
     throw new CliError(
       "NO_PROJECT",
-      `No ${PROJECT_CONFIG_FILE} found in ${resolve(options.cwd ?? process.cwd())} or its parents.`,
+      `No ${PROJECT_CONFIG_FILE} (or ${LEGACY_PROJECT_CONFIG_FILE}) found in ${resolve(options.cwd ?? process.cwd())} or its parents.`,
       {
         exitCode: EXIT_CODES.CONFIG_ERROR,
         fix: "Run `frontal init` to create a project, or cd into one.",
@@ -162,7 +201,8 @@ export function loadRawProjectConfig(
     );
   }
 
-  const baseFile = join(root, PROJECT_CONFIG_FILE);
+  const baseRel = projectConfigRelPath(root) ?? PROJECT_CONFIG_FILE;
+  const baseFile = join(root, baseRel);
   const files = [baseFile];
   let raw = readConfigFile(baseFile);
 
@@ -174,8 +214,9 @@ export function loadRawProjectConfig(
         fix: `Use one of: ${ENV_NAMES.join(", ")}.`,
       });
     }
-    const overlay = join(root, `frontal.${env}.jsonc`);
-    if (existsSync(overlay)) {
+    const overlayRel = findEnvOverlayRelPath(root, baseRel, env);
+    if (overlayRel !== undefined) {
+      const overlay = join(root, overlayRel);
       files.push(overlay);
       raw = deepMerge(raw, readConfigFile(overlay));
     }
@@ -228,7 +269,7 @@ export function loadDotenvLocal(root: string): Record<string, string> {
   return parseDotenv(readFileSync(file, "utf-8"));
 }
 
-/** Builds the minimal `frontal.jsonc` document written by `frontal init`. */
+/** Builds the minimal `.frontal/config.jsonc` document written by `frontal init`. */
 export function renderProjectConfig(name: string): string {
   const services = DEFAULT_SERVICES.map(
     (key) => `    "${key}": { "remote": false }`

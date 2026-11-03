@@ -1,0 +1,9 @@
+{
+  // Frontal project configuration. Schema: https://frontal.dev/schemas/frontal.json
+  "$schema": "https://frontal.dev/schemas/frontal.json",
+  "name": "ontology-app",
+  "env": "dev",
+  "services": {},
+  "vars": {},
+  "secrets": { "required": ["FRONTAL_API_KEY"] }
+}

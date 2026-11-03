@@ -26,8 +26,11 @@ import {
 import { RemoteProxy, serviceForPath } from "@/lib/dev/proxy.js";
 import { type DevRequest, Router, scenarioToRoute } from "@/lib/dev/router.js";
 import {
+  envOverlayCandidates,
+  LEGACY_PROJECT_CONFIG_FILE,
   PROJECT_CONFIG_FILE,
   PROJECT_STATE_DIR,
+  projectConfigRelPath,
   SERVICE_KEYS,
   type ServiceKey,
 } from "@/lib/project.js";
@@ -46,7 +49,7 @@ export interface DevServerOptions {
   /** Directory for persisted state (default `.frontal/state`). */
   persistTo?: string;
   port?: number;
-  /** Services forced to proxy to the remote API (overrides frontal.jsonc). */
+  /** Services forced to proxy to the remote API (overrides .frontal/config.jsonc). */
   remote?: string[];
   root: string;
   scenario?: string;
@@ -332,11 +335,14 @@ export class DevServer {
     // fs.watch is fast but not reliable everywhere (coalesced or nameless
     // events on macOS, missing on some filesystems). Poll the handful of
     // files that matter as a deterministic fallback.
+    const baseRel = projectConfigRelPath(root) ?? PROJECT_CONFIG_FILE;
     const polled = [
-      join(root, PROJECT_CONFIG_FILE),
+      join(root, baseRel),
       join(root, ".env.local"),
       ...(this.options.env
-        ? [join(root, `frontal.${this.options.env}.jsonc`)]
+        ? envOverlayCandidates(baseRel, this.options.env).map((rel) =>
+            join(root, rel)
+          )
         : []),
       ...(this.scenarioName
         ? [
@@ -362,18 +368,24 @@ export class DevServer {
       this.polledFiles.push(file);
     }
 
-    const targets = [root, join(root, PROJECT_STATE_DIR, "scenarios")].filter(
-      (dir) => existsSync(dir)
-    );
+    const targets = [
+      root,
+      join(root, PROJECT_STATE_DIR),
+      join(root, PROJECT_STATE_DIR, "scenarios"),
+    ].filter((dir) => existsSync(dir));
 
     for (const dir of targets) {
       try {
         const watcher = watch(dir, (_event, filename) => {
           const name = String(filename ?? "");
+          const inStateDir = dir === join(root, PROJECT_STATE_DIR);
           // Some platforms (macOS FSEvents) omit the filename; reload anyway.
           const relevant =
             name === "" ||
-            name === PROJECT_CONFIG_FILE ||
+            (inStateDir &&
+              name.startsWith("config") &&
+              name.endsWith(".jsonc")) ||
+            name === LEGACY_PROJECT_CONFIG_FILE ||
             (name.startsWith("frontal.") && name.endsWith(".jsonc")) ||
             name === ".env.local" ||
             (dir.endsWith("scenarios") && name.endsWith(".json"));

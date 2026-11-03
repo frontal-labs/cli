@@ -34,13 +34,13 @@ export interface ResolvedConfig {
 export interface ProjectOverlay {
   /** Values from the project's `.env.local` (below shell env, above profile). */
   dotenv?: Record<string, string>;
-  /** `apiUrl` from `frontal.jsonc` (below `.env.local`, above profile). */
+  /** `apiUrl` from `.frontal/config.jsonc` (below `.env.local`, above profile). */
   projectApiUrl?: string;
 }
 
 /**
  * Resolves effective settings with precedence
- * flag > shell env > .env.local > frontal.jsonc > profile > default.
+ * flag > shell env > .env.local > .frontal/config.jsonc > profile > default.
  * Credentials are returned raw here; `getSdk()` turns them into an SDK client.
  */
 export function resolveConfig(

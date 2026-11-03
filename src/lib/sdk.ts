@@ -264,7 +264,7 @@ export function createAuthFetch(
  */
 /**
  * Project-level inputs for credential/URL resolution: `.env.local` values
- * and the `apiUrl` from `frontal.jsonc`, when run inside a project.
+ * and the `apiUrl` from `.frontal/config.jsonc`, when run inside a project.
  */
 export function resolveProjectOverlay(
   globalOpts: GlobalOptions,
@@ -281,7 +281,7 @@ export function resolveProjectOverlay(
       overlay.projectApiUrl = raw.apiUrl;
     }
   } catch {
-    // A broken frontal.jsonc is reported by the commands that need it.
+    // A broken .frontal/config.jsonc is reported by the commands that need it.
   }
   return overlay;
 }

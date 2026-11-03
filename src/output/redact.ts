@@ -15,7 +15,7 @@ const SENSITIVE_KEY_PATTERN =
 let extraSensitiveKeys: Set<string> = new Set();
 
 /**
- * Registers additional key names (e.g. from `frontal.jsonc` `secrets.required`)
+ * Registers additional key names (e.g. from `.frontal/config.jsonc` `secrets.required`)
  * whose values must always be masked.
  */
 export function registerSensitiveKeys(keys: Iterable<string>): void {

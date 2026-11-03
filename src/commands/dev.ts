@@ -176,7 +176,7 @@ export function registerDevCommand(program: Command): void {
           if (!root) {
             throw new CliError(
               "NO_PROJECT",
-              "No frontal.jsonc found in this directory or its parents.",
+              "No .frontal/config.jsonc found in this directory or its parents.",
               {
                 exitCode: EXIT_CODES.CONFIG_ERROR,
                 fix: "Run `frontal init` first, or cd into a Frontal project.",

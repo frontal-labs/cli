@@ -47,7 +47,7 @@ type ClientConfigSchema =
   typeof import("@frontal-labs/core").clientConfigSchema;
 
 /**
- * Builds the `frontal.jsonc` schema. Connection rules (`apiUrl`, `sdk.*`)
+ * Builds the `.frontal/config.jsonc` schema. Connection rules (`apiUrl`, `sdk.*`)
  * are reused from the SDK's own `clientConfigSchema` so the CLI never forks
  * them. The SDK module is loaded lazily (see `getCoreModule`).
  */
@@ -160,7 +160,7 @@ export async function validateProjectConfig(
 }
 
 /**
- * Loads `frontal.jsonc` (plus `frontal.<env>.jsonc` when `env` is given)
+ * Loads the project config (plus its env overlay when `env` is given)
  * from the nearest project root and validates the merged result.
  */
 export async function loadProjectConfig(

@@ -46,7 +46,7 @@ function buildError(detail: string): CliError {
     `Could not bundle the entry file: ${detail}`,
     {
       exitCode: EXIT_CODES.GENERAL_ERROR,
-      fix: "Fix the build errors above, or check `entry` in frontal.jsonc.",
+      fix: "Fix the build errors above, or check `entry` in .frontal/config.jsonc.",
     }
   );
 }
@@ -110,7 +110,7 @@ export async function bundleProject(options: {
       `Entry file not found: ${options.entry}`,
       {
         exitCode: EXIT_CODES.CONFIG_ERROR,
-        fix: "Create the file or set `entry` in frontal.jsonc to your app's entry point.",
+        fix: "Create the file or set `entry` in .frontal/config.jsonc to your app's entry point.",
       }
     );
   }

@@ -13,6 +13,7 @@ import { registerLogsCommand } from "@/commands/logs.js";
 import { registerMigrateCommand } from "@/commands/migrate.js";
 import { registerPolicyCommands } from "@/commands/policy.js";
 import { registerRunsCommands } from "@/commands/runs.js";
+import { registerSyncCommands } from "@/commands/sync.js";
 import { registerTypesCommand } from "@/commands/types.js";
 import { registerVersionCommand } from "@/commands/version.js";
 import { registerWorkflowsCommands } from "@/commands/workflows.js";
@@ -51,6 +52,7 @@ export function buildProgram(program = new Command()): Command {
   registerInitCommand(program);
   registerDevCommand(program);
   registerTypesCommand(program);
+  registerSyncCommands(program);
   registerEnvCommands(program);
   registerLogsCommand(program);
   registerPolicyCommands(program);

@@ -1,0 +1,92 @@
+{
+  "format": "frontal.ontology/v1",
+  "objectTypes": [
+    {
+      "fields": {
+        "industry": {
+          "enum": [
+            "software",
+            "retail"
+          ],
+          "type": "enum"
+        },
+        "name": {
+          "required": true,
+          "type": "string"
+        }
+      },
+      "name": "Company",
+      "version": 1
+    },
+    {
+      "fields": {
+        "age": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "auto": true,
+          "required": true,
+          "type": "timestamp"
+        },
+        "email": {
+          "required": true,
+          "type": "string"
+        },
+        "embedding": {
+          "dimensions": 3,
+          "type": "vector"
+        },
+        "nickname": {
+          "type": "text"
+        },
+        "profile": {
+          "type": "json"
+        },
+        "score": {
+          "default": 0,
+          "required": true,
+          "type": "float"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "closed"
+          ],
+          "required": true,
+          "type": "enum"
+        },
+        "tags": {
+          "items": "string",
+          "type": "array"
+        }
+      },
+      "name": "Customer",
+      "relationships": {
+        "company": {
+          "targetEntity": "Company",
+          "type": "belongsTo"
+        },
+        "orders": {
+          "targetEntity": "Order",
+          "type": "hasMany"
+        }
+      },
+      "version": 3
+    },
+    {
+      "fields": {
+        "code": {
+          "primary": true,
+          "required": true,
+          "type": "string"
+        }
+      },
+      "name": "legacy-account"
+    }
+  ],
+  "schemaHash": "sha256:b6dd0fa1d00978df5c2b54edf686362953abe26c9ae51ae8adfec4fb3046928d",
+  "source": {
+    "endpoint": "/v1/ontology/objects/object-types",
+    "service": "ontology/objects"
+  }
+}

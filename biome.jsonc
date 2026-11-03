@@ -22,6 +22,11 @@
   "extends": ["ultracite/biome/core"],
   "overrides": [
     {
+      "includes": ["tests/fixtures/ontology-app/.frontal/**"],
+      "formatter": { "enabled": false },
+      "linter": { "enabled": false }
+    },
+    {
       "includes": ["tests/**"],
       "linter": {
         "rules": {

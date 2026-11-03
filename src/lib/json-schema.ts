@@ -47,7 +47,7 @@ function tidy(node: unknown): unknown {
 }
 
 /**
- * JSON Schema (draft 2020-12) for `frontal.jsonc`, derived from the same Zod
+ * JSON Schema (draft 2020-12) for `.frontal/config.jsonc`, derived from the same Zod
  * schema the CLI validates with, plus documentation and the service-key
  * enum that Zod expresses as a refinement.
  */

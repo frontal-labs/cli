@@ -1,0 +1,39 @@
+[
+  {
+    "name": "Customer",
+    "version": 3,
+    "fields": {
+      "email": { "type": "string", "required": true },
+      "status": {
+        "type": "enum",
+        "required": true,
+        "enum": ["active", "closed"]
+      },
+      "nickname": { "type": "text" },
+      "age": { "type": "integer" },
+      "score": { "type": "float", "required": true, "default": 0 },
+      "tags": { "type": "array", "items": "string" },
+      "profile": { "type": "json" },
+      "embedding": { "type": "vector", "dimensions": 3 },
+      "createdAt": { "type": "timestamp", "required": true, "auto": true }
+    },
+    "relationships": {
+      "company": { "type": "belongsTo", "targetEntity": "Company" },
+      "orders": { "type": "hasMany", "targetEntity": "Order" }
+    }
+  },
+  {
+    "name": "Company",
+    "version": 1,
+    "fields": {
+      "name": { "type": "string", "required": true },
+      "industry": { "type": "enum", "enum": ["software", "retail"] }
+    }
+  },
+  {
+    "name": "legacy-account",
+    "fields": {
+      "code": { "type": "string", "required": true, "primary": true }
+    }
+  }
+]

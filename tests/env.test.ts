@@ -22,7 +22,7 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "frontal-env-"));
   initProject(root, {});
   writeFileSync(
-    join(root, "frontal.jsonc"),
+    join(root, ".frontal", "config.jsonc"),
     JSON.stringify({
       apiUrl: "https://api.test.frontal.dev/v1",
       env: "dev",
@@ -42,7 +42,7 @@ afterEach(() => {
 describe("buildEnvFile", () => {
   it("writes vars, keeps existing secrets and leaves placeholders for missing ones", async () => {
     const config = await validateProjectConfig(
-      parseJsonc(readFileSync(join(root, "frontal.jsonc"), "utf-8"))
+      parseJsonc(readFileSync(join(root, ".frontal", "config.jsonc"), "utf-8"))
     );
     const built = buildEnvFile({
       config,

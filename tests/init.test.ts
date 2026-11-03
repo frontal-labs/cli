@@ -1,5 +1,6 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -30,14 +31,14 @@ describe("initProject", () => {
     expect(result.created.sort((a, b) => a.localeCompare(b))).toEqual(
       [
         ".env.example",
+        ".frontal/config.jsonc",
         ".gitignore",
-        "frontal.jsonc",
         "package.json",
         "src/.gitkeep",
       ].sort((a, b) => a.localeCompare(b))
     );
     const config = parseJsonc(
-      readFileSync(join(result.dir, "frontal.jsonc"), "utf-8")
+      readFileSync(join(result.dir, ".frontal", "config.jsonc"), "utf-8")
     );
     expect(config).toMatchObject({
       apiUrl: "https://api.frontal.dev/v1",
@@ -54,7 +55,7 @@ describe("initProject", () => {
       "FRONTAL_API_KEY=\n"
     );
     expect(readFileSync(join(result.dir, ".gitignore"), "utf-8")).toContain(
-      ".frontal/\n.env\n.env.local"
+      ".frontal/state/\n.frontal/build/\n.frontal/artifacts/\n.frontal/cache/\n.env\n.env.local"
     );
     expect(
       JSON.parse(readFileSync(join(result.dir, "package.json"), "utf-8"))
@@ -67,37 +68,64 @@ describe("initProject", () => {
   it("never overwrites without --force and keeps package.json even with it", () => {
     initProject(root, { name: "app" });
     const dir = join(root, "app");
-    writeFileSync(join(dir, "frontal.jsonc"), '{ "name": "custom" }');
+    writeFileSync(
+      join(dir, ".frontal", "config.jsonc"),
+      '{ "name": "custom" }'
+    );
     writeFileSync(join(dir, "package.json"), '{ "name": "mine" }');
 
     const second = initProject(root, { name: "app" });
     expect(second.created).toEqual([]);
     expect(second.skipped.sort((a, b) => a.localeCompare(b))).toEqual([
       ".env.example",
-      "frontal.jsonc",
+      ".frontal/config.jsonc",
     ]);
     expect(second.kept.sort((a, b) => a.localeCompare(b))).toEqual([
       ".gitignore",
       "package.json",
       "src/.gitkeep",
     ]);
-    expect(readFileSync(join(dir, "frontal.jsonc"), "utf-8")).toBe(
+    expect(readFileSync(join(dir, ".frontal", "config.jsonc"), "utf-8")).toBe(
       '{ "name": "custom" }'
     );
 
     const forced = initProject(root, { force: true, name: "app" });
     expect(forced.updated.sort((a, b) => a.localeCompare(b))).toEqual([
       ".env.example",
-      "frontal.jsonc",
+      ".frontal/config.jsonc",
     ]);
     expect(readFileSync(join(dir, "package.json"), "utf-8")).toBe(
       '{ "name": "mine" }'
     );
     expect(
-      parseJsonc(readFileSync(join(dir, "frontal.jsonc"), "utf-8"))
+      parseJsonc(readFileSync(join(dir, ".frontal", "config.jsonc"), "utf-8"))
     ).toMatchObject({
       name: "app",
     });
+  });
+
+  it("keeps writing to a legacy root frontal.jsonc instead of creating a second config", () => {
+    const dir = join(root, "legacy");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "frontal.jsonc"), '{ "name": "old" }');
+
+    const result = initProject(root, { name: "legacy" });
+    expect(result.created).not.toContain(".frontal/config.jsonc");
+    expect(result.skipped).toContain("frontal.jsonc");
+    expect(existsSync(join(dir, ".frontal", "config.jsonc"))).toBe(false);
+    expect(readFileSync(join(dir, "frontal.jsonc"), "utf-8")).toBe(
+      '{ "name": "old" }'
+    );
+  });
+
+  it("warns when an existing .gitignore ignores the whole .frontal/ directory", () => {
+    const dir = join(root, "blanket");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, ".gitignore"), ".frontal/\n");
+
+    const result = initProject(root, { name: "blanket" });
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain(".frontal/");
   });
 
   it("appends only the missing .gitignore entries", () => {
@@ -109,14 +137,14 @@ describe("initProject", () => {
     expect(result.updated).toEqual([".gitignore"]);
     const content = readFileSync(join(dir, ".gitignore"), "utf-8");
     expect(content).toBe(
-      "node_modules\n.env\n\n# Frontal\n.frontal/\n.env.local\n"
+      "node_modules\n.env\n\n# Frontal\n.frontal/state/\n.frontal/build/\n.frontal/artifacts/\n.frontal/cache/\n.env.local\n"
     );
   });
 
   it("uses the current directory when --name is omitted", () => {
     const result = initProject(root, {});
     expect(result.dir).toBe(root);
-    expect(existsSync(join(root, "frontal.jsonc"))).toBe(true);
+    expect(existsSync(join(root, ".frontal", "config.jsonc"))).toBe(true);
   });
 
   it("normalizes directory names into project names", () => {
@@ -131,7 +159,7 @@ describe("frontal init (CLI)", () => {
 
     const human = await runCli(["init", "--name", "demo"]);
     expect(human.exitCode).toBe(0);
-    expect(human.stdout.join("\n")).toContain("frontal.jsonc");
+    expect(human.stdout.join("\n")).toContain(".frontal/config.jsonc");
     expect(human.stdout.join("\n")).toContain("cd demo");
     expect(human.stdout.join("\n")).toContain("frontal dev");
 
@@ -140,7 +168,7 @@ describe("frontal init (CLI)", () => {
     expect(lastJson(json.stdout)).toMatchObject({
       created: [],
       name: "demo",
-      skipped: expect.arrayContaining(["frontal.jsonc"]),
+      skipped: expect.arrayContaining([".frontal/config.jsonc"]),
     });
   });
 });
