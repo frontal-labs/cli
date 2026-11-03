@@ -281,6 +281,13 @@ function normalizeRelations(
   for (const [relName, relation] of Object.entries(declared).sort(([a], [b]) =>
     compareNames(a, b)
   )) {
+    // A relation accessor is defined on the same record as the fields, so a
+    // shared name would hide a stored value behind a function.
+    if (fields.some((field) => field.name === relName)) {
+      throw invalidOntology(
+        `Relation "${entity}.${relName}" has the same name as a field. Rename one of them.`
+      );
+    }
     if (relation.type === "hasMany" || relation.type === "manyToMany") {
       warnings.push(
         `Skipped ${entity}.${relName} (${relation.type}): no backend query exists yet.`

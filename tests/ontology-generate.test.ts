@@ -25,6 +25,7 @@ const ERR_MALFORMED = /is malformed/;
 const ERR_ENUM_EMPTY = /is an enum without values/;
 const ERR_ENUM_DUPLICATE = /duplicate enum values/;
 const ERR_DUPLICATE_ENTITY = /defined more than once/;
+const ERR_RELATION_FIELD_CLASH = /has the same name as a field/;
 
 function render(raw: unknown[]) {
   const data = buildDocument(raw);
@@ -300,6 +301,23 @@ describe("relations", () => {
     );
     expect(files.ontologyDts).toContain(
       'employer: { target: "Company"; optional: true };'
+    );
+  });
+
+  it("rejects a relation whose name matches a field", () => {
+    expectInvalid(
+      [
+        entity(
+          "Customer",
+          { company: { type: "string" } },
+          {
+            relationships: {
+              company: { targetEntity: "Customer", type: "belongsTo" },
+            },
+          }
+        ),
+      ],
+      ERR_RELATION_FIELD_CLASH
     );
   });
 
