@@ -22,8 +22,11 @@ export async function negatives(): Promise<void> {
     status: "archived",
   });
 
-  // @ts-expect-error list is not part of the typed slice (no backend type filter)
-  frontal.ontology.Customer.list();
+  // @ts-expect-error create generates the id; an explicit id goes through put(id, input)
+  frontal.ontology.Customer.create("x", {
+    email: "a@example.com",
+    status: "active",
+  });
 
   // @ts-expect-error unknown entity
   frontal.ontology.Ghost.get("1");

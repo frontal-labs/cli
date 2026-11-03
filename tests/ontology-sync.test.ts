@@ -13,7 +13,6 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CliError } from "@/errors/cli-error.js";
-import { collectPages, type PageSource } from "@/lib/ontology/paging.js";
 import {
   checkOntology,
   type ObjectTypeSource,
@@ -22,27 +21,26 @@ import {
   syncOntology,
 } from "@/lib/ontology/sync.js";
 import { type Writer, writeFileAtomic } from "@/lib/ontology/write.js";
+import { objectType } from "./support/object-types.js";
 
-const COMPANY = {
+const COMPANY = objectType("Company", {
   fields: { name: { required: true, type: "string" } },
-  name: "Company",
   version: 1,
-};
+});
 
-const CUSTOMER = {
+const CUSTOMER = objectType("Customer", {
   fields: {
     email: { required: true, type: "string" },
     status: { enum: ["active", "closed"], required: true, type: "enum" },
   },
-  name: "Customer",
   relationships: { company: { targetEntity: "Company", type: "belongsTo" } },
   version: 3,
-};
+});
 
 const FROZEN_MTIME = new Date("2000-01-01T00:00:00Z");
 
 const ERR_MALFORMED_NAMED =
-  /Object type #1 \("Company"\) is malformed at fields\.name\.type/;
+  /Object type #1 \("Company"\) is malformed at schema\.fields\.name\.type/;
 const ERR_NO_SNAPSHOT = /ontology\.json not found/;
 const ERR_HASH = /does not match its schemaHash/;
 
@@ -84,15 +82,6 @@ function mtimesOf(): Record<string, number> {
   return Object.fromEntries(
     listFrontal().map((name) => [name, statSync(pathOf(name)).mtimeMs])
   );
-}
-
-/** A page source with a fixed envelope and a controllable next page. */
-function page(
-  data: unknown[],
-  hasMore: boolean,
-  nextPage: () => Promise<PageSource | null> = () => Promise.resolve(null)
-): PageSource {
-  return { data, nextPage, pagination: { hasMore } };
 }
 
 describe("syncOntology", () => {
@@ -173,8 +162,11 @@ describe("syncOntology", () => {
         COMPANY,
         {
           ...CUSTOMER,
-          relationships: {
-            orders: { targetEntity: "Company", type: "hasMany" },
+          schema: {
+            ...CUSTOMER.schema,
+            relationships: {
+              orders: { targetEntity: "Company", type: "hasMany" },
+            },
           },
         },
       ])
@@ -185,7 +177,7 @@ describe("syncOntology", () => {
   });
 
   it("names the object type and field when a record is malformed, and writes nothing", async () => {
-    const bad = { fields: { name: { type: "nope" } }, name: "Company" };
+    const bad = objectType("Company", { fields: { name: { type: "nope" } } });
 
     const err = await syncOntology(context, sourceOf([bad])).catch(
       (e: unknown) => e
@@ -235,56 +227,6 @@ describe("syncOntology", () => {
   });
 });
 
-describe("collectPages", () => {
-  it("reads every page in order across two pages", async () => {
-    const second = page([CUSTOMER], false);
-    const first = page([COMPANY], true, () => Promise.resolve(second));
-
-    await expect(collectPages(first)).resolves.toEqual([COMPANY, CUSTOMER]);
-  });
-
-  it("fails with no partial result when a later page cannot be read", async () => {
-    const first = page([COMPANY], true, () =>
-      Promise.reject(new Error("socket hang up"))
-    );
-
-    const err = await collectPages(first).catch((e: unknown) => e);
-
-    expect(err).toBeInstanceOf(CliError);
-    expect((err as CliError).code).toBe("ONTOLOGY_PAGE_FAILED");
-    expect((err as CliError).message).toContain(
-      "Could not read object-type page 2. No files were written."
-    );
-  });
-
-  it("fails when hasMore is true but no next page is returned", async () => {
-    const first = page([COMPANY], true, () => Promise.resolve(null));
-    await expect(collectPages(first)).rejects.toMatchObject({
-      code: "ONTOLOGY_MALFORMED",
-    });
-  });
-
-  it("rejects a page whose envelope is malformed", async () => {
-    const broken = {
-      data: "not-an-array",
-      nextPage: () => Promise.resolve(null),
-      pagination: {},
-    } as unknown as PageSource;
-    await expect(collectPages(broken)).rejects.toMatchObject({
-      code: "ONTOLOGY_MALFORMED",
-    });
-  });
-
-  it("stops at the page limit so a server that never ends the list cannot loop", async () => {
-    const endless: PageSource = page([COMPANY], true, () =>
-      Promise.resolve(endless)
-    );
-    await expect(collectPages(endless, 3)).rejects.toMatchObject({
-      code: "ONTOLOGY_PAGE_LIMIT",
-    });
-  });
-});
-
 describe("checkOntology", () => {
   it("reports no stale files for a freshly synced project", async () => {
     await syncOntology(context, sourceOf([COMPANY, CUSTOMER]));
@@ -324,7 +266,7 @@ describe("checkOntology", () => {
     const doc = JSON.parse(readFileSync(pathOf("ontology.json"), "utf-8")) as {
       objectTypes: unknown[];
     };
-    doc.objectTypes.push({ fields: {}, name: "Injected" });
+    doc.objectTypes.push(objectType("Injected", { fields: {} }));
     writeFileSync(pathOf("ontology.json"), JSON.stringify(doc));
     expect(() => checkOntology(context)).toThrow(ERR_HASH);
   });

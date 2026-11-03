@@ -57,6 +57,8 @@ export interface NormalizedRelation {
 export interface NormalizedEntity {
   fields: NormalizedField[];
   name: string;
+  /** Backend id of the object type; the object endpoints address records by it. */
+  objectTypeId: string;
   relations: NormalizedRelation[];
   /** Backend `version` of the object type, or null when absent. */
   version: number | null;

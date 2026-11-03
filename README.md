@@ -187,7 +187,8 @@ frontal rollback                                  # previous production artifact
 
 `frontal sync` downloads your Frontal ontology and writes typed SDK files into `.frontal/`.
 Commit that directory; `frontal sync --check` verifies it offline in CI. Full reference:
-[docs/ontology.md](docs/ontology.md).
+[docs/ontology.md](docs/ontology.md). The backend contract is in
+[docs/backend-spec/ontology-openapi.yaml](docs/backend-spec/ontology-openapi.yaml).
 
 ```sh
 frontal sync          # download the ontology and regenerate .frontal/

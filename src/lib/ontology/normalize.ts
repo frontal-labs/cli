@@ -1,7 +1,7 @@
 import {
-  objectTypeSchema,
+  objectTypeRecordSchema,
   type RawField,
-  type RawObjectType,
+  type RawObjectTypeRecord,
   type RawRelation,
 } from "@/lib/ontology/backend.js";
 import {
@@ -50,9 +50,12 @@ function sortedEntries<T>(record: Record<string, T>): [string, T][] {
   return Object.entries(record).sort(([a], [b]) => compareStrings(a, b));
 }
 
-/** Parses one raw record, naming the object type and the failing path in the error. */
-function parseObjectType(raw: unknown, index: number): RawObjectType {
-  const result = objectTypeSchema.safeParse(raw);
+/**
+ * Parses one raw object-type record, naming the object type and the failing
+ * path (for example `schema.fields.name.type`) in the error.
+ */
+function parseObjectType(raw: unknown, index: number): RawObjectTypeRecord {
+  const result = objectTypeRecordSchema.safeParse(raw);
   if (result.success) {
     return result.data;
   }
@@ -99,6 +102,19 @@ function assertEntityNames(names: readonly string[]): void {
       );
     }
     aliases.set(alias, name);
+  }
+}
+
+/** Object-type ids name the backend records, so each must appear once. */
+function assertObjectTypeIds(records: readonly RawObjectTypeRecord[]): void {
+  const seen = new Set<string>();
+  for (const record of records) {
+    if (seen.has(record.object_type_id)) {
+      throw invalidOntology(
+        `Object type id "${record.object_type_id}" (${record.name}) is returned more than once.`
+      );
+    }
+    seen.add(record.object_type_id);
   }
 }
 
@@ -308,44 +324,51 @@ function assertDistinctMembers(
 }
 
 /**
- * Validates raw object types and reduces them to the model the renderers use.
- * Entities, fields and relations are sorted by name, so the output does not
- * depend on the order the backend returned them in. Throws `ONTOLOGY_INVALID`
- * (and never writes anything) on the first rule violation.
+ * Validates raw object-type records and reduces them to the model the
+ * renderers use. The entity name and object-type id come from the record; the
+ * fields, relationships and version come from its `schema`. Entities, fields
+ * and relations are sorted by name, so the output does not depend on the order
+ * the backend returned them in. Throws `ONTOLOGY_INVALID` (and never writes
+ * anything) on the first rule violation.
  */
 export function normalizeOntology(
   rawObjectTypes: readonly unknown[]
 ): NormalizedOntology {
-  const parsed = rawObjectTypes.map((raw, index) => ({
-    index,
-    type: parseObjectType(raw, index),
-  }));
-  const names = parsed.map(({ type }) => type.name);
+  const records = rawObjectTypes.map((raw, index) =>
+    parseObjectType(raw, index)
+  );
+  const names = records.map((record) => record.name);
   assertEntityNames(names);
+  assertObjectTypeIds(records);
 
   const targets = new Set(names);
   const enumOwners = new Map<string, string>();
   const warnings: string[] = [];
-  const entities: NormalizedEntity[] = parsed
-    .map(({ type }) => type)
+  const entities: NormalizedEntity[] = records
     .sort((a, b) => compareStrings(a.name, b.name))
-    .map((type) => {
-      const fields = normalizeFields(type.name, type.fields, enumOwners);
+    .map((record) => {
+      const definition = record.schema;
+      const fields = normalizeFields(
+        record.name,
+        definition.fields,
+        enumOwners
+      );
       const relations = normalizeRelations(
-        type.name,
-        type.relationships,
+        record.name,
+        definition.relationships,
         fields,
         targets,
         warnings
       );
-      assertDistinctMembers(type.name, fields, relations);
+      assertDistinctMembers(record.name, fields, relations);
       fields.sort((a, b) => compareStrings(a.name, b.name));
       relations.sort((a, b) => compareStrings(a.name, b.name));
       return {
         fields,
-        name: type.name,
+        name: record.name,
+        objectTypeId: record.object_type_id,
         relations,
-        version: type.version ?? null,
+        version: definition.version ?? null,
       };
     });
 

@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { lastJson, mockApi, runCli } from "./helpers/cli.js";
+import { objectType } from "./support/object-types.js";
 
 // Generated headers carry the generator version; pin it so fixtures stay stable.
 vi.mock("@/version.js", () => ({ VERSION: "0.1.2" }));
@@ -48,9 +49,10 @@ function configOnlyProject(): void {
   );
 }
 
+/** The object-type list is an unpaged array (docs/backend-spec). */
 function objectTypesRoute(data: unknown[] = OBJECT_TYPES) {
   return {
-    body: { data, pagination: { cursor: "end", hasMore: false } },
+    body: data,
     method: "GET",
     path: "/ontology/objects/object-types",
   };
@@ -165,7 +167,7 @@ describe("frontal sync", () => {
     configOnlyProject();
     await mockApi([
       objectTypesRoute([
-        { fields: { email: { type: "bogus" } }, name: "Customer" },
+        objectType("Customer", { fields: { email: { type: "bogus" } } }),
       ]),
     ]);
 

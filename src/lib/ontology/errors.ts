@@ -8,8 +8,7 @@ export const ONTOLOGY_ERROR_CODES = {
   malformed: "ONTOLOGY_MALFORMED",
   missing: "ONTOLOGY_MISSING",
   outOfDate: "ONTOLOGY_OUT_OF_DATE",
-  pageFailed: "ONTOLOGY_PAGE_FAILED",
-  pageLimit: "ONTOLOGY_PAGE_LIMIT",
+  unauthorized: "ONTOLOGY_UNAUTHORIZED",
 } as const;
 
 /** Why a generated file is considered stale by `sync --check`. */
@@ -78,28 +77,26 @@ export function outOfDate(stale: StaleFile[]): CliError {
   );
 }
 
-/** A page after the first could not be read. Nothing has been written yet. */
-export function pageFailed(page: number, cause: unknown): CliError {
+/**
+ * Frontal rejected the credentials. The backend's error body is not parsed
+ * here (the SDK's parser does not read the spec's `{ detail }` shape), so the
+ * message is written from the status alone.
+ */
+export function unauthorized(cause: unknown): CliError {
   return new CliError(
-    ONTOLOGY_ERROR_CODES.pageFailed,
-    `Could not read object-type page ${page}. No files were written.`,
+    ONTOLOGY_ERROR_CODES.unauthorized,
+    "Frontal rejected the API key (401 Unauthorized).",
     {
       cause,
-      exitCode: EXIT_CODES.NETWORK_ERROR,
-      fix: "Retry `frontal sync`. Local files are unchanged.",
+      exitCode: EXIT_CODES.AUTH_ERROR,
+      fix: "Check FRONTAL_API_KEY, --api-key or your profile, then run `frontal auth whoami`.",
     }
   );
 }
 
-export function pageLimit(maxPages: number): CliError {
-  return new CliError(
-    ONTOLOGY_ERROR_CODES.pageLimit,
-    `The object-type list has more than ${maxPages} pages.`,
-    {
-      exitCode: EXIT_CODES.GENERAL_ERROR,
-      fix: "Report this to Frontal: the ontology is larger than the CLI can sync.",
-    }
-  );
+/** True for an SDK error that carries an HTTP 401 status. */
+export function isUnauthorizedError(err: unknown): boolean {
+  return err instanceof Error && "statusCode" in err && err.statusCode === 401;
 }
 
 /** Names a file in a user-facing message: `.frontal/<name>`. */

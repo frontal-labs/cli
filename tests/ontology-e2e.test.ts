@@ -11,7 +11,9 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { GENERATOR_VERSION } from "@/lib/ontology/constants.js";
 import { syncOntology } from "@/lib/ontology/sync.js";
+import { objectType } from "./support/object-types.js";
 
 /**
  * End-to-end: a consumer project compiled against the real SDK source.
@@ -154,17 +156,17 @@ describe.skipIf(!SDK_AVAILABLE)(
           mkdirSync(frontalDir, { recursive: true });
 
           const v1 = [
-            {
+            objectType("Customer", {
               fields: {
                 email: { required: true, type: "string" },
                 legacyCode: { type: "string" },
               },
-              name: "Customer",
               version: 1,
-            },
+            }),
           ];
-          await syncOntology({ frontalDir, generatorVersion: "0.1.2" }, () =>
-            Promise.resolve(v1)
+          await syncOntology(
+            { frontalDir, generatorVersion: GENERATOR_VERSION },
+            () => Promise.resolve(v1)
           );
           writeApp(
             dir,
@@ -184,17 +186,17 @@ describe.skipIf(!SDK_AVAILABLE)(
 
           // Ontology changes in Frontal Studio: legacyCode removed, tier added as required.
           const v2 = [
-            {
+            objectType("Customer", {
               fields: {
                 email: { required: true, type: "string" },
                 tier: { enum: ["gold", "basic"], required: true, type: "enum" },
               },
-              name: "Customer",
               version: 2,
-            },
+            }),
           ];
-          await syncOntology({ frontalDir, generatorVersion: "0.1.2" }, () =>
-            Promise.resolve(v2)
+          await syncOntology(
+            { frontalDir, generatorVersion: GENERATOR_VERSION },
+            () => Promise.resolve(v2)
           );
 
           const after = compile(dir);

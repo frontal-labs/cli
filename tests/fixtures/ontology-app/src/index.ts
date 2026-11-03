@@ -28,6 +28,8 @@ export async function run(): Promise<void> {
     status: "closed",
   });
   await frontal.ontology.Customer.update(created.id, { score: 3 });
+  const everyone: { id: string }[] = await frontal.ontology.Customer.list();
+  console.log(everyone.length);
   await frontal.ontology.Customer.delete(created.id);
 
   const legacy = await frontal.ontology["legacy-account"].get("L-1");

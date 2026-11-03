@@ -88,6 +88,10 @@ export function renderRuntimeConst(model: NormalizedOntology): string {
   const entityNames = model.entities.map((entity) =>
     JSON.stringify(entity.name)
   );
+  const objectTypeIds = model.entities.map((entity): [string, string] => [
+    propertyKey(entity.name),
+    JSON.stringify(entity.objectTypeId),
+  ]);
   const fields = model.entities.map((entity): [string, string] => [
     propertyKey(entity.name),
     renderObjectLiteral(readFieldEntries(entity), "    "),
@@ -104,6 +108,7 @@ export function renderRuntimeConst(model: NormalizedOntology): string {
   return [
     "const runtime = {",
     `  entities: [${entityNames.join(", ")}],`,
+    `  objectTypeIds: ${renderObjectLiteral(objectTypeIds, "  ")},`,
     `  fields: ${renderObjectLiteral(fields, "  ")},`,
     `  writable: ${renderObjectLiteral(writable, "  ")},`,
     `  relations: ${renderObjectLiteral(relations, "  ")},`,

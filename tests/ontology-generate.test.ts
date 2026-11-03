@@ -3,6 +3,7 @@ import { buildDocument, renderDocument } from "@/lib/ontology/document.js";
 import { generateFiles } from "@/lib/ontology/generate.js";
 import { normalizeOntology } from "@/lib/ontology/normalize.js";
 import { renderHeader } from "@/lib/ontology/render/header.js";
+import { objectType } from "./support/object-types.js";
 
 const META = {
   generatorVersion: "0.1.2",
@@ -28,16 +29,15 @@ function section(block: string, name: string): string {
   return block.slice(start, end);
 }
 
-const COMPANY = {
+const COMPANY = objectType("Company", {
   fields: {
     industry: { enum: ["software", "retail"], type: "enum" },
     name: { required: true, type: "string" },
   },
-  name: "Company",
   version: 1,
-};
+});
 
-const CUSTOMER = {
+const CUSTOMER = objectType("Customer", {
   fields: {
     age: { type: "integer" },
     createdAt: { auto: true, required: true, type: "timestamp" },
@@ -47,10 +47,9 @@ const CUSTOMER = {
     status: { enum: ["active", "closed"], required: true, type: "enum" },
     tags: { items: "string", type: "array" },
   },
-  name: "Customer",
   relationships: { company: { targetEntity: "Company", type: "belongsTo" } },
   version: 3,
-};
+});
 
 describe("header", () => {
   it("is the same three lines at the top of every generated TypeScript file", () => {
@@ -128,10 +127,9 @@ describe("ontology.d.ts", () => {
 
   it("quotes entity and field names that are not identifiers", () => {
     const { types } = render([
-      {
+      objectType("legacy-account", {
         fields: { "external-ref": { type: "string" } },
-        name: "legacy-account",
-      },
+      }),
     ]);
     expect(types).toContain(`"legacy-account": {`);
     expect(types).toContain(`"external-ref"?: string | null;`);
@@ -159,6 +157,10 @@ describe("client.ts runtime metadata", () => {
       [
         "const runtime = {",
         '  entities: ["Company", "Customer"],',
+        "  objectTypeIds: {",
+        '    Company: "ot_company",',
+        '    Customer: "ot_customer",',
+        "  },",
         "  fields: {",
         "    Company: {",
         '      id: { kind: "string", required: true },',
@@ -193,7 +195,7 @@ describe("client.ts runtime metadata", () => {
   });
 
   it("lists every entity in every section, even when empty", () => {
-    const { client } = render([{ fields: {}, name: "Empty" }]);
+    const { client } = render([objectType("Empty", { fields: {} })]);
     expect(client).toContain('entities: ["Empty"],');
     expect(client).toContain(
       '  fields: {\n    Empty: {\n      id: { kind: "string", required: true },\n    },\n  },'
@@ -226,11 +228,17 @@ describe("determinism", () => {
 
   it("produces the same snapshot document regardless of key order inside a record", () => {
     const a = renderDocument(buildDocument([COMPANY, CUSTOMER]));
+    // Same record with its keys written in a different order.
     const reordered = {
-      fields: CUSTOMER.fields,
       name: CUSTOMER.name,
-      relationships: CUSTOMER.relationships,
-      version: CUSTOMER.version,
+      object_type_id: CUSTOMER.object_type_id,
+      schema: {
+        fields: CUSTOMER.schema.fields,
+        relationships: {
+          company: { targetEntity: "Company", type: "belongsTo" },
+        },
+        version: 3,
+      },
     };
     const b = renderDocument(buildDocument([COMPANY, reordered]));
     expect(b).toBe(a);

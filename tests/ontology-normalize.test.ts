@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CliError } from "@/errors/cli-error.js";
 import { normalizeOntology } from "@/lib/ontology/normalize.js";
+import { objectType } from "./support/object-types.js";
 
 const ERR_PROTO_FK =
   /"Customer\.__proto__" is a reserved JavaScript property name/;
@@ -13,7 +14,8 @@ const ERR = {
   entityClash: /both map to the type name "MyCustomer"/,
   enumClash: /both map to the type name "ABC"/,
   fieldClash: /has the same name as a field/,
-  malformed: /Object type #2 \("Company"\) is malformed at fields\.name\.type/,
+  malformed:
+    /Object type #2 \("Company"\) is malformed at schema\.fields\.name\.type/,
   reservedEntity: /collides with the SDK namespace ontology\.objects/,
   reservedMember: /uses the reserved member name "id"/,
   unknownTarget: /targets unknown entity "Ghost"/,
@@ -21,13 +23,13 @@ const ERR = {
   unsafeField: /"Customer\.constructor" is a reserved JavaScript property name/,
 } as const;
 
-/** Minimal object type. */
+/** Minimal object type: `extra` (relationships, version) goes into its schema. */
 function entity(
   name: string,
   fields: Record<string, unknown> = {},
   extra: Record<string, unknown> = {}
 ): Record<string, unknown> {
-  return { fields, name, ...extra };
+  return objectType(name, { fields, ...extra });
 }
 
 function expectInvalid(raw: unknown[], pattern: RegExp): void {
