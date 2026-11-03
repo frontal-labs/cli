@@ -149,7 +149,7 @@ frontal deploy --prod --yes
 frontal rollback                                  # previous production artifact (+ agents listed in frontal.jsonc)
 ```
 
-## Project configuration: `frontal.jsonc`
+## Project configuration: `.frontal/config.jsonc`
 
 ```jsonc
 {
@@ -175,10 +175,25 @@ frontal rollback                                  # previous production artifact
   (`agents, ai, audit, auth, billing, blob, connectors, data, datasets, events, governance,
   graph, integrations, lineage, observability, ontology, pipelines, sandbox, schedules,
   webhooks, workers, workflows`).
-- Per-environment overlays: `frontal.staging.jsonc` is deep-merged over `frontal.jsonc`
+- The config lives in `.frontal/config.jsonc`. A root `frontal.jsonc` is still read when no
+  `.frontal/config.jsonc` exists, so older projects keep working; `frontal init` writes the new
+  location.
+- Per-environment overlays: `.frontal/config.staging.jsonc` is deep-merged over the base config
   when you pass `--env staging` (or when `env` is set to `staging`).
 - Connection rules (`apiUrl`, optional `sdk.timeout/maxRetries/retryDelay/headers`) are
   validated with the SDK's own schema.
+
+## Typed ontology: `frontal sync`
+
+`frontal sync` downloads your Frontal ontology and writes typed SDK files into `.frontal/`.
+Commit that directory; `frontal sync --check` verifies it offline in CI. Full reference:
+[docs/ontology.md](docs/ontology.md).
+
+```sh
+frontal sync          # download the ontology and regenerate .frontal/
+frontal sync --check  # offline: fail if committed generated files are stale
+frontal status        # compare the committed snapshot with Frontal
+```
 
 ## Authentication
 
