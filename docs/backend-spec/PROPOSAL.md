@@ -1,8 +1,16 @@
 # Proposed backend additions (for the ontology service owners)
 
-Status: **proposal, not implemented.** The spec in this folder (`ontology-openapi.yaml`) does not
-contain these. The SDK and CLI do not call them. They are listed here because two capabilities are
-blocked without them. Each proposal below is additive, so existing clients keep working.
+Status: the four additions are **implemented in the spec-based mock backend**
+(`tests/support/mock-ontology-backend.ts`) and specified in `CONTRACT-v2.md`. They are **not implemented
+in the production ontology service**, which still needs its owners. The production spec
+(`ontology-openapi.yaml`) does not contain them. Each addition is additive, so existing clients keep working.
+
+| Item | Mock | Production |
+|---|---|---|
+| 1. Conditional write (`ETag`, `If-Match`) | implemented | not implemented |
+| 2. Structured query with cursor paging | implemented | not implemented |
+| 3. Typed object-type schema | implemented (validated on write) | not implemented |
+| 4. Error `code` field | implemented on the new errors | not implemented |
 
 ## 1. Conditional write for atomic `update`
 

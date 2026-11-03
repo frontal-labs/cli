@@ -86,11 +86,19 @@ function newProject(): string {
  * mock server runs in this process, so a blocking spawn would starve it.
  * Only the variables below reach the child.
  */
-function frontal(
-  cwd: string,
-  args: string[],
-  token: string = mock.token
-): Promise<CliRun> {
+/**
+ * Bun intermittently hangs while loading `zod` in a freshly spawned process
+ * (about 1 run in 25 here, before any CLI code runs, and it reproduces on older
+ * commits). A child that is silent for this long is killed and started once more.
+ */
+const SILENT_START_MS = 30_000;
+
+interface Attempt {
+  run: CliRun;
+  silentHang: boolean;
+}
+
+function runOnce(cwd: string, args: string[], token: string): Promise<Attempt> {
   const options: SpawnOptions = {
     cwd,
     env: {
@@ -106,6 +114,13 @@ function frontal(
     const child = spawn("bun", [CLI_ENTRY, ...args], options);
     let stdout = "";
     let stderr = "";
+    let silentHang = false;
+    const watchdog = setTimeout(() => {
+      if (stdout === "" && stderr === "") {
+        silentHang = true;
+        child.kill("SIGKILL");
+      }
+    }, SILENT_START_MS);
     const timer = setTimeout(() => child.kill("SIGKILL"), LIVE_TIMEOUT_MS);
     child.stdout?.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf-8");
@@ -115,13 +130,36 @@ function frontal(
     });
     child.on("error", (err) => {
       clearTimeout(timer);
+      clearTimeout(watchdog);
       reject(err);
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolveRun({ exitCode: code ?? -1, stderr, stdout });
+      clearTimeout(watchdog);
+      resolveRun({
+        run: { exitCode: code ?? -1, stderr, stdout },
+        silentHang,
+      });
     });
   });
+}
+
+/**
+ * Runs `frontal <args>` in `cwd` against the mock. Asynchronous on purpose: the
+ * mock server runs in this process, so a blocking spawn would starve it.
+ * Only the variables below reach the child.
+ */
+async function frontal(
+  cwd: string,
+  args: string[],
+  token: string = mock.token
+): Promise<CliRun> {
+  const first = await runOnce(cwd, args, token);
+  if (!first.silentHang) {
+    return first.run;
+  }
+  const second = await runOnce(cwd, args, token);
+  return second.run;
 }
 
 const frontalDir = (project: string): string => join(project, ".frontal");

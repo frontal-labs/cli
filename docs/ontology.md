@@ -229,8 +229,21 @@ requests the object endpoints with key preservation.
 ## Mock backend and mock auth
 
 `tests/support/mock-ontology-backend.ts` is an in-memory server for the endpoints above. It speaks the
-spec's wire format (snake_case JSON, unpaged lists, `{ detail }` errors). It is a test double, not a
-Frontal service.
+spec's wire format (snake_case JSON, unpaged lists, `{ detail }` errors) and implements the proposed
+v2 additions in `docs/backend-spec/CONTRACT-v2.md`: revisions with `ETag` and `If-Match`, the structured
+query with cursor paging, typed object-type schemas, and `code` on the new errors. It is a test double,
+not a Frontal service. The production service does not implement the v2 additions yet.
+
+Rules the mock enforces, each covered by `tests/mock-backend-contract.test.ts`:
+
+- Revisions start at 1 and increase on every write. A deleted and recreated object continues from its
+  last revision.
+- `If-Match` with a matching revision or `*` writes; a mismatch or malformed value returns `412
+  PRECONDITION_FAILED` with `current_revision`; a missing object returns `404 NOT_FOUND`.
+- `POST /ontology/objects/objects/query` filters by the operators each field type allows. Conditions are
+  ANDed. Pages are ordered by `object_id` and use an opaque cursor bound to the object type.
+- Object-type `schema` is validated on write (`INVALID_SCHEMA`): known field types, enum values,
+  `items` only on arrays, and relationship targets that name an object type in the ontology.
 
 - **Auth is mocked.** A request must carry `Authorization: Bearer <token>` or `x-api-key: <token>`,
   matching the configured token. The default is `frt_mock_0123456789`; the SDK requires keys to start
