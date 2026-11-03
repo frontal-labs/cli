@@ -2,11 +2,10 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ONTOLOGY_FILES } from "@/lib/ontology/constants.js";
+import { GENERATOR_VERSION, ONTOLOGY_FILES } from "@/lib/ontology/constants.js";
 import { checkOntology, syncOntology } from "@/lib/ontology/sync.js";
 
 const FIXTURE = join(import.meta.dirname, "fixtures", "ontology-app");
-const FROZEN_VERSION = "0.1.2";
 
 let scratch: string | undefined;
 
@@ -25,7 +24,7 @@ describe("ontology-app fixture", () => {
     ) as unknown[];
 
     await syncOntology(
-      { frontalDir: scratch, generatorVersion: FROZEN_VERSION },
+      { frontalDir: scratch, generatorVersion: GENERATOR_VERSION },
       () => Promise.resolve(raw)
     );
 
@@ -39,7 +38,7 @@ describe("ontology-app fixture", () => {
   it("passes frontal sync --check", () => {
     const outcome = checkOntology({
       frontalDir: join(FIXTURE, ".frontal"),
-      generatorVersion: FROZEN_VERSION,
+      generatorVersion: GENERATOR_VERSION,
     });
     expect(outcome.stale).toEqual([]);
   });

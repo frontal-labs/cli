@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { Command } from "commander";
 import { type CommandContext, runAction } from "@/lib/command.js";
 import { loadProjectConfig } from "@/lib/config.js";
+import { GENERATOR_VERSION } from "@/lib/ontology/constants.js";
 import { outOfDate } from "@/lib/ontology/errors.js";
 import { fetchObjectTypes } from "@/lib/ontology/remote.js";
 import {
@@ -18,7 +19,6 @@ import { withExamples } from "@/lib/output.js";
 import { PROJECT_STATE_DIR } from "@/lib/project.js";
 import type { SdkHandle } from "@/lib/sdk.js";
 import { theme } from "@/output/theme.js";
-import { VERSION } from "@/version.js";
 
 /** Project facts every ontology command reports. */
 interface ProjectInfo {
@@ -32,7 +32,7 @@ async function projectInfo(ctx: CommandContext): Promise<ProjectInfo> {
   return {
     context: {
       frontalDir: join(project.root, PROJECT_STATE_DIR),
-      generatorVersion: VERSION,
+      generatorVersion: GENERATOR_VERSION,
     },
     environment: project.config.env,
     name: project.config.name,

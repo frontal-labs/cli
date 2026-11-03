@@ -1,6 +1,14 @@
 /** Version of the committed `.frontal/` contract. Bump when generated output changes shape. */
 export const CONTRACT_VERSION = 1 as const;
 
+/**
+ * Version of the generator's output, written into every generated header and
+ * `version.json`. It is independent of the CLI release: it changes only when
+ * the generated files change, so upgrading the CLI does not make committed
+ * files look stale. Bump it whenever generator output changes.
+ */
+export const GENERATOR_VERSION = "1.0.0" as const;
+
 /** Format tag written into `ontology.json`. */
 export const ONTOLOGY_FORMAT = "frontal.ontology/v1" as const;
 
