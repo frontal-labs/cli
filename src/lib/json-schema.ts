@@ -1,11 +1,6 @@
 import { z } from "zod";
 import { getProjectConfigSchema } from "@/lib/config.js";
-import {
-  ENV_NAMES,
-  PROJECT_CONFIG_FILE,
-  PROJECT_SCHEMA_URL,
-  SERVICE_KEYS,
-} from "@/lib/project.js";
+import { ENV_NAMES, PROJECT_SCHEMA_URL, SERVICE_KEYS } from "@/lib/project.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -17,7 +12,7 @@ const PROPERTY_DOCS: Record<string, string> = {
     "Frontal API base URL. Environment variables and flags take precedence (FRONTAL_API_URL, --api-url).",
   entry:
     "Entry file bundled by `frontal deploy` (Bun.build, ESM). Defaults to src/index.ts.",
-  env: `Default environment. Overridden per command with --env; selects the frontal.<env>.jsonc overlay. One of: ${ENV_NAMES.join(", ")}.`,
+  env: `Default environment. Overridden per command with --env; selects the config.<env>.jsonc overlay. One of: ${ENV_NAMES.join(", ")}.`,
   name: "Project name: lowercase letters, digits and dashes. Also the worker name used by `frontal deploy`.",
   sdk: "Optional overrides forwarded to the @frontal-labs/sdk client.",
   secrets:
@@ -90,7 +85,8 @@ export async function buildFrontalJsonSchema(): Promise<JsonObject> {
   return {
     $id: PROJECT_SCHEMA_URL,
     $schema: draft,
-    description: `Schema for ${PROJECT_CONFIG_FILE} (JSON with comments and trailing commas). Environment overlays use the same shape in frontal.<env>.jsonc.`,
+    description:
+      "Schema for .frontal/config.jsonc (JSON with comments and trailing commas). Environment overlays use the same shape in .frontal/config.<env>.jsonc.",
     title: "Frontal project configuration",
     ...rest,
     examples: [

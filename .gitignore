@@ -100,8 +100,6 @@ jspm_packages/
 
 # Frontal CLI specific
 .frontal/
-# Test fixture: committed generated ontology files
-!tests/fixtures/ontology-app/.frontal/
 *.frt
 
 # skills CLI local state (root skills/ is the tracked source of truth)

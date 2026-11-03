@@ -8,7 +8,9 @@
     "skipLibCheck": true,
     "noUnusedLocals": false,
     "paths": {
-      "@frontal-labs/sdk": ["../../../../sdk-typescript/packages/sdk/src/index.ts"]
+      "@frontal-labs/sdk": [
+        "../../../../sdk-typescript/packages/sdk/src/index.ts"
+      ]
     }
   },
   "include": ["src/**/*.ts", ".frontal/**/*.ts"]

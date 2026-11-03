@@ -5,6 +5,7 @@ import { DEFAULT_BASE_URL } from "@/config/resolve.js";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { runAction } from "@/lib/command.js";
+import { SDK_MIN_VERSION } from "@/lib/ontology/generate.js";
 import { withExamples } from "@/lib/output.js";
 import {
   LEGACY_PROJECT_CONFIG_FILE,
@@ -65,7 +66,7 @@ FRONTAL_API_URL=${DEFAULT_BASE_URL}
 function renderPackageJson(name: string): string {
   return `${JSON.stringify(
     {
-      dependencies: { "@frontal-labs/sdk": "^1.0.4" },
+      dependencies: { "@frontal-labs/sdk": `^${SDK_MIN_VERSION}` },
       devDependencies: { "frontal-cli": `^${VERSION}` },
       name,
       private: true,

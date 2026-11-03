@@ -60,7 +60,7 @@ describe("initProject", () => {
     expect(
       JSON.parse(readFileSync(join(result.dir, "package.json"), "utf-8"))
     ).toMatchObject({
-      dependencies: { "@frontal-labs/sdk": "^1.0.4" },
+      dependencies: { "@frontal-labs/sdk": "^2.1.0" },
       name: "my-app",
     });
   });

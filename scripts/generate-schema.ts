@@ -6,6 +6,7 @@
  *
  * Usage: bun scripts/generate-schema.ts [--check]
  */
+import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +16,15 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outFile = join(root, "schemas", "frontal.json");
 const check = process.argv.includes("--check");
 
-const content = `${JSON.stringify(await buildFrontalJsonSchema(), null, 2)}\n`;
+const raw = `${JSON.stringify(await buildFrontalJsonSchema(), null, 2)}\n`;
+// Format with the repo's Biome config so the committed file keeps repo style and
+// `--check` compares the exact bytes a regeneration would write.
+const biome = join(root, "node_modules", ".bin", "biome");
+const content = execFileSync(
+  biome,
+  ["format", "--stdin-file-path=schemas/frontal.json"],
+  { cwd: root, encoding: "utf-8", input: raw }
+);
 
 if (check) {
   let current = "";

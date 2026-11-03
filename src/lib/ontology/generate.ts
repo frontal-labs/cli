@@ -14,7 +14,12 @@ export const CONTRACT_VERSION = 1;
  * a type argument and runtime metadata).
  * ASSUMPTION: the first SDK release with that factory is 2.x; update when known.
  */
-export const SDK_RANGE = ">=2.0.0 <3.0.0";
+/**
+ * First @frontal-labs/sdk release with the generic `createFrontalClient<T>`
+ * factory that generated clients import. Published 2.0.0 does not have it.
+ */
+export const SDK_MIN_VERSION = "2.1.0";
+export const SDK_RANGE = `>=${SDK_MIN_VERSION} <3.0.0`;
 
 export interface GenerateInput {
   generatorVersion: string;

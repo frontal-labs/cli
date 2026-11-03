@@ -7,5 +7,5 @@
   },
   "generatorVersion": "0.1.2",
   "schemaHash": "sha256:b6dd0fa1d00978df5c2b54edf686362953abe26c9ae51ae8adfec4fb3046928d",
-  "sdkRange": ">=2.0.0 <3.0.0"
+  "sdkRange": ">=2.1.0 <3.0.0"
 }

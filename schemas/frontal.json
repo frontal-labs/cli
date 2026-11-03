@@ -1,7 +1,7 @@
 {
   "$id": "https://frontal.dev/schemas/frontal.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Schema for .frontal/config.jsonc (JSON with comments and trailing commas). Environment overlays use the same shape in frontal.<env>.jsonc.",
+  "description": "Schema for .frontal/config.jsonc (JSON with comments and trailing commas). Environment overlays use the same shape in .frontal/config.<env>.jsonc.",
   "title": "Frontal project configuration",
   "type": "object",
   "properties": {
@@ -31,14 +31,10 @@
       "minLength": 1
     },
     "env": {
-      "description": "Default environment. Overridden per command with --env; selects the frontal.<env>.jsonc overlay. One of: dev, staging, prod.",
+      "description": "Default environment. Overridden per command with --env; selects the config.<env>.jsonc overlay. One of: dev, staging, prod.",
       "default": "dev",
       "type": "string",
-      "enum": [
-        "dev",
-        "staging",
-        "prod"
-      ]
+      "enum": ["dev", "staging", "prod"]
     },
     "name": {
       "description": "Project name: lowercase letters, digits and dashes. Also the worker name used by `frontal deploy`.",
@@ -82,17 +78,13 @@
     "secrets": {
       "description": "Secrets that must be present in the environment. Only the names live here; values are read from .env.local or the shell.",
       "default": {
-        "required": [
-          "FRONTAL_API_KEY"
-        ]
+        "required": ["FRONTAL_API_KEY"]
       },
       "type": "object",
       "properties": {
         "required": {
           "description": "Environment variable names that must be set.",
-          "default": [
-            "FRONTAL_API_KEY"
-          ],
+          "default": ["FRONTAL_API_KEY"],
           "type": "array",
           "items": {
             "type": "string",
@@ -158,9 +150,7 @@
       }
     }
   },
-  "required": [
-    "name"
-  ],
+  "required": ["name"],
   "additionalProperties": false,
   "examples": [
     {
@@ -169,9 +159,7 @@
       "env": "dev",
       "name": "my-app",
       "secrets": {
-        "required": [
-          "FRONTAL_API_KEY"
-        ]
+        "required": ["FRONTAL_API_KEY"]
       },
       "services": {
         "agents": {
