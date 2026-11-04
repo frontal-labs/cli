@@ -42,17 +42,26 @@ export interface NormalizedField {
   required: boolean;
 }
 
-/** Relations the generator can translate. Unsupported kinds never reach this type. */
-export interface NormalizedRelation {
-  /** Foreign key on the source record (declared, or `<name>Id`). */
-  foreignKey: string;
-  /** Relation kind. Only `belongsTo` is supported: the foreign key lives on the source record. */
-  kind: "belongsTo";
-  name: string;
-  /** True when the foreign key is not required on the source record. */
-  optional: boolean;
-  target: string;
-}
+/** A relation the generator can translate. Every kind produces an accessor. */
+export type NormalizedRelation =
+  | {
+      /** Foreign key on the source record (declared, or `<name>Id`). */
+      foreignKey: string;
+      kind: "belongsTo";
+      name: string;
+      /** True when the foreign key is not required on the source record. */
+      optional: boolean;
+      target: string;
+    }
+  | {
+      kind: "hasOne" | "hasMany" | "manyToMany";
+      name: string;
+      /** True only for `hasOne`: zero related objects resolve to `null`. */
+      optional: boolean;
+      /** Backend relationship type that the source's relationship instances carry. */
+      relationshipTypeId: string;
+      target: string;
+    };
 
 export interface NormalizedEntity {
   fields: NormalizedField[];
@@ -66,6 +75,6 @@ export interface NormalizedEntity {
 
 export interface NormalizedOntology {
   entities: NormalizedEntity[];
-  /** Non-fatal notes, such as relations the generator skips. */
+  /** Non-fatal notes for the author. Empty today: every relation kind is translated. */
   warnings: string[];
 }

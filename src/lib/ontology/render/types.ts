@@ -99,7 +99,7 @@ function relationMembers(entity: NormalizedEntity): Member[] {
   return entity.relations.map((relation) => ({
     key: propertyKey(relation.name),
     optional: false,
-    type: `{ target: ${JSON.stringify(relation.target)}; optional: ${relation.optional} }`,
+    type: `{ target: ${JSON.stringify(relation.target)}; cardinality: ${JSON.stringify(relation.kind)}; optional: ${relation.optional} }`,
   }));
 }
 

@@ -135,7 +135,7 @@ describe("frontal sync", () => {
     expect(result.exitCode).toBe(0);
     expect(text).toContain("created   .frontal/ontology.d.ts");
     expect(text).toContain("created   .frontal/ontology.json");
-    expect(text).toContain("warn      Skipped Customer.orders (hasMany)");
+    expect(text).not.toContain("Skipped ");
     expect(text).toContain("Next:");
   });
 

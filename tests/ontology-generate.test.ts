@@ -115,7 +115,7 @@ describe("ontology.d.ts", () => {
 
   it("types the belongsTo relation as a lazy accessor target", () => {
     expect(render([COMPANY, CUSTOMER]).types).toContain(
-      `company: { target: "Company"; optional: true };`
+      `company: { target: "Company"; cardinality: "belongsTo"; optional: true };`
     );
   });
 
@@ -186,7 +186,7 @@ describe("client.ts runtime metadata", () => {
         "  relations: {",
         "    Company: {},",
         "    Customer: {",
-        '      company: { target: "Company", foreignKey: "companyId", optional: true },',
+        '      company: { cardinality: "belongsTo", target: "Company", foreignKey: "companyId", optional: true },',
         "    },",
         "  },",
         "} as const;",

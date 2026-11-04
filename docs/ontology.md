@@ -79,7 +79,6 @@ created   .frontal/ontology.d.ts
 updated   .frontal/client.ts
 unchanged .frontal/version.json
 created   .frontal/ontology.json
-warn      Skipped Customer.orders (hasMany): no backend query exists yet.
 synced 5 entities (sha256:…)
 ```
 
@@ -137,8 +136,8 @@ For each entity, `ontology.d.ts` declares four shapes:
 - **`create`**: what `create` and `put` accept. Read-only fields (primary, `auto`, `computed`) are left
   out. A required field with no default must be supplied. A field with a default may be omitted.
 - **`update`**: a partial patch of writable fields. Required fields stay non-null even when patched.
-- **`relations`**: one entry per supported relation, typed as `{ target; optional }`. The SDK turns
-  each entry into a lazy accessor.
+- **`relations`**: one entry per relation, typed as `{ target; cardinality; optional }`. The SDK turns
+  each entry into a lazy accessor whose result depends on the cardinality (see Relations).
 
 Types map as follows:
 
@@ -202,13 +201,25 @@ const runtime = {
 
 ## Relations
 
-Only `belongsTo` is translated. The foreign key sits on the source record: the declared `foreignKey`,
-or `<relation>Id` when none is declared. An undeclared foreign key is added as an optional, writable
-`uuid` field.
+Every relation kind produces an accessor. Two resolution paths exist: `belongsTo` reads a foreign key
+from the source record, and the other kinds read relationship instances of a declared relationship type.
 
-`hasOne`, `hasMany` and `manyToMany` are skipped with a warning and get no accessor. The backend
-has no query that can reach the target side of those relations yet. Their target entities are still
-validated.
+| Kind | Declared in the object type | Accessor result | Resolution |
+|---|---|---|---|
+| `belongsTo` | `targetEntity`, optional `foreignKey` (default `<relation>Id`) | `Target \| null` when the foreign key is optional, `Target` otherwise | Reads the foreign key from `properties`, then fetches the target object |
+| `hasOne` | `targetEntity`, `relationshipTypeId` (required) | `Target \| null` | Lists relationship instances from the source, then fetches the target. More than one instance is an error |
+| `hasMany` | `targetEntity`, `relationshipTypeId` (required) | `Target[]` | Lists relationship instances from the source, then fetches each target |
+| `manyToMany` | `targetEntity`, `relationshipTypeId` (required) | `Target[]` | Same as `hasMany` |
+
+A `hasOne`, `hasMany` or `manyToMany` relation without a `relationshipTypeId` is an `ONTOLOGY_INVALID`
+error that names the entity and relation. A `relationshipTypeId` on a `belongsTo` relation is ignored.
+
+The generated `ontology.d.ts` types each relation as `{ target; cardinality; optional }`. `optional` is
+true for a `belongsTo` with an optional foreign key and for `hasOne`. The generated `client.ts` carries
+the matching runtime entry: `belongsTo` includes `foreignKey` and `optional`; the other kinds include
+`relationshipTypeId`.
+
+An undeclared `belongsTo` foreign key is added as an optional, writable `uuid` field.
 
 A relation may not share a name with a field, or be named `id`, because both live on the same record.
 
@@ -318,8 +329,10 @@ Backend capabilities the typed client does not use yet:
 
 - **No `query`.** The contract has no documented query body for objects (the knowledge-graph query
   takes a free-text `query` string). Filtering by field is not typed.
-- **No target-side relation queries.** `hasOne`, `hasMany` and `manyToMany` are skipped until the
-  backend can answer them.
+- **Relationship resolution needs contract v2.** `hasOne`, `hasMany` and `manyToMany` resolve through the
+  relationship endpoints and the `relationshipTypeId` field, which are specified in
+  `docs/backend-spec/CONTRACT-v2.md` (section 5). The production backend does not serve the `relationshipTypeId`
+  field yet; the mock does.
 - **`update` is not atomic.** It reads the object, merges the patch, and writes it back. A concurrent
   write between those requests can be lost.
 - **`create` lets the server assign the id.** It uses `POST /objects/objects`. `put(id, input)` writes an

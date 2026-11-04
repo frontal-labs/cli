@@ -35,13 +35,6 @@ const ARRAY_ITEM_TYPES: readonly ArrayItemType[] = [
   "boolean",
 ];
 
-/** Relation kinds the generator does not translate yet, and why. */
-const SKIPPED_RELATION_REASON = {
-  hasMany: "no backend query exists yet",
-  hasOne: "the backend has no target-side query yet",
-  manyToMany: "no backend query exists yet",
-} as const;
-
 function assertNever(value: never): never {
   throw new Error(`Unhandled ontology case: ${String(value)}`);
 }
@@ -261,15 +254,14 @@ function ensureField(fields: NormalizedField[], name: string): NormalizedField {
 
 /**
  * Normalizes one entity's relations. Each relation is checked against the
- * entity's fields so a relation can never shadow a stored value. Unsupported
- * kinds are reported as warnings and dropped.
+ * entity's fields so a relation can never shadow a stored value. Relation kinds
+ * that resolve through relationship instances need a relationship type id.
  */
 function normalizeRelations(
   entity: string,
   declared: Record<string, RawRelation>,
   fields: NormalizedField[],
-  targets: ReadonlySet<string>,
-  warnings: string[]
+  targets: ReadonlySet<string>
 ): NormalizedRelation[] {
   const relations: NormalizedRelation[] = [];
   for (const [name, relation] of sortedEntries(declared)) {
@@ -296,15 +288,39 @@ function normalizeRelations(
       case "hasOne":
       case "hasMany":
       case "manyToMany":
-        warnings.push(
-          `Skipped ${entity}.${name} (${relation.type}): ${SKIPPED_RELATION_REASON[relation.type]}.`
-        );
+        relations.push({
+          kind: relation.type,
+          name,
+          optional: relation.type === "hasOne",
+          relationshipTypeId: requiredRelationshipTypeId(
+            entity,
+            name,
+            relation.type,
+            relation.relationshipTypeId
+          ),
+          target: relation.targetEntity,
+        });
         break;
       default:
         return assertNever(relation.type);
     }
   }
   return relations;
+}
+
+/** The relationship type id a relation of `kind` must declare. */
+function requiredRelationshipTypeId(
+  entity: string,
+  name: string,
+  kind: "hasOne" | "hasMany" | "manyToMany",
+  value: string | undefined
+): string {
+  if (value === undefined || value.trim() === "") {
+    throw invalidOntology(
+      `Relation "${entity}.${name}" (${kind}) needs a relationshipTypeId: the backend resolves its targets through relationship instances of that type.`
+    );
+  }
+  return value;
 }
 
 /** Rejects a field and a relation that share a name, since both live on one record. */
@@ -357,8 +373,7 @@ export function normalizeOntology(
         record.name,
         definition.relationships,
         fields,
-        targets,
-        warnings
+        targets
       );
       assertDistinctMembers(record.name, fields, relations);
       fields.sort((a, b) => compareStrings(a.name, b.name));

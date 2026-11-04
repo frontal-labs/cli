@@ -155,7 +155,7 @@ describe("syncOntology", () => {
     );
   });
 
-  it("reports skipped relations as warnings", async () => {
+  it("translates relationship-instance relations without warnings", async () => {
     const outcome = await syncOntology(
       context,
       sourceOf([
@@ -165,15 +165,17 @@ describe("syncOntology", () => {
           schema: {
             ...CUSTOMER.schema,
             relationships: {
-              orders: { targetEntity: "Company", type: "hasMany" },
+              orders: {
+                relationshipTypeId: "rt_customer_orders",
+                targetEntity: "Company",
+                type: "hasMany",
+              },
             },
           },
         },
       ])
     );
-    expect(outcome.warnings).toEqual([
-      "Skipped Customer.orders (hasMany): no backend query exists yet.",
-    ]);
+    expect(outcome.warnings).toEqual([]);
   });
 
   it("names the object type and field when a record is malformed, and writes nothing", async () => {

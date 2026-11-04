@@ -54,6 +54,8 @@ const fieldSchema = z
 const relationSchema = z
   .object({
     foreignKey: z.string().min(1).optional(),
+    /** Backend relationship type of the relation's instances (contract v2, section 5). */
+    relationshipTypeId: z.string().min(1).optional(),
     targetEntity: z.string().min(1),
     type: z.enum(RELATION_TYPES),
   })

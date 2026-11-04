@@ -13,6 +13,16 @@ export async function run(): Promise<void> {
   const company = await customer.company();
   const companyName: string | undefined = company?.name;
 
+  // hasOne, hasMany and manyToMany resolve through relationship instances.
+  const address = await customer.primaryAddress();
+  const street: string | undefined = address?.street;
+  const orders = await customer.orders();
+  const firstTotal: number | undefined = orders[0]?.total;
+  const contacts = await frontal.ontology.Company.get("co-1").then((c) =>
+    c.contacts()
+  );
+  const contactEmail: string | undefined = contacts[0]?.email;
+
   const order = await frontal.ontology.Order.get("o-1");
   const orderCustomer = await order.customer();
   const orderEmail: string | undefined = orderCustomer?.email;
@@ -35,5 +45,16 @@ export async function run(): Promise<void> {
   const legacy = await frontal.ontology["legacy-account"].get("L-1");
   const code: string = legacy.code;
 
-  console.log(email, status, score, displayName, companyName, orderEmail, code);
+  console.log(
+    email,
+    status,
+    score,
+    displayName,
+    companyName,
+    orderEmail,
+    code,
+    street,
+    firstTotal,
+    contactEmail
+  );
 }

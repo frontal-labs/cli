@@ -34,6 +34,13 @@
             "type": "string"
           }
         },
+        "relationships": {
+          "contacts": {
+            "relationshipTypeId": "rt_company_contacts",
+            "targetEntity": "Customer",
+            "type": "manyToMany"
+          }
+        },
         "version": 1
       }
     },
@@ -95,10 +102,12 @@
             "type": "belongsTo"
           },
           "orders": {
+            "relationshipTypeId": "rt_customer_orders",
             "targetEntity": "Order",
             "type": "hasMany"
           },
           "primaryAddress": {
+            "relationshipTypeId": "rt_customer_address",
             "targetEntity": "Address",
             "type": "hasOne"
           }
@@ -139,7 +148,7 @@
       }
     }
   ],
-  "schemaHash": "sha256:76fe47c20684f38d1cd761fefebbd74777f2abb760aacf35a87ccd9c407b21fa",
+  "schemaHash": "sha256:145fc4e3641d9fc41d84e17481fe47f909de7e3eca2fdb613ec5c7848611643d",
   "source": {
     "endpoint": "/v1/ontology/objects/object-types",
     "service": "ontology/objects"

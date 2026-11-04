@@ -56,11 +56,13 @@
         },
         "orders": {
           "type": "hasMany",
-          "targetEntity": "Order"
+          "targetEntity": "Order",
+          "relationshipTypeId": "rt_customer_orders"
         },
         "primaryAddress": {
           "type": "hasOne",
-          "targetEntity": "Address"
+          "targetEntity": "Address",
+          "relationshipTypeId": "rt_customer_address"
         }
       }
     }
@@ -78,6 +80,13 @@
         "industry": {
           "type": "enum",
           "enum": ["software", "retail"]
+        }
+      },
+      "relationships": {
+        "contacts": {
+          "type": "manyToMany",
+          "targetEntity": "Customer",
+          "relationshipTypeId": "rt_company_contacts"
         }
       }
     }

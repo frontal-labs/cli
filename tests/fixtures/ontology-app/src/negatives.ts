@@ -34,11 +34,14 @@ export async function negatives(): Promise<void> {
   // @ts-expect-error a relation resolves to an entity, not a string
   const company: string = await customer.company();
 
-  // @ts-expect-error hasOne is skipped by the generator, so no accessor exists
-  await customer.primaryAddress();
+  // @ts-expect-error hasOne resolves to an Address record or null, never a string
+  const wrongOne: string = await customer.primaryAddress();
 
-  // @ts-expect-error hasMany is skipped by the generator, so no accessor exists
-  await customer.orders();
+  // @ts-expect-error hasMany resolves to a list of Order records, never a list of strings
+  const wrongMany: string[] = await customer.orders();
+
+  // @ts-expect-error a relation that is not declared in the ontology has no accessor
+  await customer.loyaltyTier();
 
   await frontal.ontology.Customer.create({
     // @ts-expect-error auto fields are read-only, so they are not accepted on create
@@ -56,5 +59,5 @@ export async function negatives(): Promise<void> {
   // @ts-expect-error a required field cannot be patched to null
   await frontal.ontology.Customer.update("x", { email: null });
 
-  console.log(age, company);
+  console.log(age, company, wrongOne, wrongMany);
 }

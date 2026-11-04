@@ -154,56 +154,83 @@ describe("normalizeOntology: valid input", () => {
   });
 });
 
-describe("normalizeOntology: skipped relations", () => {
-  const SKIPPED = [
+describe("normalizeOntology: relationship-instance relations", () => {
+  const KINDS = [
     {
       kind: "hasOne",
       name: "primaryAddress",
+      optional: true,
       target: "Address",
-      warning:
-        "Skipped Customer.primaryAddress (hasOne): the backend has no target-side query yet.",
     },
-    {
-      kind: "hasMany",
-      name: "orders",
-      target: "Order",
-      warning:
-        "Skipped Customer.orders (hasMany): no backend query exists yet.",
-    },
-    {
-      kind: "manyToMany",
-      name: "labels",
-      target: "Label",
-      warning:
-        "Skipped Customer.labels (manyToMany): no backend query exists yet.",
-    },
+    { kind: "hasMany", name: "orders", optional: false, target: "Order" },
+    { kind: "manyToMany", name: "labels", optional: false, target: "Label" },
   ] as const;
 
-  it.each(SKIPPED)("skips $kind with a warning and no accessor", (skipped) => {
-    const model = normalizeOntology([
-      entity("Address"),
-      entity("Label"),
-      entity("Order"),
-      entity(
-        "Customer",
-        {},
-        {
-          relationships: {
-            [skipped.name]: {
-              targetEntity: skipped.target,
-              type: skipped.kind,
+  it.each(KINDS)(
+    "translates $kind into an accessor with its relationship type",
+    (relation) => {
+      const model = normalizeOntology([
+        entity("Address"),
+        entity("Label"),
+        entity("Order"),
+        entity(
+          "Customer",
+          {},
+          {
+            relationships: {
+              [relation.name]: {
+                relationshipTypeId: `rt_${relation.name}`,
+                targetEntity: relation.target,
+                type: relation.kind,
+              },
             },
-          },
-        }
-      ),
-    ]);
-    expect(model.warnings).toEqual([skipped.warning]);
-    expect(
-      model.entities.find((e) => e.name === "Customer")?.relations
-    ).toEqual([]);
-  });
+          }
+        ),
+      ]);
+      expect(model.warnings).toEqual([]);
+      expect(
+        model.entities.find((e) => e.name === "Customer")?.relations
+      ).toEqual([
+        {
+          kind: relation.kind,
+          name: relation.name,
+          optional: relation.optional,
+          relationshipTypeId: `rt_${relation.name}`,
+          target: relation.target,
+        },
+      ]);
+    }
+  );
 
-  it("still validates the target of a skipped relation", () => {
+  it.each(KINDS)(
+    "rejects $kind without a relationshipTypeId, naming the relation",
+    (relation) => {
+      expectInvalid(
+        [
+          entity("Address"),
+          entity("Label"),
+          entity("Order"),
+          entity(
+            "Customer",
+            {},
+            {
+              relationships: {
+                [relation.name]: {
+                  targetEntity: relation.target,
+                  type: relation.kind,
+                },
+              },
+            }
+          ),
+        ],
+        new RegExp(
+          `Relation "Customer\\.${relation.name}" \\(${relation.kind}\\) needs a relationshipTypeId`
+        )
+      );
+    }
+  );
+
+  it("still validates the target of a relationship-instance relation", () => {
     expectInvalid(
       [
         entity(
@@ -211,7 +238,11 @@ describe("normalizeOntology: skipped relations", () => {
           {},
           {
             relationships: {
-              orders: { targetEntity: "Ghost", type: "hasMany" },
+              orders: {
+                relationshipTypeId: "rt_orders",
+                targetEntity: "Ghost",
+                type: "hasMany",
+              },
             },
           }
         ),

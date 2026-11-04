@@ -2,6 +2,7 @@ import type {
   NormalizedEntity,
   NormalizedField,
   NormalizedOntology,
+  NormalizedRelation,
   ScalarFieldType,
 } from "@/lib/ontology/model.js";
 import { propertyKey } from "@/lib/ontology/names.js";
@@ -73,10 +74,29 @@ function writableNames(entity: NormalizedEntity): string[] {
     .map((field) => field.name);
 }
 
+/**
+ * One relation's runtime metadata. `belongsTo` reads a foreign key from the
+ * source record; the other kinds resolve through relationship instances of the
+ * declared relationship type (contract v2, section 5).
+ */
+function relationLiteral(relation: NormalizedRelation): string {
+  const target = JSON.stringify(relation.target);
+  switch (relation.kind) {
+    case "belongsTo":
+      return `{ cardinality: "belongsTo", target: ${target}, foreignKey: ${JSON.stringify(relation.foreignKey)}, optional: ${relation.optional} }`;
+    case "hasOne":
+    case "hasMany":
+    case "manyToMany":
+      return `{ cardinality: "${relation.kind}", target: ${target}, relationshipTypeId: ${JSON.stringify(relation.relationshipTypeId)} }`;
+    default:
+      return assertNever(relation);
+  }
+}
+
 function relationEntries(entity: NormalizedEntity): [string, string][] {
   return entity.relations.map((relation): [string, string] => [
     propertyKey(relation.name),
-    `{ target: ${JSON.stringify(relation.target)}, foreignKey: ${JSON.stringify(relation.foreignKey)}, optional: ${relation.optional} }`,
+    relationLiteral(relation),
   ]);
 }
 
