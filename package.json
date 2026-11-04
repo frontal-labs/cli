@@ -39,7 +39,7 @@
     "test:coverage": "vitest run --coverage",
     "test:readme": "bun run build && bun scripts/run-readme-blocks.ts",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && bun scripts/type-check-strict.ts",
     "validate:bindings": "node ./scripts/validate-command-bindings.mjs",
     "version-packages": "changeset version"
   },

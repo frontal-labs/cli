@@ -1,15 +1,19 @@
 import { createHash } from "node:crypto";
 
+/** True for a plain JSON-style object (not null, not an array). */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 /** Recursively sorts object keys, so equal values serialise to equal bytes. */
 export function sortKeysDeep(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => sortKeysDeep(item));
   }
-  if (value !== null && typeof value === "object") {
-    const record = value as Record<string, unknown>;
+  if (isRecord(value)) {
     const sorted: Record<string, unknown> = {};
-    for (const key of Object.keys(record).sort(compareStrings)) {
-      sorted[key] = sortKeysDeep(record[key]);
+    for (const key of Object.keys(value).sort(compareStrings)) {
+      sorted[key] = sortKeysDeep(value[key]);
     }
     return sorted;
   }

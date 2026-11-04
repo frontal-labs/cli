@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitOverride": true
+  },
+  "include": [
+    "src/lib/ontology/**/*.ts",
+    "src/commands/sync.ts",
+    "src/lib/project.ts",
+    "src/lib/config.ts"
+  ]
+}

@@ -58,8 +58,8 @@ export interface SyncOutcome {
   /** Temp files from an interrupted earlier sync that were deleted. */
   removedTemporaries: string[];
   schemaHash: string;
-  /** The reference file, when the context asks for one. */
-  typesReference?: { file: string; outcome: WriteOutcome };
+  /** The reference file, when the context asks for one; `undefined` otherwise. */
+  typesReference: { file: string; outcome: WriteOutcome } | undefined;
   warnings: string[];
 }
 

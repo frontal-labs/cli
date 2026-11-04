@@ -25,6 +25,11 @@ export const PROJECT_SCHEMA_URL = "https://frontal.dev/schemas/frontal.json";
 export const ENV_NAMES = ["dev", "staging", "prod"] as const;
 export type EnvName = (typeof ENV_NAMES)[number];
 
+/** True when `value` is one of the supported environment names. */
+export function isEnvName(value: string): value is EnvName {
+  return ENV_NAMES.some((name) => name === value);
+}
+
 /** Every service namespace exposed by `new Frontal()`. */
 export const SERVICE_KEYS = [
   "agents",
@@ -193,7 +198,7 @@ export function readConfigFile(file: string): Record<string, unknown> {
 }
 
 export interface RawProject {
-  env?: EnvName;
+  env: EnvName | undefined;
   files: string[];
   raw: Record<string, unknown>;
   root: string;
@@ -203,8 +208,8 @@ export interface RawProject {
 
 export interface LoadProjectOptions {
   cwd?: string;
-  /** Environment overlay to apply (`frontal.<env>.jsonc`). */
-  env?: string;
+  /** Environment overlay to apply (`.frontal/config.<env>.jsonc`). */
+  env?: string | undefined;
 }
 
 /**
@@ -242,9 +247,9 @@ export function loadRawProjectConfig(
   const files = [baseFile];
   let raw = readConfigFile(baseFile);
 
-  const env = options.env ?? (raw.env as string | undefined);
+  const env = options.env ?? declaredEnvironment(raw);
   if (env !== undefined) {
-    if (!ENV_NAMES.includes(env as EnvName)) {
+    if (!isEnvName(env)) {
       throw new CliError("CONFIG_INVALID", `Unknown environment "${env}".`, {
         exitCode: EXIT_CODES.CONFIG_ERROR,
         fix: `Use one of: ${ENV_NAMES.join(", ")}.`,
@@ -256,10 +261,19 @@ export function loadRawProjectConfig(
       files.push(overlay);
       raw = deepMerge(raw, readConfigFile(overlay));
     }
-    raw.env = env;
+    raw = { ...raw, env };
   }
 
-  return { env: env as EnvName | undefined, files, raw, root, warnings };
+  return { env, files, raw, root, warnings };
+}
+
+/**
+ * The `env` key of a raw config as text. A non-string value is kept as its text
+ * so the "Unknown environment" error still names it.
+ */
+function declaredEnvironment(raw: Record<string, unknown>): string | undefined {
+  const { env: value } = raw;
+  return value === undefined ? undefined : String(value);
 }
 
 const NEWLINE = /\r?\n/;
@@ -278,7 +292,10 @@ export function parseDotenv(text: string): Record<string, string> {
     if (!match) {
       continue;
     }
-    const key = match[1] as string;
+    const [, key] = match;
+    if (key === undefined) {
+      continue;
+    }
     let value = (match[2] ?? "").trim();
     const quoted =
       (value.startsWith('"') && value.endsWith('"')) ||

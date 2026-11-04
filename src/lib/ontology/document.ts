@@ -6,8 +6,13 @@ import {
   OBJECT_TYPES_SOURCE,
   ONTOLOGY_FORMAT,
 } from "@/lib/ontology/constants.js";
-import { corruptFile } from "@/lib/ontology/errors.js";
-import { compareStrings, hashOf, sortKeysDeep } from "@/lib/ontology/hash.js";
+import { corruptFile, invalidOntology } from "@/lib/ontology/errors.js";
+import {
+  compareStrings,
+  hashOf,
+  isRecord,
+  sortKeysDeep,
+} from "@/lib/ontology/hash.js";
 
 /** The committed snapshot: raw object types plus the hash that identifies them. */
 export interface OntologyDocument {
@@ -23,10 +28,23 @@ export interface OntologyDocument {
 export function buildDocument(
   rawObjectTypes: readonly unknown[]
 ): OntologyDocument {
-  const objectTypes = rawObjectTypes
-    .map((raw) => sortKeysDeep(raw) as Record<string, unknown>)
-    .sort((a, b) => compareStrings(String(a.name), String(b.name)));
+  const objectTypes = rawObjectTypes.map((raw, index) => {
+    const sorted = sortKeysDeep(raw);
+    if (!isRecord(sorted)) {
+      throw invalidOntology(
+        `Object type #${index + 1} is not an object; expected a record.`
+      );
+    }
+    return sorted;
+  });
+  objectTypes.sort((a, b) => compareStrings(nameOf(a), nameOf(b)));
   return { objectTypes, schemaHash: hashOf(objectTypes) };
+}
+
+/** The object type's name as text, used only to order records. */
+function nameOf(record: Record<string, unknown>): string {
+  const { name } = record;
+  return String(name);
 }
 
 /** Pretty JSON with sorted keys and a trailing newline. No timestamps. */
