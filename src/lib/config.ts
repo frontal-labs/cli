@@ -11,6 +11,18 @@ import {
   SERVICE_KEYS,
 } from "@/lib/project.js";
 import { getCoreModule } from "@/lib/sdk.js";
+import { theme } from "@/output/theme.js";
+import {
+  buildConfigSchema,
+  deploymentConfigSchema,
+  FRAMEWORKS,
+  featuresConfigSchema,
+  functionConfigSchema,
+  headerRuleSchema,
+  REGIONS,
+  redirectRuleSchema,
+  rewriteRuleSchema,
+} from "@/schemas/frontal-json.js";
 
 export type {
   EnvName,
@@ -60,9 +72,18 @@ export function buildProjectConfigSchema(
       /** Agent ids owned by this project; `frontal rollback` reverts them too. */
       agents: z.array(z.string().min(1)).default([]),
       apiUrl: clientConfigSchema.shape.baseUrl,
+      build: buildConfigSchema.optional(),
+      deployment: deploymentConfigSchema.optional(),
       /** Entry file bundled by `frontal deploy`. */
       entry: z.string().min(1).default("src/index.ts"),
       env: z.enum(ENV_NAMES).default("dev"),
+      features: featuresConfigSchema.optional(),
+      // Legacy web-deploy settings, carried over from the pre-`.frontal/`
+      // `frontal.json` format. They are validated and typed; no command acts on
+      // them yet.
+      framework: z.enum(FRAMEWORKS).optional(),
+      functions: z.record(z.string(), functionConfigSchema).optional(),
+      headers: z.array(headerRuleSchema).optional(),
       name: z
         .string()
         .min(1)
@@ -70,6 +91,9 @@ export function buildProjectConfigSchema(
           PROJECT_NAME_PATTERN,
           "name must be lowercase letters, digits and dashes"
         ),
+      redirects: z.array(redirectRuleSchema).optional(),
+      regions: z.array(z.enum(REGIONS)).optional(),
+      rewrites: z.array(rewriteRuleSchema).optional(),
       sdk: clientConfigSchema
         .pick({
           headers: true,
@@ -122,6 +146,20 @@ export interface LoadedProject {
   /** Config files that were merged, in order. */
   files: string[];
   root: string;
+  /** Non-fatal problems, already printed once by `loadProjectConfig`. */
+  warnings: string[];
+}
+
+/** Warnings already printed in this process, so each prints once. */
+const printedWarnings = new Set<string>();
+
+function printWarnings(warnings: readonly string[]): void {
+  for (const warning of warnings) {
+    if (!printedWarnings.has(warning)) {
+      printedWarnings.add(warning);
+      console.error(theme.warn(`Warning: ${warning}`));
+    }
+  }
 }
 
 export function formatConfigIssues(error: z.ZodError): string {
@@ -166,9 +204,10 @@ export async function validateProjectConfig(
 export async function loadProjectConfig(
   options: LoadProjectOptions = {}
 ): Promise<LoadedProject> {
-  const { root, files, raw } = loadRawProjectConfig(options);
+  const { root, files, raw, warnings } = loadRawProjectConfig(options);
+  printWarnings(warnings);
   const config = await validateProjectConfig(raw, files.join(" + "));
-  return { config, files, root };
+  return { config, files, root, warnings };
 }
 
 /** Like `loadProjectConfig` but resolves undefined when not inside a project. */

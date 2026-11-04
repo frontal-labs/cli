@@ -26,7 +26,7 @@ export interface PullResult {
   missing: string[];
   /** Keys taken from an existing file. */
   preserved: string[];
-  /** Keys written from frontal.jsonc / credentials. */
+  /** Keys written from .frontal/config.jsonc / credentials. */
   written: string[];
 }
 
@@ -41,7 +41,7 @@ function renderDotenv(
   entries: { comment?: string; key: string; value: string }[]
 ): string {
   const lines: string[] = [
-    "# Managed by `frontal env pull` — secrets are never stored in frontal.jsonc.",
+    "# Managed by `frontal env pull` — secrets are never stored in .frontal/config.jsonc.",
   ];
   for (const entry of entries) {
     if (entry.comment) {
@@ -251,14 +251,14 @@ export function registerEnvCommands(program: Command): void {
   const env = program
     .command("env")
     .description(
-      "Sync variables between frontal.jsonc, .env.local and deployments"
+      "Sync variables between .frontal/config.jsonc, .env.local and deployments"
     );
 
   withExamples(
     env
       .command("pull")
       .description(
-        "Write .env.local from frontal.jsonc vars, required secrets and your credentials"
+        "Write .env.local from .frontal/config.jsonc vars, required secrets and your credentials"
       )
       .argument("[file]", "Target file", DEFAULT_ENV_FILE)
       .option(

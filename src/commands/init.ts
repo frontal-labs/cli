@@ -8,9 +8,9 @@ import { runAction } from "@/lib/command.js";
 import { SDK_MIN_VERSION } from "@/lib/ontology/constants.js";
 import { withExamples } from "@/lib/output.js";
 import {
-  LEGACY_PROJECT_CONFIG_FILE,
   PROJECT_CONFIG_FILE,
   PROJECT_STATE_DIR,
+  projectConfigRelPath,
   renderProjectConfig,
 } from "@/lib/project.js";
 import { theme } from "@/output/theme.js";
@@ -136,15 +136,18 @@ export function initProject(cwd: string, options: InitOptions): InitResult {
   };
 
   const force = Boolean(options.force);
-  // A pre-existing root frontal.jsonc keeps being the config (never a second one).
-  const configPath =
-    !existsSync(join(dir, PROJECT_CONFIG_FILE)) &&
-    existsSync(join(dir, LEGACY_PROJECT_CONFIG_FILE))
-      ? LEGACY_PROJECT_CONFIG_FILE
-      : PROJECT_CONFIG_FILE;
+  // An existing project config keeps its location, so init never creates a
+  // second one next to a legacy file. The default location is used otherwise.
+  const existingConfig = projectConfigRelPath(dir);
+  const configPath = existingConfig ?? PROJECT_CONFIG_FILE;
   writeFile(configPath, renderProjectConfig(name), {
     overwrite: force,
   });
+  if (existingConfig !== undefined && existingConfig !== PROJECT_CONFIG_FILE) {
+    result.warnings.push(
+      `Kept ${existingConfig} as the project config. To use the default location, move it: git mv ${existingConfig} ${PROJECT_CONFIG_FILE}`
+    );
+  }
   writeFile(".env.example", renderEnvExample(), { overwrite: force });
   writeFile(join("src", ".gitkeep"), "", {
     forceable: false,

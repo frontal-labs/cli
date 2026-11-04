@@ -45,7 +45,7 @@ export function renderTypes(config: ProjectConfig, sources: string[]): string {
     `export type FrontalServiceName = ${union(services)};`,
     `export type FrontalKnownService = ${union(SERVICE_KEYS)};`,
     "",
-    "/** Plain configuration values from `vars` in frontal.jsonc. */",
+    "/** Plain configuration values from `vars` in .frontal/config.jsonc. */",
     "export interface FrontalVars {",
     ...vars.map((key) => keyLine(key, "string")),
     "}",
@@ -61,7 +61,7 @@ export function renderTypes(config: ProjectConfig, sources: string[]): string {
     keyLine("FRONTAL_API_URL", "string", true),
     "}",
     "",
-    "/** Services enabled in frontal.jsonc and their SDK clients. */",
+    "/** Services enabled in .frontal/config.jsonc and their SDK clients. */",
     "export interface FrontalServices {",
     ...services.map((key) =>
       keyLine(
@@ -71,7 +71,7 @@ export function renderTypes(config: ProjectConfig, sources: string[]): string {
     ),
     "}",
     "",
-    "/** The validated frontal.jsonc for this project. */",
+    "/** The validated .frontal/config.jsonc for this project. */",
     "export interface FrontalProject {",
     keyLine("name", literal(config.name)),
     keyLine("env", "FrontalEnvName"),
@@ -135,7 +135,7 @@ export function registerTypesCommand(program: Command): void {
   withExamples(
     program
       .command("types")
-      .description("Generate TypeScript typings from frontal.jsonc")
+      .description("Generate TypeScript typings from .frontal/config.jsonc")
       .option("--out <file>", "Output file", DEFAULT_TYPES_OUT)
       .action((opts: { out?: string }, cmd) =>
         runAction(cmd, async ({ fmt, globalOpts }) => {

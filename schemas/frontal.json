@@ -24,6 +24,120 @@
       "type": "string",
       "format": "uri"
     },
+    "build": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "devCommand": {
+          "type": "string"
+        },
+        "env": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "installCommand": {
+          "default": "npm install",
+          "type": "string"
+        },
+        "outputDirectory": {
+          "default": "dist",
+          "type": "string"
+        }
+      }
+    },
+    "deployment": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "object",
+      "properties": {
+        "preview": {
+          "type": "object",
+          "properties": {
+            "autoAssignDomain": {
+              "default": false,
+              "type": "boolean"
+            },
+            "autoDeployOn": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "domain": {
+              "type": "string"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "expiration": {
+              "type": "string",
+              "pattern": "^\\d+[dwmy]$"
+            }
+          }
+        },
+        "production": {
+          "type": "object",
+          "properties": {
+            "autoAssignDomain": {
+              "default": false,
+              "type": "boolean"
+            },
+            "autoDeployOn": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "domain": {
+              "type": "string"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "expiration": {
+              "type": "string",
+              "pattern": "^\\d+[dwmy]$"
+            }
+          }
+        },
+        "staging": {
+          "type": "object",
+          "properties": {
+            "autoAssignDomain": {
+              "default": false,
+              "type": "boolean"
+            },
+            "autoDeployOn": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "domain": {
+              "type": "string"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "expiration": {
+              "type": "string",
+              "pattern": "^\\d+[dwmy]$"
+            }
+          }
+        }
+      }
+    },
     "entry": {
       "description": "Entry file bundled by `frontal deploy` (Bun.build, ESM). Defaults to src/index.ts.",
       "default": "src/index.ts",
@@ -36,11 +150,146 @@
       "type": "string",
       "enum": ["dev", "staging", "prod"]
     },
+    "features": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "object",
+      "properties": {
+        "analytics": {
+          "default": false,
+          "type": "boolean"
+        },
+        "edgeFunctions": {
+          "default": false,
+          "type": "boolean"
+        },
+        "imageOptimization": {
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "framework": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "string",
+      "enum": [
+        "nextjs",
+        "react",
+        "vue",
+        "svelte",
+        "angular",
+        "nuxt",
+        "gatsby",
+        "vite",
+        "custom"
+      ]
+    },
+    "functions": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "maxDuration": {
+            "default": 10,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300
+          },
+          "memory": {
+            "type": "string",
+            "enum": ["128", "256", "512", "1024", "2048"]
+          },
+          "runtime": {
+            "type": "string",
+            "enum": ["nodejs18.x", "nodejs20.x", "edge"]
+          }
+        }
+      }
+    },
+    "headers": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "headers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Za-z-]+$"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "type": "string",
+            "pattern": ".*"
+          }
+        },
+        "required": ["headers", "source"]
+      }
+    },
     "name": {
       "description": "Project name: lowercase letters, digits and dashes. Also the worker name used by `frontal deploy`.",
       "type": "string",
       "minLength": 1,
       "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "redirects": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string"
+          },
+          "permanent": {
+            "default": false,
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "pattern": ".*"
+          }
+        },
+        "required": ["destination", "source"]
+      }
+    },
+    "regions": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "us-east-1",
+          "us-west-2",
+          "eu-west-1",
+          "eu-central-1",
+          "ap-southeast-1"
+        ]
+      }
+    },
+    "rewrites": {
+      "description": "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "pattern": ".*"
+          }
+        },
+        "required": ["destination", "source"]
+      }
     },
     "sdk": {
       "description": "Optional overrides forwarded to the @frontal-labs/sdk client.",

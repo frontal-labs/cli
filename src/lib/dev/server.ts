@@ -27,10 +27,9 @@ import { RemoteProxy, serviceForPath } from "@/lib/dev/proxy.js";
 import { type DevRequest, Router, scenarioToRoute } from "@/lib/dev/router.js";
 import {
   envOverlayCandidates,
-  LEGACY_PROJECT_CONFIG_FILE,
-  PROJECT_CONFIG_FILE,
+  isProjectConfigFileName,
+  PROJECT_CONFIG_CANDIDATES,
   PROJECT_STATE_DIR,
-  projectConfigRelPath,
   SERVICE_KEYS,
   type ServiceKey,
 } from "@/lib/project.js";
@@ -335,14 +334,13 @@ export class DevServer {
     // fs.watch is fast but not reliable everywhere (coalesced or nameless
     // events on macOS, missing on some filesystems). Poll the handful of
     // files that matter as a deterministic fallback.
-    const baseRel = projectConfigRelPath(root) ?? PROJECT_CONFIG_FILE;
+    // Every config location and env overlay is polled, so a file that becomes
+    // the project config (or an overlay that appears) reloads the server.
     const polled = [
-      join(root, baseRel),
+      ...PROJECT_CONFIG_CANDIDATES.map((rel) => join(root, rel)),
       join(root, ".env.local"),
       ...(this.options.env
-        ? envOverlayCandidates(baseRel, this.options.env).map((rel) =>
-            join(root, rel)
-          )
+        ? envOverlayCandidates(this.options.env).map((rel) => join(root, rel))
         : []),
       ...(this.scenarioName
         ? [
@@ -382,11 +380,8 @@ export class DevServer {
           // Some platforms (macOS FSEvents) omit the filename; reload anyway.
           const relevant =
             name === "" ||
-            (inStateDir &&
-              name.startsWith("config") &&
-              name.endsWith(".jsonc")) ||
-            name === LEGACY_PROJECT_CONFIG_FILE ||
-            (name.startsWith("frontal.") && name.endsWith(".jsonc")) ||
+            (inStateDir && isProjectConfigFileName(name, true)) ||
+            (dir === root && isProjectConfigFileName(name, false)) ||
             name === ".env.local" ||
             (dir.endsWith("scenarios") && name.endsWith(".json"));
           if (relevant) {

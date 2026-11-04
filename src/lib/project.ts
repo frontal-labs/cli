@@ -5,10 +5,21 @@ import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 
 export const PROJECT_STATE_DIR = ".frontal";
-/** Project config, relative to the project root (preferred location). */
+/** The file `frontal init` writes, relative to the project root. */
 export const PROJECT_CONFIG_FILE = `${PROJECT_STATE_DIR}/config.jsonc`;
-/** Pre-`.frontal/` config location, still read as a fallback. */
-export const LEGACY_PROJECT_CONFIG_FILE = "frontal.jsonc";
+/**
+ * Every accepted project config location, relative to the project root, in
+ * precedence order. The first one that exists is the project config; any
+ * others are ignored with a warning. `.frontal/` holds the config only when
+ * one of its config files exists, so a `.frontal/` with just `state/` is not a
+ * project root.
+ */
+export const PROJECT_CONFIG_CANDIDATES = [
+  `${PROJECT_STATE_DIR}/config.jsonc`,
+  `${PROJECT_STATE_DIR}/config.json`,
+  "frontal.jsonc",
+  "frontal.json",
+] as const;
 export const PROJECT_SCHEMA_URL = "https://frontal.dev/schemas/frontal.json";
 
 export const ENV_NAMES = ["dev", "staging", "prod"] as const;
@@ -71,40 +82,52 @@ export function parseJsonc(text: string): unknown {
   return JSON.parse(restored);
 }
 
-/**
- * Config path relative to `root`: `.frontal/config.jsonc` when present,
- * otherwise the legacy root `frontal.jsonc`. Undefined when neither exists.
- */
-export function projectConfigRelPath(root: string): string | undefined {
-  if (existsSync(join(root, PROJECT_CONFIG_FILE))) {
-    return PROJECT_CONFIG_FILE;
-  }
-  if (existsSync(join(root, LEGACY_PROJECT_CONFIG_FILE))) {
-    return LEGACY_PROJECT_CONFIG_FILE;
-  }
+/** Config files present in `root`, in precedence order (relative paths). */
+export function existingProjectConfigs(root: string): string[] {
+  return PROJECT_CONFIG_CANDIDATES.filter((rel) => existsSync(join(root, rel)));
 }
 
 /**
- * Env overlay candidates (relative to root), in lookup order. Overlays pair
- * with the base location first; a legacy `frontal.<env>.jsonc` is still read
- * so moving the base config does not silently drop an existing overlay.
+ * The project config relative to `root`: the first existing candidate, or
+ * undefined when none exists.
  */
-export function envOverlayCandidates(baseRel: string, env: string): string[] {
-  const legacy = `frontal.${env}.jsonc`;
-  return baseRel === LEGACY_PROJECT_CONFIG_FILE
-    ? [legacy]
-    : [`${PROJECT_STATE_DIR}/config.${env}.jsonc`, legacy];
+export function projectConfigRelPath(root: string): string | undefined {
+  return existingProjectConfigs(root)[0];
+}
+
+const STATE_CONFIG_FILE_NAME = /^config(\.[a-z]+)?\.jsonc?$/;
+const ROOT_CONFIG_FILE_NAME = /^frontal(\.[a-z]+)?\.jsonc?$/;
+
+/** Whether a bare file name is one of the project config files (for watchers). */
+export function isProjectConfigFileName(
+  name: string,
+  inStateDir: boolean
+): boolean {
+  return inStateDir
+    ? STATE_CONFIG_FILE_NAME.test(name)
+    : ROOT_CONFIG_FILE_NAME.test(name);
+}
+
+/**
+ * Env overlay candidates (relative to root), in lookup order: the `.frontal/`
+ * forms first, then the root `frontal.<env>` forms. The same order applies
+ * whichever base config was found.
+ */
+export function envOverlayCandidates(env: string): string[] {
+  return [
+    `${PROJECT_STATE_DIR}/config.${env}.jsonc`,
+    `${PROJECT_STATE_DIR}/config.${env}.json`,
+    `frontal.${env}.jsonc`,
+    `frontal.${env}.json`,
+  ];
 }
 
 /** The first existing env overlay for `env`, relative to root. */
 export function findEnvOverlayRelPath(
   root: string,
-  baseRel: string,
   env: string
 ): string | undefined {
-  return envOverlayCandidates(baseRel, env).find((rel) =>
-    existsSync(join(root, rel))
-  );
+  return envOverlayCandidates(env).find((rel) => existsSync(join(root, rel)));
 }
 
 /** Walks up from `start` until a project config is found. */
@@ -174,6 +197,8 @@ export interface RawProject {
   files: string[];
   raw: Record<string, unknown>;
   root: string;
+  /** Problems that do not stop loading, e.g. ignored extra config files. */
+  warnings: string[];
 }
 
 export interface LoadProjectOptions {
@@ -193,15 +218,26 @@ export function loadRawProjectConfig(
   if (!root) {
     throw new CliError(
       "NO_PROJECT",
-      `No ${PROJECT_CONFIG_FILE} (or ${LEGACY_PROJECT_CONFIG_FILE}) found in ${resolve(options.cwd ?? process.cwd())} or its parents.`,
+      `No project config (${PROJECT_CONFIG_CANDIDATES.join(", ")}) found in ${resolve(options.cwd ?? process.cwd())} or its parents.`,
       {
         exitCode: EXIT_CODES.CONFIG_ERROR,
-        fix: "Run `frontal init` to create a project, or cd into one.",
+        fix: `Run \`frontal init\` to create ${PROJECT_CONFIG_FILE}, or cd into a project.`,
       }
     );
   }
 
-  const baseRel = projectConfigRelPath(root) ?? PROJECT_CONFIG_FILE;
+  const [baseRel, ...ignored] = existingProjectConfigs(root);
+  if (baseRel === undefined) {
+    throw new CliError("NO_PROJECT", `No project config found in ${root}.`, {
+      exitCode: EXIT_CODES.CONFIG_ERROR,
+    });
+  }
+  const warnings =
+    ignored.length > 0
+      ? [
+          `Using ${baseRel}; ignoring ${ignored.join(", ")}. Keep one project config and remove the others.`,
+        ]
+      : [];
   const baseFile = join(root, baseRel);
   const files = [baseFile];
   let raw = readConfigFile(baseFile);
@@ -214,7 +250,7 @@ export function loadRawProjectConfig(
         fix: `Use one of: ${ENV_NAMES.join(", ")}.`,
       });
     }
-    const overlayRel = findEnvOverlayRelPath(root, baseRel, env);
+    const overlayRel = findEnvOverlayRelPath(root, env);
     if (overlayRel !== undefined) {
       const overlay = join(root, overlayRel);
       files.push(overlay);
@@ -223,7 +259,7 @@ export function loadRawProjectConfig(
     raw.env = env;
   }
 
-  return { env: env as EnvName | undefined, files, raw, root };
+  return { env: env as EnvName | undefined, files, raw, root, warnings };
 }
 
 const NEWLINE = /\r?\n/;

@@ -10,10 +10,28 @@ const PROPERTY_DOCS: Record<string, string> = {
     "Agent ids owned by this project. `frontal rollback` reverts them to their previous version.",
   apiUrl:
     "Frontal API base URL. Environment variables and flags take precedence (FRONTAL_API_URL, --api-url).",
+  build:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+  deployment:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
   entry:
     "Entry file bundled by `frontal deploy` (Bun.build, ESM). Defaults to src/index.ts.",
   env: `Default environment. Overridden per command with --env; selects the config.<env>.jsonc overlay. One of: ${ENV_NAMES.join(", ")}.`,
+  features:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+  framework:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+  functions:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+  headers:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
   name: "Project name: lowercase letters, digits and dashes. Also the worker name used by `frontal deploy`.",
+  redirects:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+  regions:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
+  rewrites:
+    "Legacy web-deploy setting (from frontal.json). Validated and typed; no command acts on it yet.",
   sdk: "Optional overrides forwarded to the @frontal-labs/sdk client.",
   secrets:
     "Secrets that must be present in the environment. Only the names live here; values are read from .env.local or the shell.",
