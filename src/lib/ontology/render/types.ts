@@ -161,5 +161,12 @@ export function renderOntologyTypes(
     }
     lines.push("}");
   }
+  // Makes `new Frontal()` from @frontal-labs/sdk typed by this ontology.
+  lines.push(
+    "",
+    'declare module "@frontal-labs/sdk" {',
+    "  interface FrontalOntologyRegistry extends Ontology {}",
+    "}"
+  );
   return `${lines.join("\n")}\n`;
 }

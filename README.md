@@ -185,15 +185,24 @@ frontal rollback                                  # previous production artifact
 
 ## Typed ontology: `frontal sync`
 
-`frontal sync` downloads your Frontal ontology and writes typed SDK files into `.frontal/`.
-Commit that directory; `frontal sync --check` verifies it offline in CI. Full reference:
+`frontal sync` downloads your Frontal ontology, writes typed files into `.frontal/`, and writes a
+reference file (`src/frontal-env.d.ts`) that makes `new Frontal()` from `@frontal-labs/sdk` typed.
+Commit both; `frontal sync --check` verifies them offline in CI. Full reference:
 [docs/ontology.md](docs/ontology.md). The backend contract is in
 [docs/backend-spec/ontology-openapi.yaml](docs/backend-spec/ontology-openapi.yaml).
 
 ```sh
-frontal sync          # download the ontology and regenerate .frontal/
-frontal sync --check  # offline: fail if committed generated files are stale
-frontal status        # compare the committed snapshot with Frontal
+frontal sync                          # download the ontology and regenerate .frontal/ and the reference file
+frontal sync --check                  # offline: fail if committed generated files are stale
+frontal sync --types-out lib/env.d.ts # put the reference file somewhere else
+frontal status                        # compare the committed snapshot with Frontal
+```
+
+```ts
+import { Frontal } from "@frontal-labs/sdk";
+
+const frontal = new Frontal({ apiKey: process.env.FRONTAL_API_KEY! });
+const customer = await frontal.ontology.Customer.get("123"); // typed from your ontology
 ```
 
 ## Authentication

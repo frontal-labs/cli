@@ -22,6 +22,12 @@ import { generateFiles } from "@/lib/ontology/generate.js";
 import type { NormalizedOntology } from "@/lib/ontology/model.js";
 import { normalizeOntology } from "@/lib/ontology/normalize.js";
 import {
+  assertReferenceWritable,
+  referenceContent,
+  type TypesReference,
+  writeReference,
+} from "@/lib/ontology/reference.js";
+import {
   removeStaleTemporaries,
   type WriteOutcome,
   type Writer,
@@ -33,6 +39,8 @@ export interface OntologyContext {
   /** Absolute path of the project's `.frontal/` directory. */
   frontalDir: string;
   generatorVersion: string;
+  /** Reference file that makes the typed SDK registry visible; omitted to skip it. */
+  typesReference?: TypesReference;
 }
 
 /** Produces the raw object types. Injected so tests and status need no network. */
@@ -50,6 +58,8 @@ export interface SyncOutcome {
   /** Temp files from an interrupted earlier sync that were deleted. */
   removedTemporaries: string[];
   schemaHash: string;
+  /** The reference file, when the context asks for one. */
+  typesReference?: { file: string; outcome: WriteOutcome };
   warnings: string[];
 }
 
@@ -93,6 +103,14 @@ export async function syncOntology(
   const removedTemporaries = removeStaleTemporaries(context.frontalDir);
   const snapshot = snapshotOf(await source());
   const contents = expectedContents(snapshot, context.generatorVersion);
+  const meta = {
+    generatorVersion: context.generatorVersion,
+    schemaHash: snapshot.document.schemaHash,
+  };
+  // Refuse before any write, so a file we do not own leaves .frontal/ untouched.
+  if (context.typesReference) {
+    assertReferenceWritable(context.typesReference);
+  }
 
   const files: FileChange[] = WRITE_ORDER.map((key) => ({
     file: ONTOLOGY_FILES[key],
@@ -101,12 +119,23 @@ export async function syncOntology(
       contents[key]
     ),
   }));
+  const typesReference = context.typesReference
+    ? {
+        file: context.typesReference.displayPath,
+        outcome: writeReference(
+          context.typesReference,
+          referenceContent(context.typesReference, meta),
+          write
+        ),
+      }
+    : undefined;
 
   return {
     entityCount: snapshot.model.entities.length,
     files,
     removedTemporaries,
     schemaHash: snapshot.document.schemaHash,
+    typesReference,
     warnings: snapshot.model.warnings,
   };
 }
@@ -166,6 +195,19 @@ export function checkOntology(context: OntologyContext): CheckOutcome {
       const hashMismatch =
         key === "version" && versionHashDisagrees(onDisk, document.schemaHash);
       stale.push({ file, reason: hashMismatch ? "hash-mismatch" : "differs" });
+    }
+  }
+  if (context.typesReference) {
+    const reference = context.typesReference;
+    const expected = referenceContent(reference, {
+      generatorVersion: context.generatorVersion,
+      schemaHash: document.schemaHash,
+    });
+    const onDisk = readOptional(reference.file);
+    if (onDisk === undefined) {
+      stale.push({ file: reference.displayPath, reason: "missing" });
+    } else if (onDisk !== expected) {
+      stale.push({ file: reference.displayPath, reason: "differs" });
     }
   }
   return {

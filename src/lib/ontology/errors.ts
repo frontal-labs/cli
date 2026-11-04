@@ -8,6 +8,7 @@ export const ONTOLOGY_ERROR_CODES = {
   malformed: "ONTOLOGY_MALFORMED",
   missing: "ONTOLOGY_MISSING",
   outOfDate: "ONTOLOGY_OUT_OF_DATE",
+  referenceNotOwned: "ONTOLOGY_REFERENCE_NOT_OWNED",
   unauthorized: "ONTOLOGY_UNAUTHORIZED",
 } as const;
 

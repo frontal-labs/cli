@@ -1,9 +1,11 @@
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { Command } from "commander";
 import { type CommandContext, runAction } from "@/lib/command.js";
 import { loadProjectConfig } from "@/lib/config.js";
 import { GENERATOR_VERSION } from "@/lib/ontology/constants.js";
 import { outOfDate } from "@/lib/ontology/errors.js";
+import { referenceFor, type TypesReference } from "@/lib/ontology/reference.js";
 import { fetchObjectTypes } from "@/lib/ontology/remote.js";
 import {
   checkOntology,
@@ -27,12 +29,29 @@ interface ProjectInfo {
   name: string;
 }
 
-async function projectInfo(ctx: CommandContext): Promise<ProjectInfo> {
+/** Default reference file: `src/frontal-env.d.ts`, or the root when there is no `src/`. */
+function defaultTypesOut(root: string): string {
+  return existsSync(join(root, "src"))
+    ? join("src", "frontal-env.d.ts")
+    : "frontal-env.d.ts";
+}
+
+async function projectInfo(
+  ctx: CommandContext,
+  typesOut?: string
+): Promise<ProjectInfo> {
   const project = await loadProjectConfig({ env: ctx.globalOpts.env });
+  const frontalDir = join(project.root, PROJECT_STATE_DIR);
+  const reference: TypesReference = referenceFor(
+    resolve(project.root, typesOut ?? defaultTypesOut(project.root)),
+    project.root,
+    frontalDir
+  );
   return {
     context: {
-      frontalDir: join(project.root, PROJECT_STATE_DIR),
+      frontalDir,
       generatorVersion: GENERATOR_VERSION,
+      typesReference: reference,
     },
     environment: project.config.env,
     name: project.config.name,
@@ -74,6 +93,11 @@ function printSync(outcome: SyncOutcome, changed: boolean): void {
   for (const file of outcome.files) {
     console.log(
       `${fileLabel(file.outcome)}${join(PROJECT_STATE_DIR, file.file)}`
+    );
+  }
+  if (outcome.typesReference) {
+    console.log(
+      `${fileLabel(outcome.typesReference.outcome)}${outcome.typesReference.file}`
     );
   }
   for (const warning of outcome.warnings) {
@@ -192,9 +216,13 @@ export function registerSyncCommands(program: Command): void {
         "--check",
         "Offline: fail when committed generated files do not match .frontal/ontology.json"
       )
-      .action((opts: { check?: boolean }, cmd) =>
+      .option(
+        "--types-out <file>",
+        "Reference file that makes new Frontal() typed (default src/frontal-env.d.ts)"
+      )
+      .action((opts: { check?: boolean; typesOut?: string }, cmd) =>
         runAction(cmd, async (ctx) => {
-          const info = await projectInfo(ctx);
+          const info = await projectInfo(ctx, opts.typesOut);
           if (opts.check) {
             runCheck(ctx, info);
             return;
@@ -205,6 +233,7 @@ export function registerSyncCommands(program: Command): void {
     [
       "frontal sync",
       "frontal sync --check   # CI: offline, no credentials needed",
+      "frontal sync --types-out src/types/frontal-env.d.ts",
       "frontal sync --json",
     ]
   );

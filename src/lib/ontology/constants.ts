@@ -7,7 +7,7 @@ export const CONTRACT_VERSION = 1 as const;
  * the generated files change, so upgrading the CLI does not make committed
  * files look stale. Bump it whenever generator output changes.
  */
-export const GENERATOR_VERSION = "2.0.0" as const;
+export const GENERATOR_VERSION = "3.0.0" as const;
 
 /** Format tag written into `ontology.json`. */
 export const ONTOLOGY_FORMAT = "frontal.ontology/v2" as const;

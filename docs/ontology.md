@@ -1,25 +1,26 @@
 # Typed ontology: `frontal sync`
 
 `frontal sync` turns your Frontal ontology into TypeScript types. The generated files live in
-`.frontal/`, and `createFrontal()` from `.frontal/client.ts` gives you an SDK client that
-autocompletes and type-checks your entities.
+`.frontal/`. `new Frontal()` from `@frontal-labs/sdk` is typed by them through a reference file that
+`sync` writes into your source tree, so you use the SDK directly and get autocomplete and
+type-checking on your entities.
 
-Tested against `@frontal-labs/sdk` built from `feat/ontology-types` (commit `b3a1a96`). The generated
-client requires SDK **2.1.0 or later**, which is not published yet. `frontal init` already pins that
-version, so new projects will not type-check until the SDK is released.
+The typed client requires `@frontal-labs/sdk` **2.1.0 or later**, which is not published yet.
+`frontal init` already pins that version, so new projects will not type-check until the SDK is
+released.
 
 ## Quick start
 
 ```sh
 frontal init                 # creates .frontal/config.jsonc
-frontal sync                 # downloads the ontology, writes .frontal/*
-git add .frontal && git commit -m "Add typed ontology"
+frontal sync                 # downloads the ontology, writes .frontal/* and src/frontal-env.d.ts
+git add .frontal src/frontal-env.d.ts && git commit -m "Add typed ontology"
 ```
 
 ```ts
-import { createFrontal } from "./.frontal/client";
+import { Frontal } from "@frontal-labs/sdk";
 
-const frontal = createFrontal({ apiKey: process.env.FRONTAL_API_KEY! });
+const frontal = new Frontal({ apiKey: process.env.FRONTAL_API_KEY! });
 
 const customer = await frontal.ontology.Customer.get("123");
 customer.email;                              // string
@@ -42,14 +43,29 @@ errors. Compiling never needs the network.
 | `config.jsonc` | yes | `frontal init` | Project configuration, including deployment settings |
 | `ontology.json` | yes | `sync` | Raw object types and their hash: the snapshot everything else is generated from |
 | `ontology.d.ts` | yes | `sync` | Entity types (`read`, `create`, `update`, `relations`) |
-| `client.ts` | yes | `sync` | `createFrontal()` plus the runtime metadata the SDK needs |
+| `client.ts` | yes | `sync` | Optional pinned mode: `createFrontal()` with the runtime metadata, no request at start-up |
 | `version.json` | yes | `sync` | Hashes, per-entity versions and the SDK range. No timestamps |
+| `src/frontal-env.d.ts` | yes | `sync` | Reference file that makes `new Frontal()` typed (path set by `--types-out`) |
 | `state/`, `build/`, `artifacts/`, `cache/` | no | other commands | Local-only; `init` ignores them |
 
 Generated TypeScript files start with a three-line header that names the ontology hash and the
 generator version. JSON files carry the same values as fields.
 
 Do not edit generated files. Change the ontology in Frontal Studio and run `frontal sync`.
+
+### The reference file and `--types-out`
+
+`sync` writes `src/frontal-env.d.ts` (or `frontal-env.d.ts` at the root when there is no `src/`). It
+holds one line that references `.frontal/ontology.d.ts`, and that declaration augments the SDK's
+`FrontalOntologyRegistry`. Because of it, `new Frontal()` is typed without importing anything
+generated.
+
+- `frontal sync --types-out <file>` writes the reference elsewhere. Use the same flag with
+  `frontal sync --check` in CI.
+- `sync` refuses to overwrite a file that it did not generate (no generated header). It fails before
+  writing anything, with `ONTOLOGY_REFERENCE_NOT_OWNED`. Move the file aside, or pick another path.
+- Projects that do not want the typed `new Frontal()` can ignore the reference file. Nothing else
+  depends on it.
 
 ## Commands
 
@@ -142,8 +158,13 @@ Entity names that are not identifiers are quoted, e.g. `"legacy-account"`. Field
 
 ## Runtime metadata in `client.ts`
 
-TypeScript types cannot carry names or foreign-key names, so `client.ts` passes a literal as the
-second argument of `createFrontalClient`. It is generated from the same model as the types:
+TypeScript types cannot carry names or foreign-key names, so the SDK needs runtime metadata too. The
+pinned `client.ts` passes it as the second argument of `createFrontalClient`, so it makes no request at
+start-up. Direct use (`new Frontal()` without the literal) derives the same metadata from the live
+object types on the first entity call, one request per client, cached afterwards. The generated literal
+and the derivation must agree; the parity test in `tests/ontology-parity.test.ts` checks that.
+
+The pinned literal is generated from the same model as the types:
 
 ```ts
 const runtime = {
@@ -301,9 +322,11 @@ Backend capabilities the typed client does not use yet:
   backend can answer them.
 - **`update` is not atomic.** It reads the object, merges the patch, and writes it back. A concurrent
   write between those requests can be lost.
-- **`create` assigns the id on the client.** The SDK generates a UUID and writes it with `PUT`. The spec
-  also offers `POST /objects/objects`, which generates an id when none is given. Using it would remove
-  the client-side id; the SDK does not do so yet. `put(id, input)` writes an explicit id.
+- **`create` lets the server assign the id.** It uses `POST /objects/objects`. `put(id, input)` writes an
+  explicit id.
+- **NodeNext projects.** The SDK's built declarations use extensionless relative imports, which
+  `moduleResolution: "NodeNext"` rejects, so `new Frontal()` is typed as `any` there. Bundler resolution
+  works. The fix is `.js` extensions in the SDK's emitted declarations, which is out of scope here.
 
 Assumptions that need confirmation against a live backend (each is marked `ASSUMPTION` in the code):
 
