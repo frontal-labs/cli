@@ -242,5 +242,73 @@ describe.skipIf(!BUN_AVAILABLE)(
       },
       LIVE_TIMEOUT_MS
     );
+
+    it(
+      "creates, lists by filter and deletes relationship instances over HTTP",
+      async () => {
+        const auth = { authorization: `Bearer ${mock.token}` };
+        const json = { ...auth, "content-type": "application/json" };
+        const call = async (method: string, path: string, body?: unknown) => {
+          const res = await fetch(`${mock.url}${path}`, {
+            body: body === undefined ? undefined : JSON.stringify(body),
+            headers: body === undefined ? auth : json,
+            method,
+          });
+          const text = await res.text();
+          return {
+            body: text === "" ? undefined : JSON.parse(text),
+            status: res.status,
+          };
+        };
+
+        await call("PUT", "/ontology/objects/objects/live-rel-c", {
+          object_id: "live-rel-c",
+          object_type_id: "ot_customer",
+          properties: { email: "rel@example.com", status: "active" },
+        });
+        await call("PUT", "/ontology/objects/objects/live-rel-o", {
+          object_id: "live-rel-o",
+          object_type_id: "ot_order",
+          properties: { total: 9 },
+        });
+
+        const created = await call(
+          "POST",
+          "/ontology/relationships/relationships",
+          {
+            properties: {},
+            relationship_id: "live-rel-1",
+            relationship_type_id: "rt_customer_orders",
+            source_object_id: "live-rel-c",
+            target_object_id: "live-rel-o",
+          }
+        );
+        expect(created.status).toBe(201);
+
+        const listed = await call(
+          "GET",
+          "/ontology/relationships/relationships?source_object_id=live-rel-c&relationship_type_id=rt_customer_orders"
+        );
+        expect(listed.status).toBe(200);
+        expect(listed.body).toEqual([
+          expect.objectContaining({
+            relationship_id: "live-rel-1",
+            target_object_id: "live-rel-o",
+          }),
+        ]);
+
+        const removed = await call(
+          "DELETE",
+          "/ontology/relationships/relationships/live-rel-1"
+        );
+        expect(removed.status).toBe(204);
+        const after = await call(
+          "GET",
+          "/ontology/relationships/relationships?source_object_id=live-rel-c"
+        );
+        expect(after.body).toEqual([]);
+      },
+      LIVE_TIMEOUT_MS
+    );
   }
 );

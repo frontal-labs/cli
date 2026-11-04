@@ -47,9 +47,19 @@ export interface MockOptions {
   token?: string;
 }
 
+/** A relationship instance (contract v2, section 5). */
+export interface MockRelationship {
+  properties: Record<string, unknown>;
+  relationship_id: string;
+  relationship_type_id: string;
+  source_object_id: string;
+  target_object_id: string;
+}
+
 export interface MockOntologyBackend {
   objects: () => MockObject[];
   objectTypes: () => MockObjectType[];
+  relationships: () => MockRelationship[];
   /** Every request received, in order, including rejected ones. */
   requests: () => RecordedRequest[];
   /** Replaces the object types, as a Frontal Studio edit would. Not validated. */
@@ -117,6 +127,9 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
 const OBJECT_TYPE_PATH = /^\/ontology\/objects\/object-types\/([^/]+)$/;
 const OBJECT_PATH = /^\/ontology\/objects\/objects\/([^/]+)$/;
+const RELATIONSHIP_PATH = /^\/ontology\/relationships\/relationships\/([^/]+)$/;
+/** Relation kinds that resolve through relationship instances (contract v2, section 5). */
+const RELATIONSHIP_KINDS = ["hasOne", "hasMany", "manyToMany"];
 const ETAG_PATTERN = /^"(\d+)"$/;
 
 /**
@@ -612,6 +625,17 @@ function relationshipProblem(
   if (raw.foreignKey !== undefined && typeof raw.foreignKey !== "string") {
     return `${where}.foreignKey must be a string`;
   }
+  const needsType = RELATIONSHIP_KINDS.includes(raw.type);
+  if (needsType && raw.relationshipTypeId === undefined) {
+    return `${where}.relationshipTypeId is required for ${raw.type}`;
+  }
+  if (
+    raw.relationshipTypeId !== undefined &&
+    (typeof raw.relationshipTypeId !== "string" ||
+      raw.relationshipTypeId === "")
+  ) {
+    return `${where}.relationshipTypeId must be a non-empty string`;
+  }
   return undefined;
 }
 
@@ -660,6 +684,7 @@ export function createMockOntologyBackend(
   const token = options.token ?? MOCK_TOKEN;
   let types: MockObjectType[] = structuredClone(options.objectTypes ?? []);
   const records = new Map<string, MockObject>();
+  const relationships = new Map<string, MockRelationship>();
   /** Monotonic per object id, so a deleted and recreated object never reuses a revision. */
   const revisions = new Map<string, number>();
   for (const object of options.objects ?? []) {
@@ -858,6 +883,101 @@ export function createMockOntologyBackend(
     return notFound("Not Found");
   }
 
+  /** Creates a relationship instance after checking both objects exist. */
+  function createRelationship(body: unknown): Reply {
+    if (!isRecord(body)) {
+      return { body: validationError("body"), status: 422 };
+    }
+    for (const field of [
+      "relationship_type_id",
+      "source_object_id",
+      "target_object_id",
+    ] as const) {
+      const value = body[field];
+      if (typeof value !== "string" || value === "") {
+        return { body: validationError(field), status: 422 };
+      }
+    }
+    const source = String(body.source_object_id);
+    const target = String(body.target_object_id);
+    for (const id of [source, target]) {
+      if (!records.has(id)) {
+        return coded(422, "UNKNOWN_OBJECT", `Object "${id}" does not exist`);
+      }
+    }
+    const id =
+      typeof body.relationship_id === "string" && body.relationship_id !== ""
+        ? body.relationship_id
+        : randomUUID();
+    if (relationships.has(id)) {
+      return coded(
+        409,
+        "ALREADY_EXISTS",
+        `Relationship "${id}" already exists`
+      );
+    }
+    const record: MockRelationship = {
+      properties: isRecord(body.properties) ? body.properties : {},
+      relationship_id: id,
+      relationship_type_id: String(body.relationship_type_id),
+      source_object_id: source,
+      target_object_id: target,
+    };
+    relationships.set(id, record);
+    return { body: record, status: 201 };
+  }
+
+  /** Lists relationship instances matching every filter given (unpaged, insertion order). */
+  function listRelationships(query: URLSearchParams): Reply {
+    const objectId = query.get("object_id");
+    const source = query.get("source_object_id");
+    const target = query.get("target_object_id");
+    const type = query.get("relationship_type_id");
+    const listed = [...relationships.values()].filter(
+      (record) =>
+        (!objectId ||
+          record.source_object_id === objectId ||
+          record.target_object_id === objectId) &&
+        (!source || record.source_object_id === source) &&
+        (!target || record.target_object_id === target) &&
+        (!type || record.relationship_type_id === type)
+    );
+    return { body: listed, status: 200 };
+  }
+
+  function deleteRelationship(id: string): Reply {
+    if (!relationships.has(id)) {
+      return coded(404, "NOT_FOUND", "Relationship not found");
+    }
+    relationships.delete(id);
+    return { status: 204 };
+  }
+
+  /** Routes the relationship-instance endpoints (contract v2, section 5). */
+  function routeRelationships(
+    method: string,
+    path: string,
+    query: URLSearchParams,
+    req: IncomingMessage
+  ): Promise<Reply> {
+    if (path === "/ontology/relationships/relationships") {
+      if (method === "GET") {
+        return Promise.resolve(listRelationships(query));
+      }
+      if (method === "POST") {
+        return readJson(req).then((body) => createRelationship(body));
+      }
+      return Promise.resolve(notFound("Not Found"));
+    }
+    const match = RELATIONSHIP_PATH.exec(path);
+    if (match && method === "DELETE") {
+      return Promise.resolve(
+        deleteRelationship(decodeURIComponent(match[1] ?? ""))
+      );
+    }
+    return Promise.resolve(notFound("Not Found"));
+  }
+
   /** Routes one authorised request. Paths are relative to `/v1`. */
   function route(
     method: string,
@@ -885,6 +1005,9 @@ export function createMockOntologyBackend(
     const objectMatch = OBJECT_PATH.exec(path);
     if (objectMatch) {
       return routeObject(method, decodeURIComponent(objectMatch[1] ?? ""), req);
+    }
+    if (path.startsWith("/ontology/relationships/relationships")) {
+      return routeRelationships(method, path, query, req);
     }
     return Promise.resolve(notFound("Not Found"));
   }
@@ -929,6 +1052,8 @@ export function createMockOntologyBackend(
     objects: () =>
       [...records.values()].map((record) => structuredClone(record)),
     objectTypes: () => structuredClone(types),
+    relationships: () =>
+      [...relationships.values()].map((record) => structuredClone(record)),
     requests: () => log.map((entry) => ({ ...entry })),
 
     setObjectTypes(objectTypes: MockObjectType[]): void {

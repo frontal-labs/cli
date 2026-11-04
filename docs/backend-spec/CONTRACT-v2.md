@@ -80,3 +80,29 @@ Invalid schema: `422`, `{ "code": "INVALID_SCHEMA", "detail": "..." }`.
 
 Every non-2xx response from the v2 additions has `code` (a stable upper-case identifier) and `detail`
 (human text). The v1 `{ detail }`-only responses remain valid for endpoints that do not yet return a code.
+
+## 5. Relationship traversal (decision: source-side lists, target-side single lookup)
+
+The v1 spec already defines relationship instances:
+
+- `POST /v1/ontology/relationships/relationships` with `RelationshipBody`
+  `{ relationship_type_id, source_object_id, target_object_id, relationship_id?, properties }`
+  returns `201 RelationshipResponse`.
+- `GET /v1/ontology/relationships/relationships?source_object_id=&target_object_id=&relationship_type_id=`
+  returns an array of `RelationshipResponse` (unpaged).
+- `DELETE /v1/ontology/relationships/relationships/{relationship_id}` returns `204`.
+
+v2 adds one optional field to the object-type schema:
+
+- `relationships[<name>].relationshipTypeId` (string, optional): the `relationship_type_id` used for
+  instances of that relation. Required for `hasOne`, `hasMany` and `manyToMany` to resolve; a missing
+  value is a generator error for those kinds.
+
+Resolution, given the source object `S` and relation `R` with relationship type `T`:
+
+- `belongsTo`: unchanged, the foreign key lives on `S.properties`.
+- `hasMany` and `manyToMany`: `GET ...?source_object_id=S.id&relationship_type_id=T`. Each element's
+  `target_object_id` is then fetched with `GET /objects/objects/{id}`. Result: every target, in the order
+  returned.
+- `hasOne`: the same query. Zero results gives `null`; one gives that target; more than one is an error
+  `TOO_MANY_RELATIONSHIPS` (the server does not enforce cardinality in v1).

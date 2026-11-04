@@ -40,6 +40,8 @@ const OBJECT_TYPES: MockObjectType[] = [
   { name: "Company", object_type_id: "ot_company", schema: COMPANY_SCHEMA },
 ];
 
+const UUID_PATTERN = /^[0-9a-f-]{36}$/;
+
 let mock: MockOntologyBackend;
 
 beforeEach(async () => {
@@ -514,5 +516,207 @@ describe("object-type schema", () => {
     );
     expect(res.status).toBe(422);
     expect(errorCode(res)).toBe("INVALID_SCHEMA");
+  });
+});
+
+describe("contract v2 section 5: relationship instances", () => {
+  const ORDER_TYPE = {
+    name: "Order",
+    object_type_id: "ot_order",
+    schema: { fields: { total: { type: "float" } } },
+  };
+
+  async function seedTwoCustomersAndOrder(): Promise<void> {
+    await call("PUT", "/ontology/objects/objects/c-1", {
+      body: customer("c-1", { email: "a@example.com" }),
+    });
+    await call("PUT", "/ontology/objects/objects/c-2", {
+      body: customer("c-2", { email: "b@example.com" }),
+    });
+    await call("PUT", "/ontology/objects/objects/o-1", {
+      body: { object_id: "o-1", object_type_id: "ot_order", properties: {} },
+    });
+  }
+
+  it("creates an instance with a server-generated id", async () => {
+    await seedTwoCustomersAndOrder();
+    const res = await call("POST", "/ontology/relationships/relationships", {
+      body: {
+        properties: {},
+        relationship_type_id: "rt_orders",
+        source_object_id: "c-1",
+        target_object_id: "o-1",
+      },
+    });
+    expect(res.status).toBe(201);
+    const created = res.body as { relationship_id: string };
+    expect(created.relationship_id).toMatch(UUID_PATTERN);
+  });
+
+  it("keeps a client-supplied relationship id", async () => {
+    await seedTwoCustomersAndOrder();
+    const res = await call("POST", "/ontology/relationships/relationships", {
+      body: {
+        relationship_id: "rel-fixed",
+        relationship_type_id: "rt_orders",
+        source_object_id: "c-1",
+        target_object_id: "o-1",
+      },
+    });
+    expect(res.status).toBe(201);
+    expect((res.body as { relationship_id: string }).relationship_id).toBe(
+      "rel-fixed"
+    );
+  });
+
+  it("rejects an instance whose source or target object does not exist", async () => {
+    await seedTwoCustomersAndOrder();
+    const res = await call("POST", "/ontology/relationships/relationships", {
+      body: {
+        relationship_type_id: "rt_orders",
+        source_object_id: "c-1",
+        target_object_id: "missing",
+      },
+    });
+    expect(res.status).toBe(422);
+    expect(errorCode(res)).toBe("UNKNOWN_OBJECT");
+  });
+
+  it("rejects an instance without a relationship type", async () => {
+    await seedTwoCustomersAndOrder();
+    const res = await call("POST", "/ontology/relationships/relationships", {
+      body: { source_object_id: "c-1", target_object_id: "o-1" },
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("refuses a duplicate relationship id", async () => {
+    await seedTwoCustomersAndOrder();
+    const body = {
+      relationship_id: "rel-dup",
+      relationship_type_id: "rt_orders",
+      source_object_id: "c-1",
+      target_object_id: "o-1",
+    };
+    await call("POST", "/ontology/relationships/relationships", { body });
+    const again = await call("POST", "/ontology/relationships/relationships", {
+      body,
+    });
+    expect(again.status).toBe(409);
+    expect(errorCode(again)).toBe("ALREADY_EXISTS");
+  });
+
+  it("filters by source, target, type and object id, unpaged", async () => {
+    await seedTwoCustomersAndOrder();
+    const post = (source: string, target: string, type: string) =>
+      call("POST", "/ontology/relationships/relationships", {
+        body: {
+          relationship_type_id: type,
+          source_object_id: source,
+          target_object_id: target,
+        },
+      });
+    await post("c-1", "o-1", "rt_orders");
+    await post("c-2", "o-1", "rt_orders");
+    await post("c-1", "c-2", "rt_friends");
+
+    const bySource = await call(
+      "GET",
+      "/ontology/relationships/relationships?source_object_id=c-1&relationship_type_id=rt_orders"
+    );
+    expect(bySource.status).toBe(200);
+    expect(bySource.body).toHaveLength(1);
+
+    const byTarget = await call(
+      "GET",
+      "/ontology/relationships/relationships?target_object_id=o-1"
+    );
+    expect(byTarget.body).toHaveLength(2);
+
+    const byObject = await call(
+      "GET",
+      "/ontology/relationships/relationships?object_id=c-2"
+    );
+    expect(byObject.body).toHaveLength(2);
+  });
+
+  it("deletes an instance with 204, then 404 with NOT_FOUND", async () => {
+    await seedTwoCustomersAndOrder();
+    const created = await call(
+      "POST",
+      "/ontology/relationships/relationships",
+      {
+        body: {
+          relationship_id: "rel-gone",
+          relationship_type_id: "rt_orders",
+          source_object_id: "c-1",
+          target_object_id: "o-1",
+        },
+      }
+    );
+    expect(created.status).toBe(201);
+    const removed = await call(
+      "DELETE",
+      "/ontology/relationships/relationships/rel-gone"
+    );
+    expect(removed.status).toBe(204);
+    const missing = await call(
+      "DELETE",
+      "/ontology/relationships/relationships/rel-gone"
+    );
+    expect(missing.status).toBe(404);
+    expect(errorCode(missing)).toBe("NOT_FOUND");
+  });
+
+  it("requires relationshipTypeId for hasOne, hasMany and manyToMany in object-type schemas", async () => {
+    await call("PUT", "/ontology/objects/object-types/ot_order", {
+      body: { name: "Order", schema: ORDER_TYPE.schema },
+    });
+    const res = await call(
+      "PUT",
+      "/ontology/objects/object-types/ot_customer",
+      {
+        body: {
+          name: "Customer",
+          schema: {
+            fields: { email: { type: "string" } },
+            relationships: {
+              orders: { targetEntity: "Order", type: "hasMany" },
+            },
+          },
+        },
+      }
+    );
+    expect(res.status).toBe(422);
+    expect(errorCode(res)).toBe("INVALID_SCHEMA");
+    expect((res.body as { detail: string }).detail).toContain(
+      "relationshipTypeId is required for hasMany"
+    );
+  });
+
+  it("accepts a relationship type id on a hasMany relation", async () => {
+    await call("PUT", "/ontology/objects/object-types/ot_order", {
+      body: { name: "Order", schema: ORDER_TYPE.schema },
+    });
+    const res = await call(
+      "PUT",
+      "/ontology/objects/object-types/ot_customer",
+      {
+        body: {
+          name: "Customer",
+          schema: {
+            fields: { email: { type: "string" } },
+            relationships: {
+              orders: {
+                relationshipTypeId: "rt_orders",
+                targetEntity: "Order",
+                type: "hasMany",
+              },
+            },
+          },
+        },
+      }
+    );
+    expect(res.status).toBe(200);
   });
 });

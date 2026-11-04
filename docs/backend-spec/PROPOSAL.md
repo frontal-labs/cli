@@ -132,3 +132,11 @@ Proposal: add an optional `code` (for example `OBJECT_NOT_FOUND`, `UNKNOWN_PROPE
 
 1 and 2 unblock atomic update and the typed query. 3 removes the last schema assumption. 4 is useful
 but not blocking.
+
+## 5. Relationship traversal (implemented in the mock only)
+
+Status: the mock implements `GET`, `POST` and `DELETE` on `/v1/ontology/relationships/relationships`, the
+`relationshipTypeId` field on object-type relations, and the filters described in `CONTRACT-v2.md` section 5.
+Production does not serve the `relationshipTypeId` field yet, so `hasOne`, `hasMany` and `manyToMany`
+relations do not resolve against the real service.
+
