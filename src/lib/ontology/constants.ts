@@ -16,7 +16,7 @@ export const ONTOLOGY_FORMAT = "frontal.ontology/v2" as const;
  * First @frontal-labs/sdk release with the generic `createFrontalClient<T>`
  * factory that generated clients import. Published 2.0.0 does not have it.
  */
-export const SDK_MIN_VERSION = "2.1.0";
+export const SDK_MIN_VERSION = "2.2.0";
 export const SDK_RANGE = `>=${SDK_MIN_VERSION} <3.0.0`;
 
 /** Path of the object-type list as the SDK's ontology namespace expects it. */

@@ -75,7 +75,7 @@ describe("header", () => {
       contractVersion: 1,
       generatorVersion: "0.1.2",
       schemaHash: META.schemaHash,
-      sdkRange: ">=2.1.0 <3.0.0",
+      sdkRange: ">=2.2.0 <3.0.0",
     });
   });
 });
