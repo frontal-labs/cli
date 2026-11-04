@@ -6,6 +6,10 @@ import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { runAction } from "@/lib/command.js";
 import { SDK_MIN_VERSION } from "@/lib/ontology/constants.js";
+import {
+  fetchPublishedVersions,
+  isVersionPublished,
+} from "@/lib/ontology/registry.js";
 import { withExamples } from "@/lib/output.js";
 import {
   PROJECT_CONFIG_FILE,
@@ -227,6 +231,24 @@ function printInitResult(result: InitResult): void {
   );
 }
 
+/**
+ * Warns when the SDK version a new project is pinned to is not on npm, since
+ * `install` would then fail. The check needs the registry; when it cannot be
+ * read, the warning is skipped rather than guessed.
+ */
+async function warnIfSdkUnpublished(): Promise<void> {
+  const versions = await fetchPublishedVersions("@frontal-labs/sdk");
+  if (versions === undefined || isVersionPublished(versions, SDK_MIN_VERSION)) {
+    return;
+  }
+  console.log("");
+  console.log(
+    theme.warn(
+      `@frontal-labs/sdk ${SDK_MIN_VERSION} is not on npm yet, so \`install\` will fail for this project until it is published.`
+    )
+  );
+}
+
 export function registerInitCommand(program: Command): void {
   withExamples(
     program
@@ -240,7 +262,7 @@ export function registerInitCommand(program: Command): void {
       )
       .option("--force", "Overwrite existing project config / .env.example")
       .action((opts: InitOptions, cmd) =>
-        runAction(cmd, ({ fmt, globalOpts }) => {
+        runAction(cmd, async ({ fmt, globalOpts }) => {
           const result = initProject(process.cwd(), opts);
 
           if (globalOpts.json) {
@@ -249,6 +271,7 @@ export function registerInitCommand(program: Command): void {
           }
 
           printInitResult(result);
+          await warnIfSdkUnpublished();
         })
       ),
     [
