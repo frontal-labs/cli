@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, relative, sep } from "node:path";
+import { dirname, isAbsolute, relative, sep } from "node:path";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { GENERATED_BANNER, ONTOLOGY_FILES } from "@/lib/ontology/constants.js";
@@ -32,6 +32,17 @@ export function referenceFor(
   projectRoot: string,
   frontalDir: string
 ): TypesReference {
+  const inside = relative(projectRoot, file);
+  if (isAbsolute(inside) || inside === ".." || inside.startsWith(`..${sep}`)) {
+    throw new CliError(
+      ONTOLOGY_ERROR_CODES.invalid,
+      `--types-out must be inside the project (${file} is outside ${projectRoot}).`,
+      {
+        exitCode: EXIT_CODES.VALIDATION_ERROR,
+        fix: "Pass a path under the project root, for example src/frontal-env.d.ts.",
+      }
+    );
+  }
   return {
     displayPath: posixRelative(projectRoot, file).replace(
       LEADING_DOT_SLASH,

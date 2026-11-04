@@ -53,7 +53,9 @@ export function registerWorkflowsCommands(program: Command): void {
           fmt.object(result);
         })
       ),
-    ['frontal workflows create --body \'{"name":"nightly","steps":[]}\'']
+    [
+      'frontal workflows create --body \'{"name":"nightly","triggers":[{"type":"manual"}],"steps":[{"id":"sync","type":"task","config":{}}]}\'',
+    ]
   );
 
   withExamples(
