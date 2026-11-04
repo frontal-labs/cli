@@ -2,7 +2,7 @@
 
 The CLI has two configuration layers:
 
-1. **Project** — `frontal.jsonc` in the project root (plus optional `frontal.<env>.jsonc` overlays) and a gitignored `.env.local`.
+1. **Project** — `.frontal/config.jsonc` (plus optional `.frontal/config.<env>.jsonc` overlays) and a gitignored `.env.local`.
 2. **User** — profiles in `~/.frontal/config.json` managed by `frontal config` / `frontal auth`.
 
 ## Resolution order
@@ -12,11 +12,36 @@ For the API key and base URL:
 1. Command-line flag (`--api-key`, `--api-url`)
 2. Shell environment (`FRONTAL_API_KEY`, `FRONTAL_API_URL`)
 3. `.env.local` in the project
-4. `apiUrl` from `frontal.jsonc`
+4. `apiUrl` from the project config
 5. The active profile (API key, then OAuth session; `baseUrl`)
 6. Defaults (`https://api.frontal.dev/v1`)
 
-## `frontal.jsonc`
+## Config locations and precedence
+
+The project config is the first file found, in this order, in the project directory or the nearest
+parent that has one:
+
+1. `.frontal/config.jsonc` (default; `frontal init` writes this)
+2. `.frontal/config.json`
+3. `frontal.jsonc` (root, earlier layout)
+4. `frontal.json` (root, earlier layout)
+
+Only a config file makes a directory the project root, so a `.frontal/` that holds only `state/`,
+`build/` or `policies/` does not count. Keep one project config. When more than one exists, the
+first wins and the CLI prints one warning naming the ignored files.
+
+Environment overlays use the same order: `.frontal/config.<env>.jsonc`, `.frontal/config.<env>.json`,
+`frontal.<env>.jsonc`, `frontal.<env>.json`. The first one that exists is merged over the base.
+
+`frontal init` keeps an existing config where it is, so it never creates a second one. To move a
+legacy file to the default location, run `git mv frontal.jsonc .frontal/config.jsonc`.
+
+Keys from the earlier `frontal.json` web-deploy format (`framework`, `regions`, `build`, `deployment`,
+`features`, `functions`, `headers`, `redirects`, `rewrites`) are accepted in any location and validated
+against the same rules. No command acts on them yet; they are documented in the schema as legacy
+web-deploy settings.
+
+## Project config (`.frontal/config.jsonc`)
 
 ```jsonc
 {
@@ -61,7 +86,7 @@ Point `$schema` at it for editor validation and completions.
 
 ### Environment overlays
 
-`frontal.staging.jsonc` / `frontal.prod.jsonc` are deep-merged over `frontal.jsonc`
+`.frontal/config.staging.jsonc` (or a legacy `frontal.staging.jsonc`) is deep-merged over the base config
 when the environment is selected (`--env staging` or `"env": "staging"`). Overlays
 usually only change `apiUrl`, `vars` and `services.*.remote`.
 
@@ -75,7 +100,7 @@ FRONTAL_API_URL=https://api.frontal.dev/v1
 ```
 
 `frontal init` writes `.env.example` as a template; `frontal env pull` writes `.env.local`
-from `frontal.jsonc` and your credential, and `frontal env push` uploads the variables
+from `.frontal/config.jsonc` and your credential, and `frontal env push` uploads the variables
 (except the connection settings) to the current deployment.
 
 ## Environment variables

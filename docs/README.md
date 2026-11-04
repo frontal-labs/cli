@@ -8,7 +8,7 @@ Frontal CLI lets you work with the Frontal platform from your terminal: scaffold
 
 ## Features
 
-- **Project model**: `frontal.jsonc` with per-environment overlays and generated typings
+- **Project model**: `.frontal/config.jsonc` with per-environment overlays and generated typings
 - **SDK transport**: every call goes through `@frontal-labs/sdk`; errors carry a code, fix hint, docs link and request id
 - **Authentication**: browser OAuth (PKCE) or API keys, multiple profiles
 - **Workflows, runs, invocations, events**: typed access to the public API, SSE streaming
@@ -59,7 +59,7 @@ All commands support these global options:
 ## Command Categories
 
 ### Project
-- `init`: Create `frontal.jsonc` and the project skeleton
+- `init`: Create `.frontal/config.jsonc` and the project skeleton
 - `types`: Generate `FrontalEnv` / `FrontalServices` / `FrontalProject` typings
 
 ### Authentication & Configuration

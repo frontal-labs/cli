@@ -6,7 +6,7 @@
 
 The official command-line interface for the [Frontal](https://frontal.dev) platform.
 Every API call goes through [`@frontal-labs/sdk`](https://github.com/frontal-labs/sdk-typescript);
-the CLI adds a project model (`frontal.jsonc`), a local dev loop and deployment workflows on top.
+the CLI adds a project model (`.frontal/config.jsonc`), a local dev loop and deployment workflows on top.
 
 ```bash skip
 frontal init --name my-app
@@ -44,10 +44,10 @@ frontal --help           # grouped command overview with examples
 ```bash
 frontal init --name my-app
 cd my-app
-cat frontal.jsonc
+cat .frontal/config.jsonc
 ```
 
-`types` turns `frontal.jsonc` into typings for your app — `FrontalEnv` (vars + secrets),
+`types` turns `.frontal/config.jsonc` into typings for your app — `FrontalEnv` (vars + secrets),
 `FrontalServices` (the SDK client for every enabled service), `FrontalProject`,
 plus `FrontalVars` / `FrontalSecrets` and the `FrontalEnvName` / `FrontalServiceName` /
 `FrontalKnownService` unions (with a `NodeJS.ProcessEnv` augmentation):
@@ -64,7 +64,7 @@ regenerated in place; commit it or add it to your build.
 ## Local development: `frontal dev`
 
 `dev` runs a local Frontal API for the project — no API key required. Every service
-listed in `frontal.jsonc` is served from SDK-compatible fixtures persisted under
+listed in `.frontal/config.jsonc` is served from SDK-compatible fixtures persisted under
 `.frontal/state/` (gitignored), so your app can use `@frontal-labs/sdk` unchanged:
 
 ```bash
@@ -99,7 +99,7 @@ every response carries an `X-Request-Id`. Ctrl+C shuts down cleanly.
 
 ## Environment, logs and policies
 
-`env pull` writes `.env.local` from `frontal.jsonc` (`vars`, `secrets.required`, `apiUrl`)
+`env pull` writes `.env.local` from `.frontal/config.jsonc` (`vars`, `secrets.required`, `apiUrl`)
 and your active API-key credential (`--api-key`, `FRONTAL_API_KEY`, or profile key;
 OAuth sessions do not seed the file) — never overwriting an existing file without `--force`, and
 never printing secret values. `logs` and `policy check` work against the local dev server
@@ -146,7 +146,7 @@ cat dist/frontal/manifest.json
 frontal deploy --preview                          # prints https://api.frontal.dev/v1/workers/my-app-preview
 frontal promote https://api.frontal.dev/v1/workers/my-app-preview
 frontal deploy --prod --yes
-frontal rollback                                  # previous production artifact (+ agents listed in frontal.jsonc)
+frontal rollback                                  # previous production artifact (+ agents listed in .frontal/config.jsonc)
 ```
 
 ## Project configuration: `.frontal/config.jsonc`
@@ -175,7 +175,7 @@ frontal rollback                                  # previous production artifact
   (`agents, ai, audit, auth, billing, blob, connectors, data, datasets, events, governance,
   graph, integrations, lineage, observability, ontology, pipelines, sandbox, schedules,
   webhooks, workers, workflows`).
-- The config lives in `.frontal/config.jsonc`. A root `frontal.jsonc` is still read when no
+- The config lives in `.frontal/config.jsonc`. A root `.frontal/config.jsonc` is still read when no
   `.frontal/config.jsonc` exists, so older projects keep working; `frontal init` writes the new
   location.
 - Per-environment overlays: `.frontal/config.staging.jsonc` is deep-merged over the base config
@@ -214,12 +214,12 @@ Set `FRONTAL_CONFIG_DIR` to relocate the profile store (CI, tests).
 
 | Command | Purpose |
 |---|---|
-| `frontal init [--name <dir>] [--force]` | Create `frontal.jsonc`, `.env.example`, `package.json` (if missing, never overwritten), `src/.gitkeep`, `.gitignore` entries |
+| `frontal init [--name <dir>] [--force]` | Create `.frontal/config.jsonc`, `.env.example`, `package.json` (if missing, never overwritten), `src/.gitkeep`, `.gitignore` entries |
 | `frontal dev [--port] [--scenario] [--remote] [--persist-to]` | Local Frontal API backed by `.frontal/state` |
 | `frontal types [--out <file>]` | Generate `FrontalEnv` / `FrontalServices` / `FrontalProject` typings |
 | `frontal deploy [--preview\|--prod] [--yes] [--dry-run --outdir <dir>]` | Bundle + upload a worker; print its URL |
 | `frontal promote <url>` / `frontal rollback [url]` | Re-point production at a recorded artifact (no rebuild) |
-| `frontal env pull [file] [--force]` / `frontal env push [file]` | `.env.local` from `frontal.jsonc` + credentials / upload vars to the current deployment |
+| `frontal env pull [file] [--force]` / `frontal env push [file]` | `.env.local` from `.frontal/config.jsonc` + credentials / upload vars to the current deployment |
 | `frontal logs [--follow] [--filter <q>] [--since 15m] [--level <l>]` | Query or tail platform logs (SSE) |
 | `frontal policy check [--strict] [--user] [--role]` | Dry-run governance: policy files, deploy access per service, compliance |
 | `frontal auth <login\|password-login\|signup\|logout\|whoami\|token\|refresh\|mfa>` | Sessions, API keys, MFA |
