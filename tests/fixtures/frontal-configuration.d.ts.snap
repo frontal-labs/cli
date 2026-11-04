@@ -7,7 +7,7 @@ export type FrontalEnvName = "dev" | "staging" | "prod";
 export type FrontalServiceName = "agents" | "ai" | "graph";
 export type FrontalKnownService = "agents" | "ai" | "audit" | "auth" | "billing" | "blob" | "connectors" | "data" | "datasets" | "events" | "governance" | "graph" | "integrations" | "lineage" | "observability" | "ontology" | "pipelines" | "sandbox" | "schedules" | "webhooks" | "workers" | "workflows";
 
-/** Plain configuration values from `vars` in frontal.jsonc. */
+/** Plain configuration values from `vars` in .frontal/config.jsonc. */
 export interface FrontalVars {
   LOG_LEVEL: string;
   REGION: string;
@@ -25,14 +25,14 @@ export interface FrontalEnv extends FrontalVars, FrontalSecrets {
   FRONTAL_API_URL?: string;
 }
 
-/** Services enabled in frontal.jsonc and their SDK clients. */
+/** Services enabled in .frontal/config.jsonc and their SDK clients. */
 export interface FrontalServices {
   agents: { remote: false; client: FrontalSdk["agents"] };
   ai: { remote: true; client: FrontalSdk["ai"] };
   graph: { remote: false; client: FrontalSdk["graph"] };
 }
 
-/** The validated frontal.jsonc for this project. */
+/** The validated .frontal/config.jsonc for this project. */
 export interface FrontalProject {
   name: "fixture-app";
   env: FrontalEnvName;
