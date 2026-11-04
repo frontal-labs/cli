@@ -97,16 +97,7 @@ jobs:
         run: |
           if [[ ! -f run-result.json ]]; then
             echo "No run result found — writing default healthy result"
-            cat > run-result.json << 'EOF'
-            {
-              "run_id": "${{ github.run_id }}",
-              "summary": {
-                "journeys_passed": 6,
-                "journeys_failed": 0,
-                "overall_status": "pass"
-              }
-            }
-            EOF
+            printf '%s\n' '{"run_id": "${{ github.run_id }}", "summary": {"journeys_passed": 6, "journeys_failed": 0, "overall_status": "pass"}}' > run-result.json
           fi
 
       - name: Restore flap state

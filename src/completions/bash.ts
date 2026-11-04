@@ -1,4 +1,5 @@
 import type { Command, Option } from "commander";
+import { isHiddenCommand } from "@/completions/hidden.js";
 
 function collectOptionFlags(opts: readonly Option[]): string[] {
   const flags: string[] = [];
@@ -16,7 +17,7 @@ function collectOptionFlags(opts: readonly Option[]): string[] {
 function collectVisibleSubcommandNames(cmds: readonly Command[]): string[] {
   const names: string[] = [];
   for (const cmd of cmds) {
-    if ((cmd as { _hidden?: boolean })._hidden) {
+    if (isHiddenCommand(cmd)) {
       continue;
     }
     names.push(cmd.name());
@@ -29,7 +30,7 @@ export function generateBashCompletions(program: Command): string {
   const cases: string[] = [];
 
   for (const cmd of program.commands) {
-    if ((cmd as { _hidden?: boolean })._hidden) {
+    if (isHiddenCommand(cmd)) {
       continue;
     }
     const name = cmd.name();

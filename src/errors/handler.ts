@@ -1,5 +1,6 @@
 import { CliError, docsUrlFor } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
+import { isJsonRecord, jsonField, jsonFlag } from "@/lib/json.js";
 import { redact, redactString } from "@/output/redact.js";
 import { theme } from "@/output/theme.js";
 
@@ -7,12 +8,12 @@ export interface ErrorReport {
   code: string;
   docs: string;
   exitCode: number;
-  fields?: { field: string; message: string }[];
-  fix?: string;
+  fields?: { field: string; message: string }[] | undefined;
+  fix?: string | undefined;
   message: string;
-  requestId?: string;
-  retryAfter?: number;
-  statusCode?: number;
+  requestId?: string | undefined;
+  retryAfter?: number | undefined;
+  statusCode?: number | undefined;
 }
 
 interface ApiErrorShape {
@@ -40,8 +41,8 @@ const FIX_BY_CODE: Record<string, string> = {
 };
 
 function asApiError(err: unknown): ApiErrorShape | undefined {
-  if (err instanceof Error && typeof (err as ApiErrorShape).code === "string") {
-    return err as ApiErrorShape;
+  if (err instanceof Error && "code" in err && typeof err.code === "string") {
+    return err;
   }
 }
 
@@ -85,14 +86,11 @@ function fieldsFrom(value: unknown): ErrorReport["fields"] {
     return;
   }
   const fields: { field: string; message: string }[] = [];
-  for (const item of value) {
-    if (item && typeof item === "object") {
-      const record = item as Record<string, unknown>;
-      fields.push({
-        field: String(record.field ?? record.path ?? ""),
-        message: String(record.message ?? ""),
-      });
-    }
+  for (const item of value.filter(isJsonRecord)) {
+    fields.push({
+      field: String(jsonField(item, "field") ?? jsonField(item, "path") ?? ""),
+      message: String(jsonField(item, "message") ?? ""),
+    });
   }
   return fields.length > 0 ? fields : undefined;
 }
@@ -124,26 +122,34 @@ function classifyApiError(err: ApiErrorShape): ErrorReport {
   };
 }
 
+/** The fix hint for an error code, if the table has one. */
+function fixFor(code: string): string | undefined {
+  return FIX_BY_CODE[code];
+}
+
 function classifyZodError(err: Error): ErrorReport {
-  const { issues } = err as { issues?: unknown };
+  const issues: unknown = "issues" in err ? err.issues : undefined;
   return {
     code: "VALIDATION_ERROR",
     docs: docsUrlFor("VALIDATION_ERROR"),
     exitCode: EXIT_CODES.VALIDATION_ERROR,
     fields: Array.isArray(issues)
-      ? issues.map((issue) => ({
-          field: Array.isArray(issue.path) ? issue.path.join(".") : "",
-          message: String(issue.message ?? ""),
-        }))
+      ? issues.filter(isJsonRecord).map((issue) => {
+          const path = jsonField(issue, "path");
+          return {
+            field: Array.isArray(path) ? path.join(".") : "",
+            message: String(jsonField(issue, "message") ?? ""),
+          };
+        })
       : undefined,
-    fix: FIX_BY_CODE.VALIDATION_ERROR,
+    fix: fixFor("VALIDATION_ERROR"),
     message: "Input validation failed.",
   };
 }
 
 export function classifyError(
   err: unknown,
-  context: { requestId?: string } = {}
+  context: { requestId?: string | undefined } = {}
 ): ErrorReport {
   if (err instanceof CliError) {
     return {
@@ -209,7 +215,7 @@ export function classifyError(
 
 export interface HandleErrorOptions {
   /** Request id captured by the SDK transport, when the error has none. */
-  requestId?: string;
+  requestId?: string | undefined;
 }
 
 /**
@@ -230,8 +236,8 @@ export function renderError(
   globalOpts?: Record<string, unknown>,
   options: HandleErrorOptions = {}
 ): ErrorReport {
-  const debug = Boolean(globalOpts?.debug);
-  const json = Boolean(globalOpts?.json);
+  const debug = globalOpts !== undefined && jsonFlag(globalOpts, "debug");
+  const json = globalOpts !== undefined && jsonFlag(globalOpts, "json");
   const report = classifyError(err, { requestId: options.requestId });
 
   if (json) {

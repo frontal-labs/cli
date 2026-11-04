@@ -224,12 +224,12 @@ describe("frontal promote / rollback", () => {
     ).not.toContain("v2");
   });
 
-  it("also rolls back agents listed in frontal.jsonc", async () => {
+  it("also rolls back agents listed in the project config", async () => {
     const config = parseJsonc(
-      readFileSync(join(root, "frontal.jsonc"), "utf-8")
+      readFileSync(join(root, ".frontal", "config.jsonc"), "utf-8")
     ) as Record<string, unknown>;
     writeFileSync(
-      join(root, "frontal.jsonc"),
+      join(root, ".frontal", "config.jsonc"),
       JSON.stringify({ ...config, agents: ["agt_ok", "agt_missing"] })
     );
     const mock = await mockApi([

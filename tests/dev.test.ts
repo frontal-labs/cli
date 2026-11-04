@@ -421,7 +421,7 @@ describe("frontal dev server", () => {
     );
 
     // A broken config keeps the previous table.
-    const config = join(root, "frontal.jsonc");
+    const config = join(root, ".frontal", "config.jsonc");
     writeFileSync(config, '{ "name": "x", "services": { "bogus": {} } }');
     await new Promise((resolve) => setTimeout(resolve, 1000));
     expect((await (await fetch(`${url}/v1/agents/health`)).json()).status).toBe(

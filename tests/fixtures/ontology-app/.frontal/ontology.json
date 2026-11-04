@@ -1,0 +1,156 @@
+{
+  "format": "frontal.ontology/v2",
+  "objectTypes": [
+    {
+      "name": "Address",
+      "object_type_id": "ot_address",
+      "schema": {
+        "fields": {
+          "city": {
+            "type": "string"
+          },
+          "street": {
+            "required": true,
+            "type": "string"
+          }
+        },
+        "version": 1
+      }
+    },
+    {
+      "name": "Company",
+      "object_type_id": "ot_company",
+      "schema": {
+        "fields": {
+          "industry": {
+            "enum": [
+              "software",
+              "retail"
+            ],
+            "type": "enum"
+          },
+          "name": {
+            "required": true,
+            "type": "string"
+          }
+        },
+        "relationships": {
+          "contacts": {
+            "relationshipTypeId": "rt_company_contacts",
+            "targetEntity": "Customer",
+            "type": "manyToMany"
+          }
+        },
+        "version": 1
+      }
+    },
+    {
+      "name": "Customer",
+      "object_type_id": "ot_customer",
+      "schema": {
+        "fields": {
+          "age": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "auto": true,
+            "required": true,
+            "type": "timestamp"
+          },
+          "displayName": {
+            "computed": true,
+            "type": "string"
+          },
+          "email": {
+            "required": true,
+            "type": "string"
+          },
+          "embedding": {
+            "dimensions": 3,
+            "type": "vector"
+          },
+          "external-ref": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "text"
+          },
+          "profile": {
+            "type": "json"
+          },
+          "score": {
+            "default": 0,
+            "required": true,
+            "type": "float"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "closed"
+            ],
+            "required": true,
+            "type": "enum"
+          },
+          "tags": {
+            "items": "string",
+            "type": "array"
+          }
+        },
+        "relationships": {
+          "company": {
+            "targetEntity": "Company",
+            "type": "belongsTo"
+          },
+          "orders": {
+            "relationshipTypeId": "rt_customer_orders",
+            "targetEntity": "Order",
+            "type": "hasMany"
+          },
+          "primaryAddress": {
+            "relationshipTypeId": "rt_customer_address",
+            "targetEntity": "Address",
+            "type": "hasOne"
+          }
+        },
+        "version": 3
+      }
+    },
+    {
+      "name": "Order",
+      "object_type_id": "ot_order",
+      "schema": {
+        "fields": {
+          "total": {
+            "required": true,
+            "type": "float"
+          }
+        },
+        "relationships": {
+          "customer": {
+            "targetEntity": "Customer",
+            "type": "belongsTo"
+          }
+        },
+        "version": 1
+      }
+    },
+    {
+      "name": "legacy-account",
+      "object_type_id": "ot_legacy_account",
+      "schema": {
+        "fields": {
+          "code": {
+            "primary": true,
+            "required": true,
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "schemaHash": "sha256:145fc4e3641d9fc41d84e17481fe47f909de7e3eca2fdb613ec5c7848611643d",
+  "source": {
+    "endpoint": "/v1/ontology/objects/object-types",
+    "service": "ontology/objects"
+  }
+}

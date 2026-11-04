@@ -1,3 +1,5 @@
+import { isJsonRecord, type JsonRecord } from "@/lib/json.js";
+
 const REDACTED = "[REDACTED]";
 
 // Frontal API keys (`frt_…`) — keep the prefix so users can tell which
@@ -15,15 +17,28 @@ const SENSITIVE_KEY_PATTERN =
 let extraSensitiveKeys: Set<string> = new Set();
 
 /**
- * Registers additional key names (e.g. from `frontal.jsonc` `secrets.required`)
+ * Registers additional key names (e.g. from `.frontal/config.jsonc` `secrets.required`)
  * whose values must always be masked.
  */
 export function registerSensitiveKeys(keys: Iterable<string>): void {
   extraSensitiveKeys = new Set([...extraSensitiveKeys, ...keys]);
 }
 
+/** Splits camelCase so `clientSecret` tests as `client_secret`. */
+const CAMEL_BOUNDARY = /([a-z0-9])([A-Z])/g;
+
+/** True for values that can carry a credential: strings and nested objects. */
+function isSecretValue(value: unknown): boolean {
+  return (
+    typeof value === "string" || (typeof value === "object" && value !== null)
+  );
+}
+
 export function isSensitiveKey(key: string): boolean {
-  return extraSensitiveKeys.has(key) || SENSITIVE_KEY_PATTERN.test(key);
+  if (extraSensitiveKeys.has(key)) {
+    return true;
+  }
+  return SENSITIVE_KEY_PATTERN.test(key.replace(CAMEL_BOUNDARY, "$1_$2"));
 }
 
 export function redactString(value: string): string {
@@ -38,8 +53,30 @@ export function redactString(value: string): string {
  * strips key/token patterns from strings. Safe for JSON, YAML and human
  * output.
  */
-export function redact<T>(value: T): T {
-  return redactValue(value, new WeakSet()) as T;
+export function redact(value: unknown): unknown {
+  return redactValue(value, new WeakSet());
+}
+
+/**
+ * Redacts a JSON object and keeps its record type. Redaction only rewrites
+ * leaf values, so the result is always a record; the guard makes that
+ * invariant checked instead of asserted.
+ */
+export function redactRecord(value: JsonRecord): JsonRecord {
+  const out = redactValue(value, new WeakSet());
+  if (!isJsonRecord(out)) {
+    throw new TypeError("redaction changed the shape of a record");
+  }
+  return out;
+}
+
+/** Redacts a list of JSON objects, keeping each element a record. */
+export function redactRecords(values: readonly JsonRecord[]): JsonRecord[] {
+  const out = redactValue(values, new WeakSet());
+  if (!(Array.isArray(out) && out.every(isJsonRecord))) {
+    throw new TypeError("redaction changed the shape of a record list");
+  }
+  return out;
 }
 
 function redactValue(value: unknown, seen: WeakSet<object>): unknown {
@@ -58,7 +95,8 @@ function redactValue(value: unknown, seen: WeakSet<object>): unknown {
     return value.map((item) => redactValue(item, seen));
   }
   if (value instanceof Error) {
-    const extra = redactValue({ ...value }, seen) as Record<string, unknown>;
+    const redactedFields = redactValue({ ...value }, seen);
+    const extra = isJsonRecord(redactedFields) ? redactedFields : {};
     return {
       ...extra,
       message: redactString(value.message),
@@ -68,7 +106,9 @@ function redactValue(value: unknown, seen: WeakSet<object>): unknown {
 
   const out: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
-    if (isSensitiveKey(key) && item !== undefined && item !== null) {
+    // Only secret values are masked. A boolean or number under a sensitive-
+    // looking name (for example `hasApiKey: true`) is a flag, not a credential.
+    if (isSensitiveKey(key) && isSecretValue(item)) {
       out[key] = REDACTED;
     } else {
       out[key] = redactValue(item, seen);

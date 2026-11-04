@@ -4,6 +4,7 @@ import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { runAction } from "@/lib/command.js";
 import { DevServer, type DevServerInfo } from "@/lib/dev/server.js";
+import { systemErrorCode } from "@/lib/errno.js";
 import { emitJsonLine, withExamples } from "@/lib/output.js";
 import { findProjectRoot } from "@/lib/project.js";
 import { theme } from "@/output/theme.js";
@@ -84,7 +85,7 @@ function waitForShutdown(): Promise<string> {
 }
 
 interface DevOutput {
-  log?: (line: string) => void;
+  log?: ((line: string) => void) | undefined;
   ready: (info: DevServerInfo) => void;
   reload: (info: { reason: string; routes: number }) => void;
   stopped: (signal: string) => void;
@@ -139,10 +140,7 @@ async function startOrExplain(
   try {
     return await server.start();
   } catch (err) {
-    if (
-      err instanceof Error &&
-      (err as NodeJS.ErrnoException).code === "EADDRINUSE"
-    ) {
+    if (systemErrorCode(err) === "EADDRINUSE") {
       // biome-ignore lint/style/useErrorCause: cause is forwarded through CliError options
       throw new CliError("PORT_IN_USE", `Port ${port} is already in use.`, {
         cause: err,
@@ -176,7 +174,7 @@ export function registerDevCommand(program: Command): void {
           if (!root) {
             throw new CliError(
               "NO_PROJECT",
-              "No frontal.jsonc found in this directory or its parents.",
+              "No .frontal/config.jsonc found in this directory or its parents.",
               {
                 exitCode: EXIT_CODES.CONFIG_ERROR,
                 fix: "Run `frontal init` first, or cd into a Frontal project.",

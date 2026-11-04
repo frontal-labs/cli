@@ -4,12 +4,31 @@ import { DEFAULT_BASE_URL } from "@/config/resolve.js";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 
-export const PROJECT_CONFIG_FILE = "frontal.jsonc";
-export const PROJECT_SCHEMA_URL = "https://frontal.dev/schemas/frontal.json";
 export const PROJECT_STATE_DIR = ".frontal";
+/** The file `frontal init` writes, relative to the project root. */
+export const PROJECT_CONFIG_FILE = `${PROJECT_STATE_DIR}/config.jsonc`;
+/**
+ * Every accepted project config location, relative to the project root, in
+ * precedence order. The first one that exists is the project config; any
+ * others are ignored with a warning. `.frontal/` holds the config only when
+ * one of its config files exists, so a `.frontal/` with just `state/` is not a
+ * project root.
+ */
+export const PROJECT_CONFIG_CANDIDATES = [
+  `${PROJECT_STATE_DIR}/config.jsonc`,
+  `${PROJECT_STATE_DIR}/config.json`,
+  "frontal.jsonc",
+  "frontal.json",
+] as const;
+export const PROJECT_SCHEMA_URL = "https://frontal.dev/schemas/frontal.json";
 
 export const ENV_NAMES = ["dev", "staging", "prod"] as const;
 export type EnvName = (typeof ENV_NAMES)[number];
+
+/** True when `value` is one of the supported environment names. */
+export function isEnvName(value: string): value is EnvName {
+  return ENV_NAMES.some((name) => name === value);
+}
 
 /** Every service namespace exposed by `new Frontal()`. */
 export const SERVICE_KEYS = [
@@ -37,6 +56,11 @@ export const SERVICE_KEYS = [
   "workflows",
 ] as const;
 export type ServiceKey = (typeof SERVICE_KEYS)[number];
+
+/** True when `value` names a known service. */
+export function isServiceKey(value: string): value is ServiceKey {
+  return SERVICE_KEYS.some((key) => key === value);
+}
 
 /** Services `frontal init` enables by default. */
 export const DEFAULT_SERVICES: ServiceKey[] = ["ai", "agents", "graph"];
@@ -68,11 +92,59 @@ export function parseJsonc(text: string): unknown {
   return JSON.parse(restored);
 }
 
-/** Walks up from `start` until a `frontal.jsonc` is found. */
+/** Config files present in `root`, in precedence order (relative paths). */
+export function existingProjectConfigs(root: string): string[] {
+  return PROJECT_CONFIG_CANDIDATES.filter((rel) => existsSync(join(root, rel)));
+}
+
+/**
+ * The project config relative to `root`: the first existing candidate, or
+ * undefined when none exists.
+ */
+export function projectConfigRelPath(root: string): string | undefined {
+  return existingProjectConfigs(root)[0];
+}
+
+const STATE_CONFIG_FILE_NAME = /^config(\.[a-z]+)?\.jsonc?$/;
+const ROOT_CONFIG_FILE_NAME = /^frontal(\.[a-z]+)?\.jsonc?$/;
+
+/** Whether a bare file name is one of the project config files (for watchers). */
+export function isProjectConfigFileName(
+  name: string,
+  inStateDir: boolean
+): boolean {
+  return inStateDir
+    ? STATE_CONFIG_FILE_NAME.test(name)
+    : ROOT_CONFIG_FILE_NAME.test(name);
+}
+
+/**
+ * Env overlay candidates (relative to root), in lookup order: the `.frontal/`
+ * forms first, then the root `frontal.<env>` forms. The same order applies
+ * whichever base config was found.
+ */
+export function envOverlayCandidates(env: string): string[] {
+  return [
+    `${PROJECT_STATE_DIR}/config.${env}.jsonc`,
+    `${PROJECT_STATE_DIR}/config.${env}.json`,
+    `frontal.${env}.jsonc`,
+    `frontal.${env}.json`,
+  ];
+}
+
+/** The first existing env overlay for `env`, relative to root. */
+export function findEnvOverlayRelPath(
+  root: string,
+  env: string
+): string | undefined {
+  return envOverlayCandidates(env).find((rel) => existsSync(join(root, rel)));
+}
+
+/** Walks up from `start` until a project config is found. */
 export function findProjectRoot(start = process.cwd()): string | undefined {
   let dir = resolve(start);
   for (;;) {
-    if (existsSync(join(dir, PROJECT_CONFIG_FILE))) {
+    if (projectConfigRelPath(dir) !== undefined) {
       return dir;
     }
     const parent = dirname(dir);
@@ -131,20 +203,22 @@ export function readConfigFile(file: string): Record<string, unknown> {
 }
 
 export interface RawProject {
-  env?: EnvName;
+  env: EnvName | undefined;
   files: string[];
   raw: Record<string, unknown>;
   root: string;
+  /** Problems that do not stop loading, e.g. ignored extra config files. */
+  warnings: string[];
 }
 
 export interface LoadProjectOptions {
-  cwd?: string;
-  /** Environment overlay to apply (`frontal.<env>.jsonc`). */
-  env?: string;
+  cwd?: string | undefined;
+  /** Environment overlay to apply (`.frontal/config.<env>.jsonc`). */
+  env?: string | undefined;
 }
 
 /**
- * Reads and merges `frontal.jsonc` (+ `frontal.<env>.jsonc`) without
+ * Reads and merges the project config (+ its env overlay) without
  * validating. Used by the SDK factory, which must stay SDK-import free.
  */
 export function loadRawProjectConfig(
@@ -154,44 +228,76 @@ export function loadRawProjectConfig(
   if (!root) {
     throw new CliError(
       "NO_PROJECT",
-      `No ${PROJECT_CONFIG_FILE} found in ${resolve(options.cwd ?? process.cwd())} or its parents.`,
+      `No project config (${PROJECT_CONFIG_CANDIDATES.join(", ")}) found in ${resolve(options.cwd ?? process.cwd())} or its parents.`,
       {
         exitCode: EXIT_CODES.CONFIG_ERROR,
-        fix: "Run `frontal init` to create a project, or cd into one.",
+        fix: `Run \`frontal init\` to create ${PROJECT_CONFIG_FILE}, or cd into a project.`,
       }
     );
   }
 
-  const baseFile = join(root, PROJECT_CONFIG_FILE);
+  const [baseRel, ...ignored] = existingProjectConfigs(root);
+  if (baseRel === undefined) {
+    throw new CliError("NO_PROJECT", `No project config found in ${root}.`, {
+      exitCode: EXIT_CODES.CONFIG_ERROR,
+    });
+  }
+  const warnings =
+    ignored.length > 0
+      ? [
+          `Using ${baseRel}; ignoring ${ignored.join(", ")}. Keep one project config and remove the others.`,
+        ]
+      : [];
+  const baseFile = join(root, baseRel);
   const files = [baseFile];
   let raw = readConfigFile(baseFile);
 
-  const env = options.env ?? (raw.env as string | undefined);
+  const env = options.env ?? declaredEnvironment(raw);
   if (env !== undefined) {
-    if (!ENV_NAMES.includes(env as EnvName)) {
+    if (!isEnvName(env)) {
       throw new CliError("CONFIG_INVALID", `Unknown environment "${env}".`, {
         exitCode: EXIT_CODES.CONFIG_ERROR,
         fix: `Use one of: ${ENV_NAMES.join(", ")}.`,
       });
     }
-    const overlay = join(root, `frontal.${env}.jsonc`);
-    if (existsSync(overlay)) {
+    const overlayRel = findEnvOverlayRelPath(root, env);
+    if (overlayRel !== undefined) {
+      const overlay = join(root, overlayRel);
       files.push(overlay);
       raw = deepMerge(raw, readConfigFile(overlay));
     }
-    raw.env = env;
+    raw = { ...raw, env };
   }
 
-  return { env: env as EnvName | undefined, files, raw, root };
+  return { env, files, raw, root, warnings };
+}
+
+/**
+ * The `env` key of a raw config as text. A non-string value is kept as its text
+ * so the "Unknown environment" error still names it.
+ */
+function declaredEnvironment(raw: Record<string, unknown>): string | undefined {
+  const { env: value } = raw;
+  return value === undefined ? undefined : String(value);
 }
 
 const NEWLINE = /\r?\n/;
 const DOTENV_LINE =
   /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)?\s*$/;
 
+/**
+ * Values from a dotenv file. The keys the CLI reads are declared, so they can
+ * be read with property access; any other key is still available by name.
+ */
+export interface DotenvValues {
+  FRONTAL_API_KEY?: string | undefined;
+  FRONTAL_API_URL?: string | undefined;
+  [key: string]: string | undefined;
+}
+
 /** Parses a dotenv file without mutating `process.env`. */
-export function parseDotenv(text: string): Record<string, string> {
-  const out: Record<string, string> = {};
+export function parseDotenv(text: string): DotenvValues {
+  const out: DotenvValues = {};
   for (const rawLine of text.split(NEWLINE)) {
     const line = rawLine.trim();
     if (line === "" || line.startsWith("#")) {
@@ -201,7 +307,10 @@ export function parseDotenv(text: string): Record<string, string> {
     if (!match) {
       continue;
     }
-    const key = match[1] as string;
+    const [, key] = match;
+    if (key === undefined) {
+      continue;
+    }
     let value = (match[2] ?? "").trim();
     const quoted =
       (value.startsWith('"') && value.endsWith('"')) ||
@@ -220,7 +329,7 @@ export function parseDotenv(text: string): Record<string, string> {
 }
 
 /** Reads `<root>/.env.local` if present. */
-export function loadDotenvLocal(root: string): Record<string, string> {
+export function loadDotenvLocal(root: string): DotenvValues {
   const file = join(root, ".env.local");
   if (!existsSync(file)) {
     return {};
@@ -228,7 +337,7 @@ export function loadDotenvLocal(root: string): Record<string, string> {
   return parseDotenv(readFileSync(file, "utf-8"));
 }
 
-/** Builds the minimal `frontal.jsonc` document written by `frontal init`. */
+/** Builds the minimal `.frontal/config.jsonc` document written by `frontal init`. */
 export function renderProjectConfig(name: string): string {
   const services = DEFAULT_SERVICES.map(
     (key) => `    "${key}": { "remote": false }`

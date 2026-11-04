@@ -1,0 +1,142 @@
+[
+  {
+    "object_type_id": "ot_customer",
+    "name": "Customer",
+    "schema": {
+      "version": 3,
+      "fields": {
+        "email": {
+          "type": "string",
+          "required": true
+        },
+        "status": {
+          "type": "enum",
+          "required": true,
+          "enum": ["active", "closed"]
+        },
+        "nickname": {
+          "type": "text"
+        },
+        "age": {
+          "type": "integer"
+        },
+        "score": {
+          "type": "float",
+          "required": true,
+          "default": 0
+        },
+        "tags": {
+          "type": "array",
+          "items": "string"
+        },
+        "profile": {
+          "type": "json"
+        },
+        "embedding": {
+          "type": "vector",
+          "dimensions": 3
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true,
+          "auto": true
+        },
+        "displayName": {
+          "type": "string",
+          "computed": true
+        },
+        "external-ref": {
+          "type": "string"
+        }
+      },
+      "relationships": {
+        "company": {
+          "type": "belongsTo",
+          "targetEntity": "Company"
+        },
+        "orders": {
+          "type": "hasMany",
+          "targetEntity": "Order",
+          "relationshipTypeId": "rt_customer_orders"
+        },
+        "primaryAddress": {
+          "type": "hasOne",
+          "targetEntity": "Address",
+          "relationshipTypeId": "rt_customer_address"
+        }
+      }
+    }
+  },
+  {
+    "object_type_id": "ot_company",
+    "name": "Company",
+    "schema": {
+      "version": 1,
+      "fields": {
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "industry": {
+          "type": "enum",
+          "enum": ["software", "retail"]
+        }
+      },
+      "relationships": {
+        "contacts": {
+          "type": "manyToMany",
+          "targetEntity": "Customer",
+          "relationshipTypeId": "rt_company_contacts"
+        }
+      }
+    }
+  },
+  {
+    "object_type_id": "ot_address",
+    "name": "Address",
+    "schema": {
+      "version": 1,
+      "fields": {
+        "street": {
+          "type": "string",
+          "required": true
+        },
+        "city": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "object_type_id": "ot_order",
+    "name": "Order",
+    "schema": {
+      "version": 1,
+      "fields": {
+        "total": {
+          "type": "float",
+          "required": true
+        }
+      },
+      "relationships": {
+        "customer": {
+          "type": "belongsTo",
+          "targetEntity": "Customer"
+        }
+      }
+    }
+  },
+  {
+    "object_type_id": "ot_legacy_account",
+    "name": "legacy-account",
+    "schema": {
+      "fields": {
+        "code": {
+          "type": "string",
+          "required": true,
+          "primary": true
+        }
+      }
+    }
+  }
+]

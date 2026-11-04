@@ -28,9 +28,9 @@ export interface RouteDefinition {
    */
   path: string | RegExp;
   /** Service that owns the route (for `[local]`/`[remote]` reporting). */
-  service?: string;
+  service?: string | undefined;
   /** Number of times the route may match before it is skipped (scenarios). */
-  times?: number;
+  times?: number | undefined;
 }
 
 interface CompiledRoute extends RouteDefinition {
@@ -87,11 +87,15 @@ function matchSegments(
 ): Record<string, string> | undefined {
   const params: Record<string, string> = {};
   for (let i = 0; i < segments.length; i += 1) {
-    const segment = segments[i] as string;
-    const part = parts[i] as string;
+    const segment = segments[i];
+    const part = parts[i];
+    if (segment === undefined || part === undefined) {
+      return;
+    }
     const param = PARAM_SEGMENT.exec(segment);
-    if (param) {
-      params[(param[1] ?? param[2]) as string] = decodeURIComponent(part);
+    const paramName = param?.[1] ?? param?.[2];
+    if (paramName !== undefined) {
+      params[paramName] = decodeURIComponent(part);
     } else if (segment !== part) {
       return;
     }

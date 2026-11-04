@@ -1,6 +1,6 @@
 export interface SSEEvent {
   data: string;
-  id?: string;
+  id?: string | undefined;
   type: string;
 }
 

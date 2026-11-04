@@ -1,4 +1,6 @@
 import { configManager } from "@/config/manager.js";
+import { readCliEnv } from "@/lib/env.js";
+import type { DotenvValues } from "@/lib/project.js";
 
 export const DEFAULT_BASE_URL = "https://api.frontal.dev/v1";
 
@@ -19,28 +21,28 @@ export interface GlobalOptions {
 }
 
 export interface ResolvedConfig {
-  accessToken?: string;
+  accessToken?: string | undefined;
   apiKey: string;
-  authUrl?: string;
+  authUrl?: string | undefined;
   baseUrl: string;
   debug: boolean;
-  orgId?: string;
+  orgId?: string | undefined;
   profileName: string;
-  refreshToken?: string;
-  tokenExpiresAt?: number;
-  workspaceId?: string;
+  refreshToken?: string | undefined;
+  tokenExpiresAt?: number | undefined;
+  workspaceId?: string | undefined;
 }
 
 export interface ProjectOverlay {
   /** Values from the project's `.env.local` (below shell env, above profile). */
-  dotenv?: Record<string, string>;
-  /** `apiUrl` from `frontal.jsonc` (below `.env.local`, above profile). */
+  dotenv?: DotenvValues | undefined;
+  /** `apiUrl` from `.frontal/config.jsonc` (below `.env.local`, above profile). */
   projectApiUrl?: string;
 }
 
 /**
  * Resolves effective settings with precedence
- * flag > shell env > .env.local > frontal.jsonc > profile > default.
+ * flag > shell env > .env.local > .frontal/config.jsonc > profile > default.
  * Credentials are returned raw here; `getSdk()` turns them into an SDK client.
  */
 export function resolveConfig(
@@ -49,37 +51,37 @@ export function resolveConfig(
 ): ResolvedConfig {
   const profileName =
     opts.profile ??
-    process.env.FRONTAL_PROFILE ??
+    readCliEnv().FRONTAL_PROFILE ??
     configManager.getActiveProfileName();
   const profile = configManager.getProfile(profileName);
-  const dotenv = overlay.dotenv ?? {};
+  const dotenv: DotenvValues = overlay.dotenv ?? {};
 
   const apiKey =
     opts.apiKey ??
-    process.env.FRONTAL_API_KEY ??
+    readCliEnv().FRONTAL_API_KEY ??
     dotenv.FRONTAL_API_KEY ??
     profile.apiKey ??
     "";
 
   const baseUrl =
     opts.apiUrl ??
-    process.env.FRONTAL_API_URL ??
+    readCliEnv().FRONTAL_API_URL ??
     dotenv.FRONTAL_API_URL ??
     overlay.projectApiUrl ??
     profile.baseUrl ??
     DEFAULT_BASE_URL;
 
-  const orgId = opts.org ?? process.env.FRONTAL_ORG_ID ?? profile.orgId;
+  const orgId = opts.org ?? readCliEnv().FRONTAL_ORG_ID ?? profile.orgId;
 
   const workspaceId =
-    opts.workspace ?? process.env.FRONTAL_WORKSPACE_ID ?? profile.workspaceId;
+    opts.workspace ?? readCliEnv().FRONTAL_WORKSPACE_ID ?? profile.workspaceId;
 
   const debug = opts.debug ?? profile.debug ?? false;
 
   return {
     accessToken: profile.accessToken,
     apiKey,
-    authUrl: process.env.FRONTAL_AUTH_URL ?? profile.authUrl,
+    authUrl: readCliEnv().FRONTAL_AUTH_URL ?? profile.authUrl,
     baseUrl,
     debug,
     orgId,

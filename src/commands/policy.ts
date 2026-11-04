@@ -5,20 +5,21 @@ import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { type CommandContext, runAction } from "@/lib/command.js";
 import { loadProjectConfig, type ProjectConfig } from "@/lib/config.js";
+import { isJsonRecord, type JsonRecord, jsonField } from "@/lib/json.js";
 import { withExamples } from "@/lib/output.js";
 import { PROJECT_STATE_DIR } from "@/lib/project.js";
 import type { SdkHandle } from "@/lib/sdk.js";
 import { theme } from "@/output/theme.js";
 
-type Obj = Record<string, unknown>;
+type Obj = JsonRecord;
 
 export type RuleResult = "pass" | "warn" | "deny";
 
 export interface RuleReport {
-  fix?: string;
+  fix?: string | undefined;
   passed: boolean;
-  reason?: string;
-  resource?: string;
+  reason?: string | undefined;
+  resource?: string | undefined;
   result: RuleResult;
   ruleId: string;
 }
@@ -34,10 +35,10 @@ export interface PolicyCheckReport {
 }
 
 export interface PolicyCheckOptions {
-  env?: string;
-  role?: string[];
-  strict?: boolean;
-  user?: string;
+  env?: string | undefined;
+  role?: string[] | undefined;
+  strict?: boolean | undefined;
+  user?: string | undefined;
 }
 
 const POLICY_FORMATS: Record<string, "rego" | "json_schema" | "cel"> = {
@@ -73,15 +74,25 @@ function pickString(source: Obj, keys: string[]): string | undefined {
   }
 }
 
+/** A role's display name, from a role object (`name`, else `id`). */
+function roleLabel(role: unknown): unknown {
+  if (!isJsonRecord(role)) {
+    return undefined;
+  }
+  return jsonField(role, "name") ?? jsonField(role, "id");
+}
+
 function pickRoles(profile: Obj): string[] {
-  const candidates = [profile.roleNames, profile.roles, profile.role];
+  const candidates = [
+    jsonField(profile, "roleNames"),
+    jsonField(profile, "roles"),
+    jsonField(profile, "role"),
+  ];
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
       return candidate
         .map((role) =>
-          typeof role === "string"
-            ? role
-            : String((role as Obj).name ?? (role as Obj).id ?? "")
+          typeof role === "string" ? role : String(roleLabel(role) ?? "")
         )
         .filter(Boolean);
     }
@@ -158,7 +169,11 @@ async function validatePolicyFiles(
     const errors = (result.errors ?? []).map((e) =>
       typeof e === "string"
         ? e
-        : String((e as Obj).message ?? JSON.stringify(e))
+        : String(
+            isJsonRecord(e)
+              ? (jsonField(e, "message") ?? JSON.stringify(e))
+              : JSON.stringify(e)
+          )
     );
     reports.push({
       fix: result.valid
@@ -228,7 +243,9 @@ async function checkActivePolicies(handle: SdkHandle): Promise<RuleReport> {
 
 async function checkCompliance(handle: SdkHandle): Promise<RuleReport> {
   const result = await handle.frontal.governance.compliance.score();
-  const score = Number(result.score ?? result.value ?? Number.NaN);
+  const score = Number(
+    jsonField(result, "score") ?? jsonField(result, "value") ?? Number.NaN
+  );
   if (Number.isNaN(score)) {
     return {
       fix: "Run a compliance assessment for this workspace.",

@@ -22,7 +22,7 @@ export async function runAction(
   cmd: Command,
   fn: (ctx: CommandContext) => Promise<void> | void
 ): Promise<void> {
-  const globalOpts = cmd.optsWithGlobals() as CommandContext["globalOpts"];
+  const globalOpts: CommandContext["globalOpts"] = cmd.optsWithGlobals();
   let handle: SdkHandle | undefined;
 
   const ctx: CommandContext = {
@@ -47,10 +47,10 @@ export async function runAction(
 }
 
 export function paginationParams(opts: {
-  cursor?: string;
-  limit?: string | number;
-}): Record<string, unknown> {
-  const params: Record<string, unknown> = {};
+  cursor?: string | undefined;
+  limit?: string | number | undefined;
+}): { limit?: number; cursor?: string } {
+  const params: { limit?: number; cursor?: string } = {};
   if (opts.limit !== undefined && opts.limit !== "") {
     params.limit = Number(opts.limit);
   }

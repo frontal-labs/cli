@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
+import { isJsonRecord, type JsonRecord } from "@/lib/json.js";
 import { PROJECT_STATE_DIR } from "@/lib/project.js";
 
 export const STATE_NAMESPACES = [
@@ -25,6 +26,44 @@ export const STATE_NAMESPACES = [
 export type StateNamespace = (typeof STATE_NAMESPACES)[number];
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/** Turns a stored value into the expected type, or `undefined` if it does not fit. */
+export type RecordParser<T> = (value: unknown) => T | undefined;
+
+function asRecord(value: unknown): JsonRecord | undefined {
+  return isJsonRecord(value) ? value : undefined;
+}
+
+/** Parses one stored file's JSON text. Invalid JSON or a value `parse` rejects is an error. */
+function parseStored<T>(
+  parse: RecordParser<T>,
+  text: string,
+  file: string
+): T | undefined {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
+    // biome-ignore lint/style/useErrorCause: cause is forwarded through CliError options
+    throw new CliError("STATE_CORRUPT", `${file} is not valid JSON.`, {
+      cause: err,
+      exitCode: EXIT_CODES.CONFIG_ERROR,
+      fix: "Delete the file or restore it from source control.",
+    });
+  }
+  const value = parse(raw);
+  if (value === undefined) {
+    throw new CliError(
+      "STATE_CORRUPT",
+      `${file} does not match the expected record shape.`,
+      {
+        exitCode: EXIT_CODES.CONFIG_ERROR,
+        fix: "Delete the file or restore it from source control.",
+      }
+    );
+  }
+  return value;
+}
 
 /**
  * JSON-per-record store under `.frontal/state/<namespace>/<id>.json`.
@@ -51,12 +90,25 @@ export class ProjectState {
     return join(this.dir(namespace), `${id}.json`);
   }
 
-  read<T>(namespace: StateNamespace, id: string): T | undefined {
+  /** Reads one stored record. Throws if the stored value is not an object. */
+  read(namespace: StateNamespace, id: string): JsonRecord | undefined {
+    return this.readAs(namespace, id, asRecord);
+  }
+
+  /**
+   * Reads one stored record and checks it with `parse`. A stored value that
+   * does not fit is an error, never a silently mistyped value.
+   */
+  readAs<T>(
+    namespace: StateNamespace,
+    id: string,
+    parse: RecordParser<T>
+  ): T | undefined {
     const file = this.file(namespace, id);
     if (!existsSync(file)) {
       return;
     }
-    return JSON.parse(readFileSync(file, "utf-8")) as T;
+    return parseStored(parse, readFileSync(file, "utf-8"), file);
   }
 
   write(namespace: StateNamespace, id: string, value: unknown): void {
@@ -65,7 +117,13 @@ export class ProjectState {
     writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
   }
 
-  list<T>(namespace: StateNamespace): T[] {
+  /** Lists every stored record in a namespace. */
+  list(namespace: StateNamespace): JsonRecord[] {
+    return this.listAs(namespace, asRecord);
+  }
+
+  /** Lists every stored record in a namespace, checked with `parse`. */
+  listAs<T>(namespace: StateNamespace, parse: RecordParser<T>): T[] {
     const dir = this.dir(namespace);
     if (!existsSync(dir)) {
       return [];
@@ -73,7 +131,11 @@ export class ProjectState {
     return readdirSync(dir)
       .filter((name) => name.endsWith(".json"))
       .sort()
-      .map((name) => JSON.parse(readFileSync(join(dir, name), "utf-8")) as T);
+      .map((name) => {
+        const file = join(dir, name);
+        return parseStored(parse, readFileSync(file, "utf-8"), file);
+      })
+      .filter((value): value is T => value !== undefined);
   }
 
   ids(namespace: StateNamespace): string[] {

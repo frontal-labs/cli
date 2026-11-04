@@ -7,9 +7,14 @@ import { vi } from "vitest";
 process.env.FRONTAL_CONFIG_DIR = mkdtempSync(
   join(tmpdir(), "frontal-cli-test-")
 );
-// FRONTAL_LIVE gates the network suites in tests/live; everything else that
-// could leak a developer's credentials or environment into tests is dropped.
-const KEEP = new Set(["FRONTAL_CONFIG_DIR", "FRONTAL_LIVE"]);
+// FRONTAL_LIVE gates the network suites in tests/live, and FRONTAL_SDK_SOURCE
+// points the consumer fixture at an SDK checkout. Everything else that could
+// leak a developer's credentials or environment into tests is dropped.
+const KEEP = new Set([
+  "FRONTAL_CONFIG_DIR",
+  "FRONTAL_LIVE",
+  "FRONTAL_SDK_SOURCE",
+]);
 for (const key of Object.keys(process.env)) {
   if (key.startsWith("FRONTAL_") && !KEEP.has(key)) {
     delete process.env[key];

@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { jsonField, jsonString } from "@/lib/json.js";
 import {
   evaluateCondition,
   parseUntilCondition,
@@ -6,6 +7,22 @@ import {
 } from "@/utils/polling.js";
 
 type ActionHandler = (...args: unknown[]) => Promise<void>;
+
+function isActionHandler(value: unknown): value is ActionHandler {
+  return typeof value === "function";
+}
+
+/**
+ * Commander keeps the command's action in a private field. Read it only when
+ * it is present and callable; otherwise there is nothing to wrap.
+ */
+function readActionHandler(command: Command): ActionHandler | undefined {
+  if (!("_actionHandler" in command)) {
+    return;
+  }
+  const value: unknown = command._actionHandler;
+  return isActionHandler(value) ? value : undefined;
+}
 
 function createCaptureLogger() {
   let lastOutput = "";
@@ -111,8 +128,8 @@ export function installWatchMiddleware(program: Command): void {
 
   program.hook("preAction", (thisCommand) => {
     const opts = thisCommand.optsWithGlobals();
-    const watchInterval = opts.watch;
-    const untilExpr = opts.until;
+    const watchInterval = jsonField(opts, "watch");
+    const untilExpr = jsonString(opts, "until");
 
     if (watchInterval === undefined && !untilExpr) {
       return;
@@ -140,8 +157,7 @@ export function installWatchMiddleware(program: Command): void {
       return;
     }
 
-    const cmd = thisCommand as unknown as Record<string, unknown>;
-    const originalAction = cmd._actionHandler as ActionHandler | undefined;
+    const originalAction = readActionHandler(thisCommand);
     if (!originalAction) {
       return;
     }
@@ -150,7 +166,7 @@ export function installWatchMiddleware(program: Command): void {
     const interval =
       typeof watchInterval === "string" ? Number(watchInterval) * 1000 : 2000;
 
-    cmd._actionHandler = async (...args: unknown[]) => {
+    const wrapped: ActionHandler = async (...args: unknown[]) => {
       const capture = createCaptureLogger();
 
       if (condition && !watchInterval) {
@@ -173,5 +189,6 @@ export function installWatchMiddleware(program: Command): void {
         );
       }
     };
+    Object.assign(thisCommand, { _actionHandler: wrapped });
   });
 }

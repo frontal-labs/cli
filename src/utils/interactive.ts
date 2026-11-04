@@ -1,7 +1,8 @@
 import { isatty } from "node:tty";
+import { readCliEnv } from "@/lib/env.js";
 
 export function isInteractive(): boolean {
-  return isatty(0) && isatty(1) && !process.env.CI;
+  return isatty(0) && isatty(1) && !readCliEnv().CI;
 }
 
 export async function confirmAction(
@@ -39,9 +40,10 @@ export async function promptText(
 ): Promise<string> {
   const { text } = await import("@clack/prompts");
   const result = await text({
-    defaultValue,
     message,
-    placeholder: defaultValue,
+    ...(defaultValue === undefined
+      ? {}
+      : { defaultValue, placeholder: defaultValue }),
   });
   if (typeof result !== "string") {
     throw new Error("Input cancelled.");

@@ -8,8 +8,8 @@ export interface StreamEvent {
 }
 
 export interface StreamRenderOptions {
-  json?: boolean;
-  quiet?: boolean;
+  json?: boolean | undefined;
+  quiet?: boolean | undefined;
 }
 
 function formatData(data: unknown): string {

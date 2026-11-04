@@ -5,10 +5,16 @@ import { DEFAULT_BASE_URL } from "@/config/resolve.js";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { runAction } from "@/lib/command.js";
+import { SDK_MIN_VERSION } from "@/lib/ontology/constants.js";
+import {
+  fetchPublishedVersions,
+  isVersionPublished,
+} from "@/lib/ontology/registry.js";
 import { withExamples } from "@/lib/output.js";
 import {
   PROJECT_CONFIG_FILE,
   PROJECT_STATE_DIR,
+  projectConfigRelPath,
   renderProjectConfig,
 } from "@/lib/project.js";
 import { theme } from "@/output/theme.js";
@@ -16,7 +22,18 @@ import { VERSION } from "@/version.js";
 
 const PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const NEWLINE = /\r?\n/;
-const GITIGNORE_ENTRIES = [`${PROJECT_STATE_DIR}/`, ".env", ".env.local"];
+/** Generated/local-only `.frontal/` subdirectories. Config and ontology stay committed. */
+const GITIGNORE_ENTRIES = [
+  `${PROJECT_STATE_DIR}/state/`,
+  `${PROJECT_STATE_DIR}/build/`,
+  `${PROJECT_STATE_DIR}/artifacts/`,
+  `${PROJECT_STATE_DIR}/cache/`,
+  // Temp files from an interrupted `frontal sync`; never committed.
+  `${PROJECT_STATE_DIR}/.*.tmp`,
+  ".env",
+  ".env.local",
+];
+const BLANKET_STATE_IGNORE = `${PROJECT_STATE_DIR}/`;
 
 export interface InitOptions {
   force?: boolean;
@@ -32,6 +49,8 @@ export interface InitResult {
   /** Existing files that would be replaced with --force. */
   skipped: string[];
   updated: string[];
+  /** Non-fatal problems the user should fix (e.g. config ignored by .gitignore). */
+  warnings: string[];
 }
 
 /** Normalizes a directory name into a valid project name. */
@@ -53,7 +72,7 @@ FRONTAL_API_URL=${DEFAULT_BASE_URL}
 function renderPackageJson(name: string): string {
   return `${JSON.stringify(
     {
-      dependencies: { "@frontal-labs/sdk": "^1.0.4" },
+      dependencies: { "@frontal-labs/sdk": `^${SDK_MIN_VERSION}` },
       devDependencies: { "frontal-cli": `^${VERSION}` },
       name,
       private: true,
@@ -96,6 +115,7 @@ export function initProject(cwd: string, options: InitOptions): InitResult {
     name,
     skipped: [],
     updated: [],
+    warnings: [],
   };
   mkdirSync(dir, { recursive: true });
 
@@ -120,9 +140,18 @@ export function initProject(cwd: string, options: InitOptions): InitResult {
   };
 
   const force = Boolean(options.force);
-  writeFile(PROJECT_CONFIG_FILE, renderProjectConfig(name), {
+  // An existing project config keeps its location, so init never creates a
+  // second one next to a legacy file. The default location is used otherwise.
+  const existingConfig = projectConfigRelPath(dir);
+  const configPath = existingConfig ?? PROJECT_CONFIG_FILE;
+  writeFile(configPath, renderProjectConfig(name), {
     overwrite: force,
   });
+  if (existingConfig !== undefined && existingConfig !== PROJECT_CONFIG_FILE) {
+    result.warnings.push(
+      `Kept ${existingConfig} as the project config. To use the default location, move it: git mv ${existingConfig} ${PROJECT_CONFIG_FILE}`
+    );
+  }
   writeFile(".env.example", renderEnvExample(), { overwrite: force });
   writeFile(join("src", ".gitkeep"), "", {
     forceable: false,
@@ -139,6 +168,11 @@ export function initProject(cwd: string, options: InitOptions): InitResult {
     ? readFileSync(gitignore, "utf-8")
     : "";
   const lines = existing.split(NEWLINE);
+  if (lines.some((line) => line.trim() === BLANKET_STATE_IGNORE)) {
+    result.warnings.push(
+      `.gitignore ignores ${BLANKET_STATE_IGNORE} entirely, so ${PROJECT_CONFIG_FILE} and the generated ontology files will not be committed. Replace "${BLANKET_STATE_IGNORE}" with the entries listed in ${PROJECT_STATE_DIR}/state/ etc.`
+    );
+  }
   const missing = GITIGNORE_ENTRIES.filter((entry) => !lines.includes(entry));
   if (missing.length > 0) {
     const prefix =
@@ -159,18 +193,76 @@ export function initProject(cwd: string, options: InitOptions): InitResult {
   return result;
 }
 
+/** Human-readable summary of an init run, followed by next steps. */
+function printInitResult(result: InitResult): void {
+  for (const file of result.created) {
+    console.log(`${theme.success("create")}  ${file}`);
+  }
+  for (const file of result.updated) {
+    console.log(`${theme.warn("update")}  ${file}`);
+  }
+  for (const file of result.skipped) {
+    console.log(
+      `${theme.dim("skip")}    ${file} ${theme.dim("(exists, use --force)")}`
+    );
+  }
+  for (const file of result.kept) {
+    console.log(`${theme.dim("keep")}    ${file} ${theme.dim("(exists)")}`);
+  }
+  for (const warning of result.warnings) {
+    console.log(`${theme.warn("warn")}    ${warning}`);
+  }
+
+  const rel = relative(process.cwd(), result.dir);
+  console.log("");
+  console.log(theme.bold("Next steps:"));
+  if (rel !== "") {
+    console.log(`  cd ${rel}`);
+  }
+  console.log("  frontal dev          # local server, no API key needed");
+  console.log(
+    "  frontal env pull     # write .env.local from .frontal/config.jsonc"
+  );
+  console.log(
+    "  frontal sync         # download the ontology and generate types"
+  );
+  console.log(
+    "  frontal types        # generate src/frontal-configuration.d.ts"
+  );
+}
+
+/**
+ * Warns when the SDK version a new project is pinned to is not on npm, since
+ * `install` would then fail. The check needs the registry; when it cannot be
+ * read, the warning is skipped rather than guessed.
+ */
+async function warnIfSdkUnpublished(): Promise<void> {
+  const versions = await fetchPublishedVersions("@frontal-labs/sdk");
+  if (versions === undefined || isVersionPublished(versions, SDK_MIN_VERSION)) {
+    return;
+  }
+  console.log("");
+  console.log(
+    theme.warn(
+      `@frontal-labs/sdk ${SDK_MIN_VERSION} is not on npm yet, so \`install\` will fail for this project until it is published.`
+    )
+  );
+}
+
 export function registerInitCommand(program: Command): void {
   withExamples(
     program
       .command("init")
-      .description("Create a new Frontal project (frontal.jsonc, .env.example)")
+      .description(
+        "Create a new Frontal project (.frontal/config.jsonc, .env.example)"
+      )
       .option(
         "--name <dir>",
         "Directory to create (defaults to the current directory)"
       )
-      .option("--force", "Overwrite existing frontal.jsonc / .env.example")
+      .option("--force", "Overwrite existing project config / .env.example")
       .action((opts: InitOptions, cmd) =>
-        runAction(cmd, ({ fmt, globalOpts }) => {
+        runAction(cmd, async ({ fmt, globalOpts }) => {
           const result = initProject(process.cwd(), opts);
 
           if (globalOpts.json) {
@@ -178,38 +270,8 @@ export function registerInitCommand(program: Command): void {
             return;
           }
 
-          for (const file of result.created) {
-            console.log(`${theme.success("create")}  ${file}`);
-          }
-          for (const file of result.updated) {
-            console.log(`${theme.warn("update")}  ${file}`);
-          }
-          for (const file of result.skipped) {
-            console.log(
-              `${theme.dim("skip")}    ${file} ${theme.dim("(exists, use --force)")}`
-            );
-          }
-          for (const file of result.kept) {
-            console.log(
-              `${theme.dim("keep")}    ${file} ${theme.dim("(exists)")}`
-            );
-          }
-
-          const rel = relative(process.cwd(), result.dir);
-          console.log("");
-          console.log(theme.bold("Next steps:"));
-          if (rel !== "") {
-            console.log(`  cd ${rel}`);
-          }
-          console.log(
-            "  frontal dev          # local server, no API key needed"
-          );
-          console.log(
-            "  frontal env pull     # write .env.local from frontal.jsonc"
-          );
-          console.log(
-            "  frontal types        # generate src/frontal-configuration.d.ts"
-          );
+          printInitResult(result);
+          await warnIfSdkUnpublished();
         })
       ),
     [

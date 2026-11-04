@@ -12,7 +12,6 @@ import {
   type Server,
   type ServerResponse,
 } from "node:http";
-import type { AddressInfo } from "node:net";
 import { join, resolve } from "node:path";
 import type { GlobalOptions } from "@/config/resolve.js";
 import { loadProjectConfig } from "@/lib/config.js";
@@ -26,39 +25,41 @@ import {
 import { RemoteProxy, serviceForPath } from "@/lib/dev/proxy.js";
 import { type DevRequest, Router, scenarioToRoute } from "@/lib/dev/router.js";
 import {
-  PROJECT_CONFIG_FILE,
+  envOverlayCandidates,
+  isProjectConfigFileName,
+  isServiceKey,
+  PROJECT_CONFIG_CANDIDATES,
   PROJECT_STATE_DIR,
   SERVICE_KEYS,
-  type ServiceKey,
 } from "@/lib/project.js";
 import { loadScenario, ProjectState } from "@/lib/state.js";
 
 export type ServiceMode = "local" | "remote";
 
 export interface DevServerOptions {
-  env?: string;
+  env?: string | undefined;
   globalOpts: GlobalOptions;
-  host?: string;
+  host?: string | undefined;
   /** Called for every request log line. */
-  log?: (line: string) => void;
+  log?: ((line: string) => void) | undefined;
   /** Called after a successful live reload. */
-  onReload?: (info: { reason: string; routes: number }) => void;
+  onReload?: ((info: { reason: string; routes: number }) => void) | undefined;
   /** Directory for persisted state (default `.frontal/state`). */
-  persistTo?: string;
-  port?: number;
-  /** Services forced to proxy to the remote API (overrides frontal.jsonc). */
-  remote?: string[];
+  persistTo?: string | undefined;
+  port?: number | undefined;
+  /** Services forced to proxy to the remote API (overrides .frontal/config.jsonc). */
+  remote?: string[] | undefined;
   root: string;
-  scenario?: string;
+  scenario?: string | undefined;
   /** Watch config/scenario files and reload the route table. */
-  watch?: boolean;
+  watch?: boolean | undefined;
 }
 
 export interface DevServerInfo {
   host: string;
   port: number;
   routes: number;
-  scenario?: string;
+  scenario?: string | undefined;
   services: Record<string, ServiceMode>;
   url: string;
 }
@@ -163,12 +164,12 @@ export class DevServer {
   private readonly localRouter = new Router();
   private readonly scenarioRouter = new Router();
   private readonly proxy: RemoteProxy;
-  private server?: Server;
+  private server: Server | undefined;
   private watchers: FSWatcher[] = [];
   private polledFiles: string[] = [];
-  private reloadTimer?: ReturnType<typeof setTimeout>;
+  private reloadTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly subscribers = new Set<(event: DevEvent) => void>();
-  private readonly scenarioName?: string;
+  private readonly scenarioName: string | undefined;
 
   private readonly options: DevServerOptions;
 
@@ -211,7 +212,7 @@ export class DevServer {
     const services: Record<string, ServiceMode> = {};
     const forced = new Set(this.options.remote ?? []);
     for (const key of forced) {
-      if (!SERVICE_KEYS.includes(key as ServiceKey)) {
+      if (!isServiceKey(key)) {
         throw new Error(
           `Unknown service "${key}" in --remote. Valid services: ${SERVICE_KEYS.join(", ")}.`
         );
@@ -269,9 +270,13 @@ export class DevServer {
   }
 
   info(): DevServerInfo {
-    const address = this.server?.address() as AddressInfo | null;
+    const address = this.server?.address();
+    const boundPort =
+      typeof address === "object" && address !== null
+        ? address.port
+        : undefined;
     const host = this.options.host ?? "127.0.0.1";
-    const port = address?.port ?? this.options.port ?? 8787;
+    const port = boundPort ?? this.options.port ?? 8787;
     return {
       host,
       port,
@@ -332,11 +337,13 @@ export class DevServer {
     // fs.watch is fast but not reliable everywhere (coalesced or nameless
     // events on macOS, missing on some filesystems). Poll the handful of
     // files that matter as a deterministic fallback.
+    // Every config location and env overlay is polled, so a file that becomes
+    // the project config (or an overlay that appears) reloads the server.
     const polled = [
-      join(root, PROJECT_CONFIG_FILE),
+      ...PROJECT_CONFIG_CANDIDATES.map((rel) => join(root, rel)),
       join(root, ".env.local"),
       ...(this.options.env
-        ? [join(root, `frontal.${this.options.env}.jsonc`)]
+        ? envOverlayCandidates(this.options.env).map((rel) => join(root, rel))
         : []),
       ...(this.scenarioName
         ? [
@@ -362,19 +369,22 @@ export class DevServer {
       this.polledFiles.push(file);
     }
 
-    const targets = [root, join(root, PROJECT_STATE_DIR, "scenarios")].filter(
-      (dir) => existsSync(dir)
-    );
+    const targets = [
+      root,
+      join(root, PROJECT_STATE_DIR),
+      join(root, PROJECT_STATE_DIR, "scenarios"),
+    ].filter((dir) => existsSync(dir));
 
     for (const dir of targets) {
       try {
         const watcher = watch(dir, (_event, filename) => {
           const name = String(filename ?? "");
+          const inStateDir = dir === join(root, PROJECT_STATE_DIR);
           // Some platforms (macOS FSEvents) omit the filename; reload anyway.
           const relevant =
             name === "" ||
-            name === PROJECT_CONFIG_FILE ||
-            (name.startsWith("frontal.") && name.endsWith(".jsonc")) ||
+            (inStateDir && isProjectConfigFileName(name, true)) ||
+            (dir === root && isProjectConfigFileName(name, false)) ||
             name === ".env.local" ||
             (dir.endsWith("scenarios") && name.endsWith(".json"));
           if (relevant) {
@@ -426,7 +436,7 @@ export class DevServer {
       }
     }
     const raw = new Request(url, {
-      body: bytes && bytes.length > 0 ? bytes : undefined,
+      ...(bytes && bytes.length > 0 ? { body: bytes } : {}),
       headers,
       method,
       signal: controller.signal,

@@ -3,11 +3,11 @@ import { EXIT_CODES } from "@/errors/exit-codes.js";
 export const DOCS_BASE_URL = "https://frontal.dev/docs/cli/errors";
 
 export interface CliErrorOptions {
-  cause?: unknown;
-  docs?: string;
-  exitCode?: number;
-  fix?: string;
-  requestId?: string;
+  cause?: unknown | undefined;
+  docs?: string | undefined;
+  exitCode?: number | undefined;
+  fix?: string | undefined;
+  requestId?: string | undefined;
 }
 
 /**
@@ -19,8 +19,8 @@ export class CliError extends Error {
   readonly code: string;
   readonly docs: string;
   readonly exitCode: number;
-  readonly fix?: string;
-  readonly requestId?: string;
+  readonly fix?: string | undefined;
+  readonly requestId?: string | undefined;
 
   constructor(code: string, message: string, options: CliErrorOptions = {}) {
     super(message, options.cause ? { cause: options.cause } : undefined);
