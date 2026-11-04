@@ -1,4 +1,4 @@
-import { type SpawnOptions, spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { runBun } from "./support/bun-run.js";
 import {
   createMockOntologyBackend,
   type MockObjectType,
@@ -87,19 +88,15 @@ function newProject(): string {
  * Only the variables below reach the child.
  */
 /**
- * Bun intermittently hangs while loading `zod` in a freshly spawned process
- * (about 1 run in 25 here, before any CLI code runs, and it reproduces on older
- * commits). A child that is silent for this long is killed and started once more.
+ * Runs `frontal <args>` in `cwd` against the mock. Only the variables below
+ * reach the child; a silent start-up hang is retried by `runBun`.
  */
-const SILENT_START_MS = 30_000;
-
-interface Attempt {
-  run: CliRun;
-  silentHang: boolean;
-}
-
-function runOnce(cwd: string, args: string[], token: string): Promise<Attempt> {
-  const options: SpawnOptions = {
+function frontal(
+  cwd: string,
+  args: string[],
+  token: string = mock.token
+): Promise<CliRun> {
+  return runBun([CLI_ENTRY, ...args], {
     cwd,
     env: {
       FRONTAL_API_KEY: token,
@@ -109,57 +106,8 @@ function runOnce(cwd: string, args: string[], token: string): Promise<Attempt> {
       NO_COLOR: "1",
       PATH: process.env.PATH ?? "",
     },
-  };
-  return new Promise((resolveRun, reject) => {
-    const child = spawn("bun", [CLI_ENTRY, ...args], options);
-    let stdout = "";
-    let stderr = "";
-    let silentHang = false;
-    const watchdog = setTimeout(() => {
-      if (stdout === "" && stderr === "") {
-        silentHang = true;
-        child.kill("SIGKILL");
-      }
-    }, SILENT_START_MS);
-    const timer = setTimeout(() => child.kill("SIGKILL"), LIVE_TIMEOUT_MS);
-    child.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf-8");
-    });
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf-8");
-    });
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      clearTimeout(watchdog);
-      reject(err);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      clearTimeout(watchdog);
-      resolveRun({
-        run: { exitCode: code ?? -1, stderr, stdout },
-        silentHang,
-      });
-    });
+    timeoutMs: LIVE_TIMEOUT_MS,
   });
-}
-
-/**
- * Runs `frontal <args>` in `cwd` against the mock. Asynchronous on purpose: the
- * mock server runs in this process, so a blocking spawn would starve it.
- * Only the variables below reach the child.
- */
-async function frontal(
-  cwd: string,
-  args: string[],
-  token: string = mock.token
-): Promise<CliRun> {
-  const first = await runOnce(cwd, args, token);
-  if (!first.silentHang) {
-    return first.run;
-  }
-  const second = await runOnce(cwd, args, token);
-  return second.run;
 }
 
 const frontalDir = (project: string): string => join(project, ".frontal");

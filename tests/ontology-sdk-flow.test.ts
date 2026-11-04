@@ -1,7 +1,6 @@
-import { type SpawnOptions, spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -12,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { type BunRun, runBun } from "./support/bun-run.js";
 import {
   createMockOntologyBackend,
   type MockObjectType,
@@ -75,7 +75,6 @@ afterAll(async () => {
 function consumerProject(): string {
   const dir = join(scratch, "app");
   mkdirSync(dir, { recursive: true });
-  cpSync(join(FIXTURE, ".frontal"), join(dir, ".frontal"), { recursive: true });
   copyFileSync(FLOW_SOURCE, join(dir, "main.ts"));
   writeFileSync(
     join(dir, "tsconfig.json"),
@@ -104,15 +103,11 @@ function consumerProject(): string {
   return dir;
 }
 
-interface RunResult {
-  exitCode: number;
-  stderr: string;
-  stdout: string;
-}
+type RunResult = BunRun;
 
-/** Runs `bun main.ts` in `cwd`. Asynchronous: the mock server lives in this process. */
+/** Runs `bun main.ts` in `cwd` against the mock (see runBun for the start-up retry). */
 function runFlow(cwd: string): Promise<RunResult> {
-  const options: SpawnOptions = {
+  return runBun(["main.ts"], {
     cwd,
     env: {
       FRONTAL_API_KEY: mock.token,
@@ -121,26 +116,7 @@ function runFlow(cwd: string): Promise<RunResult> {
       NO_COLOR: "1",
       PATH: process.env.PATH ?? "",
     },
-  };
-  return new Promise((resolveRun, reject) => {
-    const child = spawn("bun", ["main.ts"], options);
-    let stdout = "";
-    let stderr = "";
-    const timer = setTimeout(() => child.kill("SIGKILL"), RUN_TIMEOUT_MS);
-    child.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf-8");
-    });
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf-8");
-    });
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      resolveRun({ exitCode: code ?? -1, stderr, stdout });
-    });
+    timeoutMs: RUN_TIMEOUT_MS,
   });
 }
 
@@ -184,6 +160,16 @@ describe.skipIf(!(BUN_AVAILABLE && SDK_AVAILABLE))(
             .requests()
             .every((entry) => entry.method !== "PUT" || entry.authorized)
         ).toBe(true);
+        // Without a runtime argument the SDK reads the object types once for the
+        // whole run, however many entity calls follow.
+        const metadataReads = mock
+          .requests()
+          .filter(
+            (entry) =>
+              entry.method === "GET" &&
+              entry.path.endsWith("/ontology/objects/object-types")
+          );
+        expect(metadataReads).toHaveLength(1);
       },
       RUN_TIMEOUT_MS
     );

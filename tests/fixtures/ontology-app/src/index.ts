@@ -1,6 +1,6 @@
-import { createFrontal } from "../.frontal/client";
+import { Frontal } from "@frontal-labs/sdk";
 
-const frontal = createFrontal({ apiKey: "test" });
+const frontal = new Frontal({ apiKey: "test" });
 
 export async function run(): Promise<void> {
   const customer = await frontal.ontology.Customer.get("123");

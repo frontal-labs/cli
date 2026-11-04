@@ -7,7 +7,7 @@
     "Order": 1,
     "legacy-account": null
   },
-  "generatorVersion": "2.0.0",
+  "generatorVersion": "3.0.0",
   "schemaHash": "sha256:76fe47c20684f38d1cd761fefebbd74777f2abb760aacf35a87ccd9c407b21fa",
   "sdkRange": ">=2.1.0 <3.0.0"
 }

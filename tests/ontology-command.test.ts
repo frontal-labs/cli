@@ -38,6 +38,12 @@ function committedProject(): void {
   cpSync(join(FIXTURE, ".frontal"), join(root, ".frontal"), {
     recursive: true,
   });
+  // The reference file lives in src/ when the project has one (the default).
+  mkdirSync(join(root, "src"), { recursive: true });
+  cpSync(
+    join(FIXTURE, "src", "frontal-env.d.ts"),
+    join(root, "src", "frontal-env.d.ts")
+  );
 }
 
 /** A project with only the fixture config, as `frontal init` leaves it. */
@@ -210,5 +216,65 @@ describe("frontal status", () => {
     expect(text).toContain("Frontal Project: ontology-app");
     expect(text).toContain("Status: OUTDATED");
     expect(text).toContain("Run frontal sync to update generated types.");
+  });
+});
+
+describe("frontal sync: reference file", () => {
+  it("reports the reference file as missing in --check", async () => {
+    committedProject();
+    rmSync(join(root, "src", "frontal-env.d.ts"));
+
+    const result = await runCli(["sync", "--check", "--json"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(lastJson(result.stdout)).toMatchObject({
+      stale: [{ file: "src/frontal-env.d.ts", reason: "missing" }],
+    });
+  });
+
+  it("writes the reference file into src/ when the project has one", async () => {
+    configOnlyProject();
+    mkdirSync(join(root, "src"), { recursive: true });
+    await mockApi([objectTypesRoute()]);
+
+    const result = await runCli(["sync"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.join("\n")).toContain(
+      "created   src/frontal-env.d.ts"
+    );
+    expect(readFileSync(join(root, "src", "frontal-env.d.ts"), "utf-8")).toBe(
+      readFileSync(join(FIXTURE, "src", "frontal-env.d.ts"), "utf-8")
+    );
+  });
+
+  it("writes to --types-out when given", async () => {
+    configOnlyProject();
+    await mockApi([objectTypesRoute()]);
+
+    const result = await runCli([
+      "sync",
+      "--types-out",
+      "types/frontal-env.d.ts",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(join(root, "types", "frontal-env.d.ts"))).toBe(true);
+  });
+
+  it("refuses to overwrite a file frontal did not generate, and writes nothing", async () => {
+    configOnlyProject();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src", "frontal-env.d.ts"), "// hand written\n");
+    await mockApi([objectTypesRoute()]);
+
+    const result = await runCli(["sync"]);
+
+    expect(result.exitCode).toBe(6);
+    expect(result.stderr.join("\n")).toContain("ONTOLOGY_REFERENCE_NOT_OWNED");
+    expect(readFileSync(join(root, "src", "frontal-env.d.ts"), "utf-8")).toBe(
+      "// hand written\n"
+    );
+    expect(existsSync(join(root, ".frontal", "ontology.json"))).toBe(false);
   });
 });
