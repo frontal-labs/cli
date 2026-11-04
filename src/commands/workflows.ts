@@ -1,6 +1,10 @@
+import { WorkflowDefinitionSchema } from "@frontal-labs/workflows";
 import type { Command } from "commander";
 import { assertOperationSupported } from "@/contract/operations.js";
+import { CliError } from "@/errors/cli-error.js";
+import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { paginationParams, runAction } from "@/lib/command.js";
+import { formatConfigIssues } from "@/lib/config.js";
 import { emitJsonLine, withExamples } from "@/lib/output.js";
 import { renderSSEStream } from "@/output/stream.js";
 import { parseJsonInput } from "@/utils/json.js";
@@ -36,11 +40,16 @@ export function registerWorkflowsCommands(program: Command): void {
         runAction(cmd, async ({ fmt, sdk }) => {
           assertOperationSupported("POST", "/workflows");
           const body = parseJsonInput(opts.body, "--body");
+          const definition = WorkflowDefinitionSchema.safeParse(body);
+          if (!definition.success) {
+            throw new CliError(
+              "VALIDATION_ERROR",
+              `Invalid workflow definition: ${formatConfigIssues(definition.error)}`,
+              { exitCode: EXIT_CODES.VALIDATION_ERROR }
+            );
+          }
           const { frontal } = await sdk();
-          // The SDK validates the definition against WorkflowDefinitionSchema.
-          const result = await frontal.workflows.create(
-            body as Parameters<typeof frontal.workflows.create>[0]
-          );
+          const result = await frontal.workflows.create(definition.data);
           fmt.object(result);
         })
       ),

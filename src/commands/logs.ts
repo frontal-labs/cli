@@ -11,7 +11,7 @@ import {
   jsonObject,
 } from "@/lib/json.js";
 import { emitJsonLine, withExamples } from "@/lib/output.js";
-import { redact } from "@/output/redact.js";
+import { redactRecord } from "@/output/redact.js";
 import { theme } from "@/output/theme.js";
 
 type Obj = JsonRecord;
@@ -146,7 +146,7 @@ export async function queryLogs(
     return;
   }
   for (const entry of entries) {
-    console.log(formatLogLine(redact(entry)));
+    console.log(formatLogLine(redactRecord(entry)));
   }
   if (page.pagination.hasMore) {
     ctx.fmt.info("… more entries available (increase --limit).");
@@ -188,7 +188,7 @@ async function consumeStream(
     if (json) {
       emitJsonLine({ id: event.id, type: event.type, ...entry });
     } else {
-      console.log(formatLogLine(redact(entry)));
+      console.log(formatLogLine(redactRecord(entry)));
     }
   }
 }

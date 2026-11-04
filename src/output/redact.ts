@@ -1,4 +1,4 @@
-import { isJsonRecord } from "@/lib/json.js";
+import { isJsonRecord, type JsonRecord } from "@/lib/json.js";
 
 const REDACTED = "[REDACTED]";
 
@@ -40,8 +40,30 @@ export function redactString(value: string): string {
  * strips key/token patterns from strings. Safe for JSON, YAML and human
  * output.
  */
-export function redact<T>(value: T): T {
-  return redactValue(value, new WeakSet()) as T;
+export function redact(value: unknown): unknown {
+  return redactValue(value, new WeakSet());
+}
+
+/**
+ * Redacts a JSON object and keeps its record type. Redaction only rewrites
+ * leaf values, so the result is always a record; the guard makes that
+ * invariant checked instead of asserted.
+ */
+export function redactRecord(value: JsonRecord): JsonRecord {
+  const out = redactValue(value, new WeakSet());
+  if (!isJsonRecord(out)) {
+    throw new TypeError("redaction changed the shape of a record");
+  }
+  return out;
+}
+
+/** Redacts a list of JSON objects, keeping each element a record. */
+export function redactRecords(values: readonly JsonRecord[]): JsonRecord[] {
+  const out = redactValue(values, new WeakSet());
+  if (!(Array.isArray(out) && out.every(isJsonRecord))) {
+    throw new TypeError("redaction changed the shape of a record list");
+  }
+  return out;
 }
 
 function redactValue(value: unknown, seen: WeakSet<object>): unknown {
