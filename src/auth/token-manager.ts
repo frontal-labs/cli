@@ -1,14 +1,32 @@
+import { z } from "zod";
 import {
   CLI_CLIENT_ID,
   TOKEN_REFRESH_BUFFER_SECONDS,
 } from "@/auth/constants.js";
 
-interface TokenResponse {
-  access_token: string;
-  expires_in: number;
-  refresh_token?: string;
-  token_type: string;
+/** OAuth error bodies (RFC 6749 section 5.2). Anything else is ignored. */
+const oauthErrorSchema = z.object({
+  error: z.string().optional(),
+  error_description: z.string().optional(),
+});
+
+/** Reads the OAuth error message from an untrusted response body. */
+async function readOAuthError(response: Response): Promise<{
+  error?: string | undefined;
+  error_description?: string | undefined;
+}> {
+  const raw: unknown = await response.json().catch(() => ({}));
+  const parsed = oauthErrorSchema.safeParse(raw);
+  return parsed.success ? parsed.data : {};
 }
+
+/** A successful token response. Anything missing or mistyped is an error. */
+const tokenResponseSchema = z.object({
+  access_token: z.string(),
+  expires_in: z.number(),
+  refresh_token: z.string().optional(),
+  token_type: z.string(),
+});
 
 export interface TokenSet {
   accessToken: string;
@@ -38,9 +56,7 @@ export async function exchangeCode(params: {
   });
 
   if (!response.ok) {
-    const err = (await response.json().catch(() => ({}))) as Partial<
-      Record<string, string>
-    >;
+    const err = await readOAuthError(response);
     throw new Error(
       err.error_description ??
         err.error ??
@@ -48,7 +64,7 @@ export async function exchangeCode(params: {
     );
   }
 
-  const data = (await response.json()) as TokenResponse;
+  const data = tokenResponseSchema.parse(await response.json());
   return {
     accessToken: data.access_token,
     expiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
@@ -74,9 +90,7 @@ export async function refreshTokens(params: {
   });
 
   if (!response.ok) {
-    const err = (await response.json().catch(() => ({}))) as Partial<
-      Record<string, string>
-    >;
+    const err = await readOAuthError(response);
     throw new Error(
       err.error_description ??
         err.error ??
@@ -84,7 +98,7 @@ export async function refreshTokens(params: {
     );
   }
 
-  const data = (await response.json()) as TokenResponse;
+  const data = tokenResponseSchema.parse(await response.json());
   return {
     accessToken: data.access_token,
     expiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
@@ -103,13 +117,15 @@ export function isTokenExpired(
 export function decodeTokenExpiry(jwt: string): number | null {
   try {
     const parts = jwt.split(".");
-    if (parts.length !== 3) {
+    const [, encodedPayload] = parts;
+    if (parts.length !== 3 || encodedPayload === undefined) {
       return null;
     }
-    const payload = JSON.parse(
-      Buffer.from(parts[1], "base64url").toString("utf-8")
+    const raw: unknown = JSON.parse(
+      Buffer.from(encodedPayload, "base64url").toString("utf-8")
     );
-    return typeof payload.exp === "number" ? payload.exp : null;
+    const parsed = z.object({ exp: z.number() }).safeParse(raw);
+    return parsed.success ? parsed.data.exp : null;
   } catch {
     return null;
   }

@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { z } from "zod";
 import {
   agentRecord,
   agentVersionRecord,
@@ -20,6 +21,16 @@ import {
   policyRecord,
 } from "@/lib/dev/fixtures.js";
 import type { DevRequest, RouteDefinition } from "@/lib/dev/router.js";
+import {
+  isJsonRecord,
+  jsonArray,
+  jsonField,
+  jsonNumber,
+  jsonObject,
+  jsonRecordArray,
+  jsonString,
+  jsonStringArray,
+} from "@/lib/json.js";
 import type { ProjectState } from "@/lib/state.js";
 import { VERSION } from "@/version.js";
 
@@ -39,11 +50,15 @@ export interface LocalContext {
 export const DOCS_URL = "https://frontal.dev/docs/cli/dev";
 const SAFE_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
-export function json(body: unknown, status = 200, headers: Obj = {}): Response {
+export function json(
+  body: unknown,
+  status = 200,
+  headers: Record<string, string> = {}
+): Response {
   return new Response(JSON.stringify(body), {
     headers: {
       "content-type": "application/json",
-      ...(headers as Record<string, string>),
+      ...headers,
     },
     status,
   });
@@ -72,15 +87,23 @@ function notFound(req: DevRequest, what: string): Response {
   return apiError(404, "NOT_FOUND", `${what} not found`, req.requestId);
 }
 
-function bodyObject(req: DevRequest): Obj {
-  return typeof req.body === "object" &&
-    req.body !== null &&
-    !Array.isArray(req.body)
-    ? (req.body as Obj)
-    : {};
+/** A route parameter. The router only calls a handler with the params it matched. */
+function pathParam(req: DevRequest, name: string): string {
+  const value = req.params[name];
+  if (value === undefined) {
+    throw new Error(`Missing route parameter "${name}".`);
+  }
+  return value;
 }
 
-function pageOptions(req: DevRequest): { cursor?: string; limit?: number } {
+function bodyObject(req: DevRequest): Obj {
+  return isJsonRecord(req.body) ? req.body : {};
+}
+
+function pageOptions(req: DevRequest): {
+  cursor?: string | undefined;
+  limit?: number | undefined;
+} {
   const limit = req.query.get("limit");
   return {
     cursor: req.query.get("cursor") ?? undefined,
@@ -171,11 +194,11 @@ function healthRoutes(ctx: LocalContext): RouteDefinition[] {
 
 function agentRoutes(ctx: LocalContext): RouteDefinition[] {
   const { state } = ctx;
-  const load = (id: string): Obj | undefined => state.read<Obj>("agents", id);
+  const load = (id: string): Obj | undefined => state.read("agents", id);
   const save = (agent: Obj): void =>
-    state.write("agents", String(agent.id), agent);
+    state.write("agents", String(jsonField(agent, "id")), agent);
   const versionsOf = (agent: Obj): Obj[] => {
-    const count = Number(agent.version ?? 1);
+    const count = Number(jsonField(agent, "version") ?? 1);
     return Array.from({ length: count }, (_, i) =>
       agentVersionRecord(agent, i + 1)
     ).reverse();
@@ -184,10 +207,10 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
   return [
     {
       handler: (req) => {
-        let agents = state.list<Obj>("agents");
+        let agents = state.list("agents");
         const status = req.query.get("status");
         if (status) {
-          agents = agents.filter((a) => a.status === status);
+          agents = agents.filter((a) => jsonField(a, "status") === status);
         }
         return json(page(agents, pageOptions(req)));
       },
@@ -198,10 +221,8 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     {
       handler: (req) => {
         const definition = bodyObject(req);
-        if (
-          typeof definition.name !== "string" ||
-          definition.name.length === 0
-        ) {
+        const definitionName = jsonString(definition, "name");
+        if (definitionName === undefined || definitionName.length === 0) {
           return apiError(
             400,
             "VALIDATION_ERROR",
@@ -222,10 +243,10 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const run = state.read<Obj>("runs", req.params.runId as string);
+        const run = state.read("runs", pathParam(req, "runId"));
         return run
           ? json({ messages: [{ content: "local dev run", role: "system" }] })
-          : notFound(req, `Run ${req.params.runId}`);
+          : notFound(req, `Run ${pathParam(req, "runId")}`);
       },
       method: "GET",
       path: "/agents/runs/{runId}/conversation",
@@ -233,15 +254,24 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const run = state.read<Obj>("runs", req.params.runId as string);
+        const run = state.read("runs", pathParam(req, "runId"));
         if (!run) {
-          return notFound(req, `Run ${req.params.runId}`);
+          return notFound(req, `Run ${pathParam(req, "runId")}`);
         }
         return sseResponse(
           once([
-            { data: { run_id: run.id, status: "running" }, event: "status" },
+            {
+              data: { run_id: jsonField(run, "id"), status: "running" },
+              event: "status",
+            },
             { data: { step: 1, type: "observe" }, event: "step" },
-            { data: { run_id: run.id, status: run.status }, event: "status" },
+            {
+              data: {
+                run_id: jsonField(run, "id"),
+                status: jsonField(run, "status"),
+              },
+              event: "status",
+            },
             { data: run, event: "done" },
           ]),
           req.requestId
@@ -253,8 +283,10 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const run = state.read<Obj>("runs", req.params.runId as string);
-        return run ? json(run) : notFound(req, `Run ${req.params.runId}`);
+        const run = state.read("runs", pathParam(req, "runId"));
+        return run
+          ? json(run)
+          : notFound(req, `Run ${pathParam(req, "runId")}`);
       },
       method: "GET",
       path: "/agents/runs/{runId}",
@@ -262,10 +294,10 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const agent = load(req.params.id as string);
+        const agent = load(pathParam(req, "id"));
         return agent
           ? json(page(versionsOf(agent), pageOptions(req)))
-          : notFound(req, `Agent ${req.params.id}`);
+          : notFound(req, `Agent ${pathParam(req, "id")}`);
       },
       method: "GET",
       path: "/agents/{id}/versions",
@@ -273,19 +305,18 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const agent = load(req.params.id as string);
+        const agent = load(pathParam(req, "id"));
         if (!agent) {
-          return notFound(req, `Agent ${req.params.id}`);
+          return notFound(req, `Agent ${pathParam(req, "id")}`);
         }
         const body = bodyObject(req);
-        const current = Number(agent.version ?? 1);
-        const target =
-          typeof body.to_version === "number" ? body.to_version : current - 1;
+        const current = Number(jsonField(agent, "version") ?? 1);
+        const target = jsonNumber(body, "to_version") ?? current - 1;
         if (target < 1 || target > current) {
           return apiError(
             400,
             "VALIDATION_ERROR",
-            `Cannot roll back agent ${agent.id} to version ${target}`,
+            `Cannot roll back agent ${jsonField(agent, "id")} to version ${target}`,
             req.requestId,
             {
               fields: [
@@ -313,13 +344,13 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const agent = load(req.params.id as string);
+        const agent = load(pathParam(req, "id"));
         if (!agent) {
-          return notFound(req, `Agent ${req.params.id}`);
+          return notFound(req, `Agent ${pathParam(req, "id")}`);
         }
         const runs = state
-          .list<Obj>("runs")
-          .filter((r) => r.agent_id === agent.id);
+          .list("runs")
+          .filter((r) => jsonField(r, "agent_id") === jsonField(agent, "id"));
         return json(page(runs, pageOptions(req)));
       },
       method: "GET",
@@ -328,23 +359,27 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const agent = load(req.params.id as string);
+        const agent = load(pathParam(req, "id"));
         if (!agent) {
-          return notFound(req, `Agent ${req.params.id}`);
+          return notFound(req, `Agent ${pathParam(req, "id")}`);
         }
         const body = bodyObject(req);
         const run = executionRecord(
-          String(agent.id),
-          String(body.event ?? "manual"),
-          (body.payload as Obj | undefined) ?? {}
+          String(jsonField(agent, "id")),
+          String(jsonField(body, "event") ?? "manual"),
+          jsonObject(body, "payload") ?? {}
         );
-        state.write("runs", String(run.id), run);
+        state.write("runs", String(jsonField(run, "id")), run);
         emitLog(
           ctx,
-          logEntry("info", `agent ${agent.name} handled ${run.trigger_event}`, {
-            agent_id: agent.id,
-            run_id: run.id,
-          })
+          logEntry(
+            "info",
+            `agent ${jsonField(agent, "name")} handled ${jsonField(run, "trigger_event")}`,
+            {
+              agent_id: jsonField(agent, "id"),
+              run_id: jsonField(run, "id"),
+            }
+          )
         );
         return json(run, 202);
       },
@@ -354,8 +389,10 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const agent = load(req.params.id as string);
-        return agent ? json(agent) : notFound(req, `Agent ${req.params.id}`);
+        const agent = load(pathParam(req, "id"));
+        return agent
+          ? json(agent)
+          : notFound(req, `Agent ${pathParam(req, "id")}`);
       },
       method: "GET",
       path: "/agents/{id}",
@@ -363,16 +400,16 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const agent = load(req.params.id as string);
+        const agent = load(pathParam(req, "id"));
         if (!agent) {
-          return notFound(req, `Agent ${req.params.id}`);
+          return notFound(req, `Agent ${pathParam(req, "id")}`);
         }
         const updated = {
           ...agent,
           ...bodyObject(req),
-          id: agent.id,
+          id: jsonField(agent, "id"),
           updated_at: nowIso(),
-          version: Number(agent.version ?? 1) + 1,
+          version: Number(jsonField(agent, "version") ?? 1) + 1,
         };
         save(updated);
         return json(updated);
@@ -383,9 +420,9 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) =>
-        state.remove("agents", req.params.id as string)
+        state.remove("agents", pathParam(req, "id"))
           ? new Response(null, { status: 204 })
-          : notFound(req, `Agent ${req.params.id}`),
+          : notFound(req, `Agent ${pathParam(req, "id")}`),
       method: "DELETE",
       path: "/agents/{id}",
       service: "agents",
@@ -396,14 +433,16 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
 function graphRoutes(ctx: LocalContext): RouteDefinition[] {
   const { state } = ctx;
   const entities = (): Obj[] =>
-    state.list<Obj>("graph").filter((r) => String(r.id).startsWith("ent_"));
-  const load = (id: string): Obj | undefined => state.read<Obj>("graph", id);
+    state
+      .list("graph")
+      .filter((r) => String(jsonField(r, "id")).startsWith("ent_"));
+  const load = (id: string): Obj | undefined => state.read("graph", id);
 
   const matches = (entity: Obj, conditions: Obj): boolean => {
-    const fields = (entity.fields as Obj | undefined) ?? {};
+    const fields = jsonObject(entity, "fields") ?? {};
     return Object.entries(conditions).every(([key, expected]) => {
-      const actual = key === "type" ? entity.type : fields[key];
-      if (key === "type" && entity.type === null) {
+      const actual = key === "type" ? jsonField(entity, "type") : fields[key];
+      if (key === "type" && jsonField(entity, "type") === null) {
         return true;
       }
       return matchesFilter(actual, expected);
@@ -413,21 +452,21 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
   const queryHandler = (req: DevRequest): Response => {
     const body = bodyObject(req);
     const conditions =
-      (body.conditions as Obj | undefined) ??
-      (body.filter as Obj | undefined) ??
-      {};
-    const entityType = body.entity_type ?? body.type;
+      jsonObject(body, "conditions") ?? jsonObject(body, "filter") ?? {};
+    const entityType =
+      jsonField(body, "entity_type") ?? jsonField(body, "type");
     // Entities created via `use(type).create()` carry no type on the wire;
     // they match any entity_type filter.
     const results = entities().filter(
       (e) =>
-        (entityType && e.type !== null ? e.type === entityType : true) &&
-        matches(e, conditions)
+        (entityType && jsonField(e, "type") !== null
+          ? jsonField(e, "type") === entityType
+          : true) && matches(e, conditions)
     );
     return json(
       page(results, {
-        cursor: typeof body.cursor === "string" ? body.cursor : undefined,
-        limit: typeof body.limit === "number" ? body.limit : undefined,
+        cursor: jsonString(body, "cursor"),
+        limit: jsonNumber(body, "limit"),
       })
     );
   };
@@ -452,8 +491,9 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
         let items = entities();
         if (conditions) {
           try {
-            const parsed = JSON.parse(conditions) as Obj;
-            items = items.filter((e) => matches(e, parsed));
+            const parsed: unknown = JSON.parse(conditions);
+            const conditionsObject: Obj = isJsonRecord(parsed) ? parsed : {};
+            items = items.filter((e) => matches(e, conditionsObject));
           } catch {
             return apiError(
               400,
@@ -472,9 +512,9 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     {
       handler: (req) => {
         const body = bodyObject(req);
-        const fields = (body.fields as Obj | undefined) ?? body;
+        const fields = jsonObject(body, "fields") ?? body;
         const entity = entityRecord(fields);
-        state.write("graph", String(entity.id), entity);
+        state.write("graph", String(jsonField(entity, "id")), entity);
         return json(entity, 201);
       },
       method: "POST",
@@ -483,20 +523,26 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const entity = load(req.params.id as string);
+        const entity = load(pathParam(req, "id"));
         if (!entity) {
-          return notFound(req, `Entity ${req.params.id}`);
+          return notFound(req, `Entity ${pathParam(req, "id")}`);
         }
         const links = state
-          .list<Obj>("graph")
+          .list("graph")
           .filter(
-            (r) => String(r.id).startsWith("rel_") && r.from_id === entity.id
+            (r) =>
+              String(jsonField(r, "id")).startsWith("rel_") &&
+              jsonField(r, "from_id") === jsonField(entity, "id")
           );
         return json({
           data: links,
-          entity_id: entity.id,
+          entity_id: jsonField(entity, "id"),
           history: [
-            { change: "created", changed_at: entity.created_at, version: 1 },
+            {
+              change: "created",
+              changed_at: jsonField(entity, "created_at"),
+              version: 1,
+            },
           ],
         });
       },
@@ -506,18 +552,24 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const entity = load(req.params.id as string);
+        const entity = load(pathParam(req, "id"));
         if (!entity) {
-          return notFound(req, `Entity ${req.params.id}`);
+          return notFound(req, `Entity ${pathParam(req, "id")}`);
         }
         const body = bodyObject(req);
         const relationship = {
           created_at: nowIso(),
-          fields: (body.fields as Obj | undefined) ?? {},
-          from_id: entity.id,
+          fields: jsonObject(body, "fields") ?? {},
+          from_id: jsonField(entity, "id"),
           id: newId("rel"),
-          to_id: body.target_id ?? body.to_id ?? body.entity_id,
-          type: body.type ?? body.relationship ?? "related",
+          to_id:
+            jsonField(body, "target_id") ??
+            jsonField(body, "to_id") ??
+            jsonField(body, "entity_id"),
+          type:
+            jsonField(body, "type") ??
+            jsonField(body, "relationship") ??
+            "related",
         };
         state.write("graph", String(relationship.id), relationship);
         return json(relationship, 201);
@@ -528,8 +580,10 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const entity = load(req.params.id as string);
-        return entity ? json(entity) : notFound(req, `Entity ${req.params.id}`);
+        const entity = load(pathParam(req, "id"));
+        return entity
+          ? json(entity)
+          : notFound(req, `Entity ${pathParam(req, "id")}`);
       },
       method: "GET",
       path: "/ontology/graph/entities/{id}",
@@ -537,21 +591,21 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const entity = load(req.params.id as string);
+        const entity = load(pathParam(req, "id"));
         if (!entity) {
-          return notFound(req, `Entity ${req.params.id}`);
+          return notFound(req, `Entity ${pathParam(req, "id")}`);
         }
         const body = bodyObject(req);
         const updated = {
           ...entity,
           fields: {
-            ...(entity.fields as Obj),
-            ...((body.fields as Obj | undefined) ?? {}),
+            ...jsonObject(entity, "fields"),
+            ...(jsonObject(body, "fields") ?? {}),
           },
           updated_at: nowIso(),
-          version: Number(entity.version ?? 1) + 1,
+          version: Number(jsonField(entity, "version") ?? 1) + 1,
         };
-        state.write("graph", String(entity.id), updated);
+        state.write("graph", String(jsonField(entity, "id")), updated);
         return json(updated);
       },
       method: "PUT",
@@ -560,17 +614,19 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) =>
-        state.remove("graph", req.params.id as string)
+        state.remove("graph", pathParam(req, "id"))
           ? new Response(null, { status: 204 })
-          : notFound(req, `Entity ${req.params.id}`),
+          : notFound(req, `Entity ${pathParam(req, "id")}`),
       method: "DELETE",
       path: "/ontology/graph/entities/{id}",
       service: "graph",
     },
     {
       handler: (req) => {
-        const rel = load(req.params.id as string);
-        return rel ? json(rel) : notFound(req, `Relationship ${req.params.id}`);
+        const rel = load(pathParam(req, "id"));
+        return rel
+          ? json(rel)
+          : notFound(req, `Relationship ${pathParam(req, "id")}`);
       },
       method: "GET",
       path: "/ontology/graph/relationships/{id}",
@@ -578,9 +634,9 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) =>
-        state.remove("graph", req.params.id as string)
+        state.remove("graph", pathParam(req, "id"))
           ? new Response(null, { status: 204 })
-          : notFound(req, `Relationship ${req.params.id}`),
+          : notFound(req, `Relationship ${pathParam(req, "id")}`),
       method: "DELETE",
       path: "/ontology/graph/relationships/{id}",
       service: "graph",
@@ -593,7 +649,7 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const ids = (bodyObject(req).ids as string[] | undefined) ?? [];
+        const ids = jsonStringArray(bodyObject(req), "ids");
         return json({ data: ids.map((id) => load(id)).filter(Boolean) });
       },
       method: "POST",
@@ -604,20 +660,27 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
       handler: (req) => {
         const body = bodyObject(req);
         const startId = String(
-          body.start_id ?? body.entity_id ?? body.id ?? ""
+          jsonField(body, "start_id") ??
+            jsonField(body, "entity_id") ??
+            jsonField(body, "id") ??
+            ""
         );
         const start = load(startId);
         if (!start) {
           return notFound(req, `Entity ${startId || "(missing start_id)"}`);
         }
         const rels = state
-          .list<Obj>("graph")
+          .list("graph")
           .filter(
-            (r) => String(r.id).startsWith("rel_") && r.from_id === start.id
+            (r) =>
+              String(jsonField(r, "id")).startsWith("rel_") &&
+              jsonField(r, "from_id") === jsonField(start, "id")
           );
         const nodes = [
           start,
-          ...rels.map((r) => load(String(r.to_id))).filter(Boolean),
+          ...rels
+            .map((r) => load(String(jsonField(r, "to_id"))))
+            .filter(Boolean),
         ];
         return json({ data: nodes, edges: rels, nodes, results: nodes });
       },
@@ -628,18 +691,24 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
     {
       handler: (req) => {
         const body = bodyObject(req);
-        const from = load(String(body.from_id ?? body.start_id ?? ""));
-        const to = load(String(body.to_id ?? body.end_id ?? ""));
+        const from = load(
+          String(
+            jsonField(body, "from_id") ?? jsonField(body, "start_id") ?? ""
+          )
+        );
+        const to = load(
+          String(jsonField(body, "to_id") ?? jsonField(body, "end_id") ?? "")
+        );
         if (!(from && to)) {
           return notFound(req, "Path endpoints");
         }
         const direct = state
-          .list<Obj>("graph")
+          .list("graph")
           .find(
             (r) =>
-              String(r.id).startsWith("rel_") &&
-              r.from_id === from.id &&
-              r.to_id === to.id
+              String(jsonField(r, "id")).startsWith("rel_") &&
+              jsonField(r, "from_id") === jsonField(from, "id") &&
+              jsonField(r, "to_id") === jsonField(to, "id")
           );
         return json({
           edges: direct ? [direct] : [],
@@ -658,7 +727,7 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
         return json({
           answer: `Local dev graph has ${entities().length} entities.`,
           data: entities().slice(0, 10),
-          question: body.question ?? body.query,
+          question: jsonField(body, "question") ?? jsonField(body, "query"),
         });
       },
       method: "POST",
@@ -670,7 +739,7 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
 
 function datasetRoutes(ctx: LocalContext): RouteDefinition[] {
   const { state } = ctx;
-  const datasets = (): Obj[] => state.list<Obj>("datasets");
+  const datasets = (): Obj[] => state.list("datasets");
   const catalog = (ds: Obj): Obj => ({ ...ds, source: "local" });
 
   return [
@@ -683,21 +752,27 @@ function datasetRoutes(ctx: LocalContext): RouteDefinition[] {
     {
       handler: (req) => {
         const body = bodyObject(req);
+        const datasetId = jsonString(body, "dataset_id");
         const existing =
-          typeof body.dataset_id === "string"
-            ? state.read<Obj>("datasets", body.dataset_id)
-            : undefined;
-        const rows = Array.isArray(body.rows) ? body.rows : [];
+          datasetId === undefined
+            ? undefined
+            : state.read("datasets", datasetId);
+        const rows = jsonArray(body, "rows") ?? [];
         const dataset = existing
           ? {
               ...existing,
-              row_count: Number(existing.row_count ?? 0) + rows.length,
+              row_count:
+                Number(jsonField(existing, "row_count") ?? 0) + rows.length,
               updated_at: nowIso(),
             }
           : datasetRecord(body);
-        state.write("datasets", String(dataset.id), dataset);
+        state.write("datasets", String(jsonField(dataset, "id")), dataset);
         return json(
-          { dataset, dataset_id: dataset.id, ingested: rows.length },
+          {
+            dataset,
+            dataset_id: jsonField(dataset, "id"),
+            ingested: rows.length,
+          },
           202
         );
       },
@@ -707,8 +782,8 @@ function datasetRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const ds = state.read<Obj>("datasets", req.params.id as string);
-        return ds ? json(ds) : notFound(req, `Dataset ${req.params.id}`);
+        const ds = state.read("datasets", pathParam(req, "id"));
+        return ds ? json(ds) : notFound(req, `Dataset ${pathParam(req, "id")}`);
       },
       method: "GET",
       path: "/data/ingest/datasets/{id}",
@@ -728,10 +803,10 @@ function datasetRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const ds = state.read<Obj>("datasets", req.params.id as string);
+        const ds = state.read("datasets", pathParam(req, "id"));
         return ds
           ? json(catalog(ds))
-          : notFound(req, `Dataset ${req.params.id}`);
+          : notFound(req, `Dataset ${pathParam(req, "id")}`);
       },
       method: "GET",
       path: "/data/catalog/catalog/datasets/{id}",
@@ -752,13 +827,22 @@ function datasetRoutes(ctx: LocalContext): RouteDefinition[] {
   ];
 }
 
-interface BlobMeta {
-  bucket: string;
-  content_type: string;
-  created_at: string;
-  file: string;
-  key: string;
-  size: number;
+const blobMetaSchema = z
+  .object({
+    bucket: z.string(),
+    content_type: z.string(),
+    created_at: z.string(),
+    file: z.string(),
+    key: z.string(),
+    size: z.number(),
+  })
+  .loose();
+
+type BlobMeta = z.infer<typeof blobMetaSchema>;
+
+function parseBlobMeta(value: unknown): BlobMeta | undefined {
+  const parsed = blobMetaSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function blobRoutes(ctx: LocalContext): RouteDefinition[] {
@@ -767,22 +851,23 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
   const metaId = (bucket: string, key: string): string =>
     createHash("sha1").update(`${bucket}/${key}`).digest("hex");
   const meta = (bucket: string, key: string): BlobMeta | undefined =>
-    state.read<BlobMeta>("blob", metaId(bucket, key));
+    state.readAs("blob", metaId(bucket, key), parseBlobMeta);
 
   const objectPath = (req: DevRequest): { bucket: string; key: string } => ({
-    bucket: req.params.bucket as string,
-    key: req.params["*"] as string,
+    bucket: pathParam(req, "bucket"),
+    key: pathParam(req, "*"),
   });
 
   return [
     {
       handler: (req) => {
         const body = bodyObject(req);
-        const prefix = typeof body.prefix === "string" ? body.prefix : "";
+        const prefix = jsonString(body, "prefix") ?? "";
         const objects = state
-          .list<BlobMeta>("blob")
+          .listAs("blob", parseBlobMeta)
           .filter(
-            (m) => m.bucket === req.params.bucket && m.key.startsWith(prefix)
+            (m) =>
+              m.bucket === pathParam(req, "bucket") && m.key.startsWith(prefix)
           )
           .map((m) => ({
             content_type: m.content_type,
@@ -928,19 +1013,23 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
 
   function copyOrMove(req: DevRequest, move: boolean): Response {
     const body = bodyObject(req);
-    const from = body.source ?? body.from ?? {};
-    const to = body.destination ?? body.to ?? {};
-    const src = from as Obj;
-    const dst = to as Obj;
+    const from = jsonField(body, "source") ?? jsonField(body, "from") ?? {};
+    const to = jsonField(body, "destination") ?? jsonField(body, "to") ?? {};
+    const src: Obj = isJsonRecord(from) ? from : {};
+    const dst: Obj = isJsonRecord(to) ? to : {};
     const srcMeta = meta(
-      String(src.bucket ?? body.from_bucket),
-      String(src.key ?? body.from_key)
+      String(jsonField(src, "bucket") ?? jsonField(body, "from_bucket")),
+      String(jsonField(src, "key") ?? jsonField(body, "from_key"))
     );
     if (!(srcMeta && existsSync(srcMeta.file))) {
       return notFound(req, "Source object");
     }
-    const dstBucket = String(dst.bucket ?? body.to_bucket ?? srcMeta.bucket);
-    const dstKey = String(dst.key ?? body.to_key ?? srcMeta.key);
+    const dstBucket = String(
+      jsonField(dst, "bucket") ?? jsonField(body, "to_bucket") ?? srcMeta.bucket
+    );
+    const dstKey = String(
+      jsonField(dst, "key") ?? jsonField(body, "to_key") ?? srcMeta.key
+    );
     const id = metaId(dstBucket, dstKey);
     const file = join(blobDir, `${id}.bin`);
     mkdirSync(blobDir, { recursive: true });
@@ -962,11 +1051,12 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
 
 function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
   const filterLogs = (input: Obj): Obj[] => {
-    const query = typeof input.query === "string" ? input.query.trim() : "";
-    const level = typeof input.level === "string" ? input.level : undefined;
-    const tokens = query === "" || query === "*" ? [] : query.split(WHITESPACE);
+    const query = jsonString(input, "query")?.trim() ?? "";
+    const level = jsonString(input, "level");
+    const tokens: string[] =
+      query === "" || query === "*" ? [] : query.split(WHITESPACE);
     return ctx.logs.filter((entry) => {
-      if (level && entry.level !== level) {
+      if (level && jsonField(entry, "level") !== level) {
         return false;
       }
       return tokens.every((token) => matchesLogToken(entry, token));
@@ -978,11 +1068,12 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
       handler: (req) => {
         const body = bodyObject(req);
         const entries = filterLogs(body);
-        const ordered = body.order === "asc" ? entries : [...entries].reverse();
+        const ordered =
+          jsonField(body, "order") === "asc" ? entries : [...entries].reverse();
         return json(
           page(ordered, {
-            cursor: typeof body.cursor === "string" ? body.cursor : undefined,
-            limit: typeof body.limit === "number" ? body.limit : undefined,
+            cursor: jsonString(body, "cursor"),
+            limit: jsonNumber(body, "limit"),
           })
         );
       },
@@ -1031,7 +1122,11 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
                 }
                 return {
                   done: false,
-                  value: { data: entry, event: "log", id: String(entry.id) },
+                  value: {
+                    data: entry,
+                    event: "log",
+                    id: String(jsonField(entry, "id")),
+                  },
                 };
               },
               return() {
@@ -1049,7 +1144,7 @@ function observabilityRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const entries = (bodyObject(req).entries as Obj[] | undefined) ?? [];
+        const entries = jsonRecordArray(bodyObject(req), "entries");
         for (const entry of entries) {
           emitLog(ctx, {
             id: newId("log"),
@@ -1103,14 +1198,10 @@ function compare(a: unknown, b: unknown): number {
 
 /** Evaluates an SDK filter value (scalar or `{ eq, gt, in, contains, ... }`). */
 function matchesFilter(actual: unknown, expected: unknown): boolean {
-  if (
-    expected === null ||
-    typeof expected !== "object" ||
-    Array.isArray(expected)
-  ) {
+  if (!isJsonRecord(expected)) {
     return actual === expected;
   }
-  const ops = expected as Obj;
+  const ops = expected;
   const text = String(actual ?? "");
   return Object.entries(ops).every(([op, value]) => {
     switch (op) {
@@ -1159,7 +1250,7 @@ function matchesLogToken(entry: Obj, token: string): boolean {
     if (key === "project") {
       return true;
     }
-    const metadata = (entry.metadata as Obj | undefined) ?? {};
+    const metadata = jsonObject(entry, "metadata") ?? {};
     const actual = entry[key] ?? metadata[key];
     if (actual !== undefined) {
       return String(actual) === value;
@@ -1179,15 +1270,15 @@ function countBy(items: Obj[], key: string): Obj {
 
 function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
   const { state } = ctx;
-  const policies = (): Obj[] => state.list<Obj>("policies");
+  const policies = (): Obj[] => state.list("policies");
   const denyRules = (): Obj[] =>
     policies().flatMap((p) => {
-      const def = (p.definition as Obj | undefined) ?? {};
-      const deny = Array.isArray(def.deny) ? (def.deny as Obj[]) : [];
+      const def = jsonObject(p, "definition") ?? {};
+      const deny = jsonRecordArray(def, "deny");
       return deny.map((rule) => ({
         ...rule,
-        policy_id: p.id,
-        policy_name: p.name,
+        policy_id: jsonField(p, "id"),
+        policy_name: jsonField(p, "name"),
       }));
     });
 
@@ -1214,7 +1305,7 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
       handler: (req) => {
         const status = req.query.get("status");
         const items = status
-          ? policies().filter((p) => p.status === status)
+          ? policies().filter((p) => jsonField(p, "status") === status)
           : policies();
         return json(page(items, pageOptions(req)));
       },
@@ -1225,7 +1316,7 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
     {
       handler: (req) => {
         const policy = policyRecord(bodyObject(req));
-        state.write("policies", String(policy.id), policy);
+        state.write("policies", String(jsonField(policy, "id")), policy);
         return json(policy, 201);
       },
       method: "POST",
@@ -1236,7 +1327,9 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
       handler: (req) => {
         const body = bodyObject(req);
         const { definition } = body;
-        const format = String(body.definition_format ?? "json_schema");
+        const format = String(
+          jsonField(body, "definition_format") ?? "json_schema"
+        );
         const errors: string[] = [];
         if (
           definition === undefined ||
@@ -1263,8 +1356,10 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const policy = state.read<Obj>("policies", req.params.id as string);
-        return policy ? json(policy) : notFound(req, `Policy ${req.params.id}`);
+        const policy = state.read("policies", pathParam(req, "id"));
+        return policy
+          ? json(policy)
+          : notFound(req, `Policy ${pathParam(req, "id")}`);
       },
       method: "GET",
       path: "/policies/{id}",
@@ -1272,9 +1367,9 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) =>
-        state.remove("policies", req.params.id as string)
+        state.remove("policies", pathParam(req, "id"))
           ? new Response(null, { status: 204 })
-          : notFound(req, `Policy ${req.params.id}`),
+          : notFound(req, `Policy ${pathParam(req, "id")}`),
       method: "DELETE",
       path: "/policies/{id}",
       service: "governance",
@@ -1282,25 +1377,31 @@ function governanceRoutes(ctx: LocalContext): RouteDefinition[] {
     {
       handler: (req) => {
         const body = bodyObject(req);
-        const action = String(body.action ?? "");
-        const resourceType = body.resource_type
-          ? String(body.resource_type)
+        const action = String(jsonField(body, "action") ?? "");
+        const resourceType = jsonField(body, "resource_type")
+          ? String(jsonField(body, "resource_type"))
           : undefined;
-        const roles = Array.isArray(body.role_names)
-          ? body.role_names.map(String)
-          : [];
-        const denied = denyRules().find(
-          (rule) =>
-            (rule.action === "*" || rule.action === action) &&
-            (!rule.resource_type || rule.resource_type === resourceType) &&
-            (!Array.isArray(rule.roles) ||
-              rule.roles.some((r) => roles.includes(String(r))))
-        );
+        const roles = (jsonArray(body, "role_names") ?? []).map(String);
+        const denied = denyRules().find((rule) => {
+          const ruleAction = jsonField(rule, "action");
+          const ruleResource = jsonField(rule, "resource_type");
+          const ruleRoles = jsonArray(rule, "roles");
+          return (
+            (ruleAction === "*" || ruleAction === action) &&
+            (!ruleResource || ruleResource === resourceType) &&
+            (ruleRoles === undefined ||
+              ruleRoles.some((r) => roles.includes(String(r))))
+          );
+        });
         return json({
           allowed: !denied,
-          policy_id: denied?.policy_id,
+          policy_id:
+            denied === undefined ? undefined : jsonField(denied, "policy_id"),
           reason: denied
-            ? String(denied.reason ?? `denied by policy ${denied.policy_name}`)
+            ? String(
+                jsonField(denied, "reason") ??
+                  `denied by policy ${jsonField(denied, "policy_name")}`
+              )
             : undefined,
         });
       },
@@ -1362,8 +1463,7 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
 
   return [
     {
-      handler: (req) =>
-        json(page(state.list<Obj>("workers"), pageOptions(req))),
+      handler: (req) => json(page(state.list("workers"), pageOptions(req))),
       method: "GET",
       path: "/workers",
       service: "workers",
@@ -1371,7 +1471,7 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
     {
       handler: (req) => {
         const body = bodyObject(req);
-        const name = String(body.name ?? "");
+        const name = String(jsonField(body, "name") ?? "");
         if (!SAFE_NAME.test(name)) {
           return apiError(
             400,
@@ -1381,7 +1481,8 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
             { fields: [{ field: "name", message: "Invalid worker name" }] }
           );
         }
-        if (typeof body.code !== "string" || body.code.length === 0) {
+        const code = jsonString(body, "code");
+        if (code === undefined || code.length === 0) {
           return apiError(
             400,
             "VALIDATION_ERROR",
@@ -1392,20 +1493,25 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
             }
           );
         }
-        const previous = state.read<Obj>("workers", name);
-        const version = Number(previous?.version ?? 0) + 1;
+        const previous = state.read("workers", name);
+        const version =
+          Number((previous ? jsonField(previous, "version") : undefined) ?? 0) +
+          1;
         const { origin } = new URL(req.raw.url);
         const worker = {
-          code_size: body.code.length,
+          code_size: code.length,
           deployed_at: nowIso(),
-          entrypoint: body.entrypoint ?? "index.js",
-          env_vars: (body.env_vars as Obj | undefined) ?? {},
+          entrypoint: jsonField(body, "entrypoint") ?? "index.js",
+          env_vars: jsonObject(body, "env_vars") ?? {},
           environment: ctx.env,
           name,
           url: `${origin}/v1/workers/${name}`,
           version,
         };
-        state.write("workers", name, { ...worker, code: body.code });
+        state.write("workers", name, {
+          ...worker,
+          code: jsonField(body, "code"),
+        });
         return json(worker, 201);
       },
       method: "POST",
@@ -1414,9 +1520,9 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const worker = state.read<Obj>("workers", req.params.name as string);
+        const worker = state.read("workers", pathParam(req, "name"));
         if (!worker) {
-          return notFound(req, `Worker ${req.params.name}`);
+          return notFound(req, `Worker ${pathParam(req, "name")}`);
         }
         const { code: _code, env_vars: _env, ...visible } = worker;
         return json({ ...visible, invoked: true });
@@ -1427,15 +1533,15 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) => {
-        const worker = state.read<Obj>("workers", req.params.name as string);
+        const worker = state.read("workers", pathParam(req, "name"));
         if (!worker) {
-          return notFound(req, `Worker ${req.params.name}`);
+          return notFound(req, `Worker ${pathParam(req, "name")}`);
         }
         return json({
           input: req.body ?? null,
           invoked: true,
-          name: worker.name,
-          version: worker.version,
+          name: jsonField(worker, "name"),
+          version: jsonField(worker, "version"),
         });
       },
       method: "POST",
@@ -1444,9 +1550,9 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
     },
     {
       handler: (req) =>
-        state.remove("workers", req.params.name as string)
+        state.remove("workers", pathParam(req, "name"))
           ? new Response(null, { status: 204 })
-          : notFound(req, `Worker ${req.params.name}`),
+          : notFound(req, `Worker ${pathParam(req, "name")}`),
       method: "DELETE",
       path: "/workers/{name}",
       service: "workers",

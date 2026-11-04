@@ -1,3 +1,4 @@
+import { isJsonRecord, jsonField } from "@/lib/json.js";
 export interface UntilCondition {
   field: string;
   value: string;
@@ -34,7 +35,7 @@ export function evaluateCondition(
     if (Array.isArray(current)) {
       return current.some((item) => evaluateCondition(item, condition));
     }
-    current = (current as Record<string, unknown>)[part];
+    current = isJsonRecord(current) ? jsonField(current, part) : undefined;
   }
 
   return String(current) === condition.value;

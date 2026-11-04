@@ -1,4 +1,5 @@
 import type { Command, Help } from "commander";
+import { z } from "zod";
 import { theme } from "@/output/theme.js";
 import { VERSION } from "@/version.js";
 
@@ -9,7 +10,10 @@ export function runtimeInfo(): {
   runtime: "bun" | "node";
   runtimeVersion: string;
 } {
-  const { bun } = process.versions as { bun?: string };
+  const { bun } = z
+    .object({ bun: z.string().optional() })
+    .loose()
+    .parse(process.versions);
   return {
     arch: process.arch,
     platform: process.platform,

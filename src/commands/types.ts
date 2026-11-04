@@ -101,9 +101,9 @@ export interface TypesResult {
 }
 
 export async function generateTypes(options: {
-  cwd?: string;
-  env?: string;
-  out?: string;
+  cwd?: string | undefined;
+  env?: string | undefined;
+  out?: string | undefined;
 }): Promise<TypesResult> {
   const { config, files, root } = await loadProjectConfig({
     cwd: options.cwd,

@@ -1,3 +1,5 @@
+import { isJsonRecord } from "@/lib/json.js";
+
 const REDACTED = "[REDACTED]";
 
 // Frontal API keys (`frt_…`) — keep the prefix so users can tell which
@@ -58,7 +60,8 @@ function redactValue(value: unknown, seen: WeakSet<object>): unknown {
     return value.map((item) => redactValue(item, seen));
   }
   if (value instanceof Error) {
-    const extra = redactValue({ ...value }, seen) as Record<string, unknown>;
+    const redactedFields = redactValue({ ...value }, seen);
+    const extra = isJsonRecord(redactedFields) ? redactedFields : {};
     return {
       ...extra,
       message: redactString(value.message),

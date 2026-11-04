@@ -24,6 +24,8 @@ export const REGIONS = [
 export const RUNTIMES = ["nodejs18.x", "nodejs20.x", "edge"] as const;
 
 export const MEMORY_SIZES = [128, 256, 512, 1024, 2048] as const;
+/** `MEMORY_SIZES` as the text values the config file uses. */
+const MEMORY_SIZE_TEXT = ["128", "256", "512", "1024", "2048"] as const;
 
 const REGEX_PATTERNS = {
   ENV_VAR_NAME: /^[A-Z_][A-Z0-9_]*$/,
@@ -88,10 +90,7 @@ export const functionConfigSchema = z.object({
     .min(CONSTRAINTS.MAX_DURATION_MIN)
     .max(CONSTRAINTS.MAX_DURATION_MAX)
     .default(DEFAULTS.MAX_DURATION),
-  memory: z
-    .enum(MEMORY_SIZES.map(String) as [string, ...string[]])
-    .transform(Number)
-    .default(DEFAULTS.MEMORY),
+  memory: z.enum(MEMORY_SIZE_TEXT).transform(Number).default(DEFAULTS.MEMORY),
   runtime: z.enum(RUNTIMES).optional(),
 });
 

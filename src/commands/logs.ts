@@ -4,11 +4,17 @@ import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { classifyError } from "@/errors/handler.js";
 import { type CommandContext, runAction } from "@/lib/command.js";
 import { tryLoadProjectConfig } from "@/lib/config.js";
+import {
+  isJsonRecord,
+  type JsonRecord,
+  jsonField,
+  jsonObject,
+} from "@/lib/json.js";
 import { emitJsonLine, withExamples } from "@/lib/output.js";
 import { redact } from "@/output/redact.js";
 import { theme } from "@/output/theme.js";
 
-type Obj = Record<string, unknown>;
+type Obj = JsonRecord;
 
 export interface LogsOptions {
   filter?: string;
@@ -37,7 +43,7 @@ export function sinceToIso(since: string, now = Date.now()): string {
   const match = DURATION.exec(since.trim());
   if (match) {
     const amount = Number(match[1]);
-    const unit = UNIT_MS[match[2] as string] as number;
+    const unit = UNIT_MS[match[2] ?? ""] ?? 0;
     return new Date(now - amount * unit).toISOString();
   }
   const parsed = Date.parse(since);
@@ -58,18 +64,20 @@ const LEVEL_COLORS: Record<string, (s: string) => string> = {
 };
 
 export function formatLogLine(entry: Obj): string {
-  const level = String(entry.level ?? "info");
+  const level = String(jsonField(entry, "level") ?? "info");
   const paint = LEVEL_COLORS[level] ?? ((s: string) => s);
-  const timestamp = String(entry.timestamp ?? "")
+  const timestamp = String(jsonField(entry, "timestamp") ?? "")
     .replace("T", " ")
     .replace(FRACTIONAL_SECONDS, "");
-  const service = entry.service ? theme.dim(String(entry.service)) : "";
+  const serviceName = jsonField(entry, "service");
+  const service = serviceName ? theme.dim(String(serviceName)) : "";
+  const metadata = jsonObject(entry, "metadata");
   const requestId =
-    (entry.metadata as Obj | undefined)?.request_id ??
-    (entry.metadata as Obj | undefined)?.requestId ??
-    entry.requestId;
+    (metadata === undefined ? undefined : jsonField(metadata, "request_id")) ??
+    (metadata === undefined ? undefined : jsonField(metadata, "requestId")) ??
+    jsonField(entry, "requestId");
   const suffix = requestId ? theme.dim(` (${String(requestId)})`) : "";
-  return `${theme.dim(timestamp)} ${paint(level.padEnd(5))} ${service} ${String(entry.message ?? "")}${suffix}`;
+  return `${theme.dim(timestamp)} ${paint(level.padEnd(5))} ${service} ${String(jsonField(entry, "message") ?? "")}${suffix}`;
 }
 
 /** Client-side fallback for servers that ignore the `query` filter. */
@@ -114,7 +122,7 @@ export async function queryLogs(
   const { frontal, lastRequestId } = await ctx.sdk();
   const query = opts.filter ?? (await defaultQuery(ctx));
   const page = await frontal.observability.logs.query({
-    level: opts.level,
+    ...(opts.level === undefined ? {} : { level: opts.level }),
     limit: opts.limit ? Number(opts.limit) : DEFAULT_LIMIT,
     order: "asc",
     query,
@@ -122,9 +130,9 @@ export async function queryLogs(
     timeTo: new Date().toISOString(),
   });
 
-  const entries = (page.data as Obj[]).filter((entry) =>
-    matchesFilter(entry, opts.filter)
-  );
+  const entries = page.data
+    .filter(isJsonRecord)
+    .filter((entry) => matchesFilter(entry, opts.filter));
   if (ctx.globalOpts.json) {
     for (const entry of entries) {
       emitJsonLine(entry);
@@ -138,7 +146,7 @@ export async function queryLogs(
     return;
   }
   for (const entry of entries) {
-    console.log(formatLogLine(redact(entry) as Obj));
+    console.log(formatLogLine(redact(entry)));
   }
   if (page.pagination.hasMore) {
     ctx.fmt.info("… more entries available (increase --limit).");
@@ -169,17 +177,18 @@ async function consumeStream(
     if (signal.aborted) {
       return;
     }
-    const entry = (event.data ?? {}) as Obj;
+    const entry: Obj = isJsonRecord(event.data) ? event.data : {};
     if (!matchesFilter(entry, opts.filter)) {
       continue;
     }
-    if (typeof entry.timestamp === "string") {
-      state.timeFrom = entry.timestamp;
+    const timestamp = jsonField(entry, "timestamp");
+    if (typeof timestamp === "string") {
+      state.timeFrom = timestamp;
     }
     if (json) {
       emitJsonLine({ id: event.id, type: event.type, ...entry });
     } else {
-      console.log(formatLogLine(redact(entry) as Obj));
+      console.log(formatLogLine(redact(entry)));
     }
   }
 }
@@ -228,7 +237,7 @@ export async function followLogs(
         timeFrom: state.timeFrom,
         timeTo: "now",
         ...(opts.level ? { level: opts.level } : {}),
-      } as Parameters<typeof frontal.observability.logs.stream>[0]);
+      } satisfies Parameters<typeof frontal.observability.logs.stream>[0]);
       state.attempt = 0;
       // biome-ignore lint/performance/noAwaitInLoops: reconnect loop
       await consumeStream(ctx, stream, opts, state, signal);

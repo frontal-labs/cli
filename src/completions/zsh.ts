@@ -1,11 +1,12 @@
 import type { Command } from "commander";
+import { isHiddenCommand } from "@/completions/hidden.js";
 
 export function generateZshCompletions(program: Command): string {
   const commandEntries: string[] = [];
   const subcases: string[] = [];
 
   for (const cmd of program.commands) {
-    if ((cmd as { _hidden?: boolean })._hidden) {
+    if (isHiddenCommand(cmd)) {
       continue;
     }
     const name = cmd.name();
@@ -14,7 +15,7 @@ export function generateZshCompletions(program: Command): string {
 
     const subs: string[] = [];
     for (const sub of cmd.commands) {
-      if ((sub as { _hidden?: boolean })._hidden) {
+      if (isHiddenCommand(sub)) {
         continue;
       }
       const subDesc = sub.description() || sub.name();

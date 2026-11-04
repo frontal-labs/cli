@@ -2,7 +2,7 @@ import type { GlobalOptions } from "@/config/resolve.js";
 import { classifyError } from "@/errors/handler.js";
 import { apiError } from "@/lib/dev/handlers.js";
 import type { DevRequest } from "@/lib/dev/router.js";
-import type { ServiceKey } from "@/lib/project.js";
+import { isServiceKey, type ServiceKey } from "@/lib/project.js";
 import { getSdk, type SdkHandle } from "@/lib/sdk.js";
 
 /**
@@ -41,9 +41,10 @@ export function serviceForPath(path: string): ServiceKey | undefined {
     for (const prefix of prefixes) {
       if (
         (path === prefix || path.startsWith(`${prefix}/`)) &&
-        (!best || prefix.length > best.length)
+        (!best || prefix.length > best.length) &&
+        isServiceKey(key)
       ) {
-        best = { key: key as ServiceKey, length: prefix.length };
+        best = { key, length: prefix.length };
       }
     }
   }
@@ -83,12 +84,11 @@ export class RemoteProxy {
       });
     }
 
+    const accept = req.headers.get("accept");
     const headers = {
       [PROXY_HEADER]: service,
       "x-request-id": req.requestId,
-      ...(req.headers.get("accept")
-        ? { Accept: req.headers.get("accept") as string }
-        : {}),
+      ...(accept ? { Accept: accept } : {}),
     };
     const params = Object.fromEntries(req.query.entries());
 

@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
+import { systemErrorCode } from "@/lib/errno.js";
 import { ProjectState, STATE_NAMESPACES } from "@/lib/state.js";
 
 export const BUNDLE_FILE = "index.js";
@@ -33,11 +34,19 @@ interface BunGlobal {
   }) => Promise<BunBuildOutput>;
 }
 
+function isBunGlobal(value: unknown): value is BunGlobal {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "build" in value &&
+    typeof value.build === "function"
+  );
+}
+
 function bunRuntime(): BunGlobal | undefined {
-  const candidate = (globalThis as { Bun?: unknown }).Bun;
-  return candidate && typeof (candidate as BunGlobal).build === "function"
-    ? (candidate as BunGlobal)
-    : undefined;
+  const host: object = globalThis;
+  const candidate: unknown = "Bun" in host ? host.Bun : undefined;
+  return isBunGlobal(candidate) ? candidate : undefined;
 }
 
 function buildError(detail: string): CliError {
@@ -66,7 +75,11 @@ async function bundleEntry(entryFile: string, root: string): Promise<string> {
         result.logs.map((log) => log.message).join("\n") || "unknown error"
       );
     }
-    return await (result.outputs[0] as { text: () => Promise<string> }).text();
+    const [output] = result.outputs;
+    if (!output) {
+      throw buildError("the bundler produced no output");
+    }
+    return await output.text();
   }
 
   const proc = spawnSync(
@@ -74,7 +87,7 @@ async function bundleEntry(entryFile: string, root: string): Promise<string> {
     ["build", "--format=esm", "--target=bun", entryFile],
     { cwd: root, encoding: "utf-8" }
   );
-  if (proc.error && (proc.error as NodeJS.ErrnoException).code === "ENOENT") {
+  if (systemErrorCode(proc.error) === "ENOENT") {
     throw new CliError(
       "BUNDLER_UNAVAILABLE",
       "Bundling needs the Bun runtime.",
@@ -141,7 +154,7 @@ export function snapshotStateSchema(root: string): StateSchemaSnapshot {
   const state = new ProjectState(root);
   const snapshot: StateSchemaSnapshot = {};
   for (const namespace of STATE_NAMESPACES) {
-    const records = state.list<Record<string, unknown>>(namespace);
+    const records = state.list(namespace);
     if (records.length === 0) {
       continue;
     }

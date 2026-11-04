@@ -1,8 +1,21 @@
 import { z } from "zod";
 import { getProjectConfigSchema } from "@/lib/config.js";
+import {
+  isJsonRecord,
+  type JsonRecord,
+  jsonObject,
+  setJsonField,
+} from "@/lib/json.js";
 import { ENV_NAMES, PROJECT_SCHEMA_URL, SERVICE_KEYS } from "@/lib/project.js";
 
-type JsonObject = Record<string, unknown>;
+/** A generated schema member that must exist; its absence is a generator bug. */
+function objectMember(record: JsonRecord, key: string): JsonRecord {
+  const value = jsonObject(record, key);
+  if (value === undefined) {
+    throw new Error(`Generated JSON Schema is missing "${key}".`);
+  }
+  return value;
+}
 
 const PROPERTY_DOCS: Record<string, string> = {
   $schema: "JSON Schema used by editors for validation and completions.",
@@ -45,11 +58,11 @@ function tidy(node: unknown): unknown {
   if (Array.isArray(node)) {
     return node.map(tidy);
   }
-  if (typeof node !== "object" || node === null) {
+  if (!isJsonRecord(node)) {
     return node;
   }
-  const out: JsonObject = {};
-  for (const [key, value] of Object.entries(node as JsonObject)) {
+  const out: JsonRecord = {};
+  for (const [key, value] of Object.entries(node)) {
     // Zod emits the JS integer ceiling for unbounded positive ints; drop it.
     if (key === "maximum" && value === MAX_SAFE_INTEGER_MARKER) {
       continue;
@@ -64,7 +77,7 @@ function tidy(node: unknown): unknown {
  * schema the CLI validates with, plus documentation and the service-key
  * enum that Zod expresses as a refinement.
  */
-export async function buildFrontalJsonSchema(): Promise<JsonObject> {
+export async function buildFrontalJsonSchema(): Promise<JsonRecord> {
   const zodSchema = await getProjectConfigSchema();
   const generated = tidy(
     z.toJSONSchema(zodSchema, {
@@ -72,32 +85,39 @@ export async function buildFrontalJsonSchema(): Promise<JsonObject> {
       target: "draft-2020-12",
       unrepresentable: "any",
     })
-  ) as JsonObject;
+  );
+  if (!isJsonRecord(generated)) {
+    throw new Error("Zod did not produce a JSON Schema object.");
+  }
 
-  const properties = generated.properties as Record<string, JsonObject>;
+  const properties = objectMember(generated, "properties");
   for (const [key, doc] of Object.entries(PROPERTY_DOCS)) {
-    if (properties[key]) {
-      properties[key] = { description: doc, ...properties[key] };
+    const current = jsonObject(properties, key);
+    if (current) {
+      setJsonField(properties, key, { description: doc, ...current });
     }
   }
 
-  const services = properties.services as JsonObject;
-  services.propertyNames = { enum: [...SERVICE_KEYS], type: "string" };
-  const serviceEntry = services.additionalProperties as JsonObject;
-  const serviceProps = serviceEntry.properties as Record<string, JsonObject>;
-  const { remote } = serviceProps;
-  serviceProps.remote = {
+  const services = objectMember(properties, "services");
+  setJsonField(services, "propertyNames", {
+    enum: [...SERVICE_KEYS],
+    type: "string",
+  });
+  const serviceEntry = objectMember(services, "additionalProperties");
+  const serviceProps = objectMember(serviceEntry, "properties");
+  const remote = jsonObject(serviceProps, "remote") ?? {};
+  setJsonField(serviceProps, "remote", {
     description: "Proxy this service to the remote API during `frontal dev`.",
     ...remote,
-  };
+  });
 
-  const secrets = properties.secrets as JsonObject;
-  const secretProps = secrets.properties as Record<string, JsonObject>;
-  const { required } = secretProps;
-  secretProps.required = {
+  const secrets = objectMember(properties, "secrets");
+  const secretProps = objectMember(secrets, "properties");
+  const required = jsonObject(secretProps, "required") ?? {};
+  setJsonField(secretProps, "required", {
     description: "Environment variable names that must be set.",
     ...required,
-  };
+  });
 
   const { $schema: draft, ...rest } = generated;
   return {

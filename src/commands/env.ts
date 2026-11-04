@@ -8,7 +8,7 @@ import { type CommandContext, runAction } from "@/lib/command.js";
 import { loadProjectConfig, type ProjectConfig } from "@/lib/config.js";
 import { type DeployRecord, readCurrentDeploy } from "@/lib/deploys.js";
 import { withExamples } from "@/lib/output.js";
-import { parseDotenv } from "@/lib/project.js";
+import { type DotenvValues, parseDotenv } from "@/lib/project.js";
 import { resolveCredential } from "@/lib/sdk.js";
 import { deployWorker } from "@/lib/workers.js";
 import { registerSensitiveKeys } from "@/output/redact.js";
@@ -34,11 +34,11 @@ interface PullInput {
   config: ProjectConfig;
   /** Credential-derived defaults for secrets (never read from the target file). */
   defaults: Partial<Record<string, string>>;
-  existing: Partial<Record<string, string>>;
+  existing: DotenvValues;
 }
 
 function renderDotenv(
-  entries: { comment?: string; key: string; value: string }[]
+  entries: { comment?: string | undefined; key: string; value: string }[]
 ): string {
   const lines: string[] = [
     "# Managed by `frontal env pull` — secrets are never stored in .frontal/config.jsonc.",
@@ -63,7 +63,11 @@ export function buildEnvFile(input: PullInput): {
   written: string[];
 } {
   const { config, existing, defaults } = input;
-  const entries: { comment?: string; key: string; value: string }[] = [];
+  const entries: {
+    comment?: string | undefined;
+    key: string;
+    value: string;
+  }[] = [];
   const written: string[] = [];
   const preserved: string[] = [];
   const missing: string[] = [];
@@ -120,7 +124,11 @@ export function buildEnvFile(input: PullInput): {
 
 export async function pullEnv(
   ctx: CommandContext,
-  options: { env?: string; file?: string; force?: boolean }
+  options: {
+    env?: string | undefined;
+    file?: string | undefined;
+    force?: boolean | undefined;
+  }
 ): Promise<PullResult> {
   const { config, root } = await loadProjectConfig({ env: options.env });
   registerSensitiveKeys(config.secrets.required);
@@ -137,17 +145,17 @@ export async function pullEnv(
     );
   }
 
-  const existing = existsSync(file)
+  const existing: DotenvValues = existsSync(file)
     ? parseDotenv(readFileSync(file, "utf-8"))
     : {};
 
   // Only credentials from flags, the shell or the profile may seed the file —
   // never values that came from the very file being written.
   const credential = resolveCredential(resolveConfig(ctx.globalOpts));
-  const defaults: Record<string, string> = {};
-  if (credential?.kind === "api-key") {
-    defaults.FRONTAL_API_KEY = credential.apiKey;
-  }
+  const defaults: Record<string, string> =
+    credential?.kind === "api-key"
+      ? { FRONTAL_API_KEY: credential.apiKey }
+      : {};
 
   const built = buildEnvFile({ config, defaults, existing });
   writeFileSync(file, built.content, { mode: 0o600 });
@@ -162,7 +170,7 @@ export async function pullEnv(
 export interface PushResult {
   deployment: string;
   keys: string[];
-  requestId?: string;
+  requestId?: string | undefined;
 }
 
 /**
@@ -173,7 +181,7 @@ export interface PushResult {
  */
 export async function pushEnv(
   ctx: CommandContext,
-  options: { env?: string; file?: string }
+  options: { env?: string | undefined; file?: string | undefined }
 ): Promise<PushResult> {
   const { config, root } = await loadProjectConfig({ env: options.env });
   registerSensitiveKeys(config.secrets.required);
@@ -216,7 +224,7 @@ export async function pushEnv(
 
   const envVars: Record<string, string> = { ...config.vars };
   for (const [key, value] of Object.entries(values)) {
-    if (!CONNECTION_KEYS.has(key)) {
+    if (value !== undefined && !CONNECTION_KEYS.has(key)) {
       envVars[key] = value;
     }
   }

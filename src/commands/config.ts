@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { configManager } from "@/config/manager.js";
 import { handleError } from "@/errors/handler.js";
+import { isJsonRecord, jsonField } from "@/lib/json.js";
 import { Formatter } from "@/output/formatter.js";
 import { theme } from "@/output/theme.js";
 import { confirmAction } from "@/utils/interactive.js";
@@ -96,14 +97,16 @@ export function registerConfigCommands(program: Command): void {
       try {
         const cfg = configManager.load();
         const fmt = Formatter.from(cmd.optsWithGlobals());
-        const profiles = Object.keys(cfg.profiles).map((name) => ({
-          active: name === cfg.activeProfile ? "*" : "",
-          apiKey: cfg.profiles[name].apiKey
-            ? `${cfg.profiles[name].apiKey?.slice(0, 7)}...`
-            : "(not set)",
-          baseUrl: cfg.profiles[name].baseUrl ?? "(default)",
-          name,
-        }));
+        const profiles = Object.entries(cfg.profiles).map(
+          ([name, profile]) => ({
+            active: name === cfg.activeProfile ? "*" : "",
+            apiKey: profile.apiKey
+              ? `${profile.apiKey.slice(0, 7)}...`
+              : "(not set)",
+            baseUrl: profile.baseUrl ?? "(default)",
+            name,
+          })
+        );
         fmt.table(profiles, [
           { header: "", key: "active" },
           { header: "PROFILE", key: "name" },
@@ -188,10 +191,14 @@ function setNestedValue(
     if (part === undefined) {
       continue;
     }
-    if (typeof current[part] !== "object" || current[part] === null) {
-      current[part] = {};
+    const next = current[part];
+    if (isJsonRecord(next)) {
+      current = next;
+    } else {
+      const created: Record<string, unknown> = {};
+      current[part] = created;
+      current = created;
     }
-    current = current[part] as Record<string, unknown>;
   }
   const last = parts.at(-1);
   if (!last) {
@@ -211,7 +218,7 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
     ) {
       return;
     }
-    current = (current as Record<string, unknown>)[part];
+    current = isJsonRecord(current) ? jsonField(current, part) : undefined;
   }
   return current;
 }

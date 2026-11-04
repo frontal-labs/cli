@@ -57,6 +57,11 @@ export const SERVICE_KEYS = [
 ] as const;
 export type ServiceKey = (typeof SERVICE_KEYS)[number];
 
+/** True when `value` names a known service. */
+export function isServiceKey(value: string): value is ServiceKey {
+  return SERVICE_KEYS.some((key) => key === value);
+}
+
 /** Services `frontal init` enables by default. */
 export const DEFAULT_SERVICES: ServiceKey[] = ["ai", "agents", "graph"];
 
@@ -207,7 +212,7 @@ export interface RawProject {
 }
 
 export interface LoadProjectOptions {
-  cwd?: string;
+  cwd?: string | undefined;
   /** Environment overlay to apply (`.frontal/config.<env>.jsonc`). */
   env?: string | undefined;
 }
@@ -280,9 +285,19 @@ const NEWLINE = /\r?\n/;
 const DOTENV_LINE =
   /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)?\s*$/;
 
+/**
+ * Values from a dotenv file. The keys the CLI reads are declared, so they can
+ * be read with property access; any other key is still available by name.
+ */
+export interface DotenvValues {
+  FRONTAL_API_KEY?: string | undefined;
+  FRONTAL_API_URL?: string | undefined;
+  [key: string]: string | undefined;
+}
+
 /** Parses a dotenv file without mutating `process.env`. */
-export function parseDotenv(text: string): Record<string, string> {
-  const out: Record<string, string> = {};
+export function parseDotenv(text: string): DotenvValues {
+  const out: DotenvValues = {};
   for (const rawLine of text.split(NEWLINE)) {
     const line = rawLine.trim();
     if (line === "" || line.startsWith("#")) {
@@ -314,7 +329,7 @@ export function parseDotenv(text: string): Record<string, string> {
 }
 
 /** Reads `<root>/.env.local` if present. */
-export function loadDotenvLocal(root: string): Record<string, string> {
+export function loadDotenvLocal(root: string): DotenvValues {
   const file = join(root, ".env.local");
   if (!existsSync(file)) {
     return {};

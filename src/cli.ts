@@ -17,6 +17,7 @@ import { registerSyncCommands } from "@/commands/sync.js";
 import { registerTypesCommand } from "@/commands/types.js";
 import { registerVersionCommand } from "@/commands/version.js";
 import { registerWorkflowsCommands } from "@/commands/workflows.js";
+import { readCliEnv } from "@/lib/env.js";
 import { applyCommandExamples } from "@/lib/examples.js";
 import { installWatchMiddleware } from "@/middleware/watch.js";
 import { configureHelp } from "@/output/help.js";
@@ -24,7 +25,7 @@ import { VERSION } from "@/version.js";
 
 /** Registers global options and every command on `program`. */
 export function buildProgram(program = new Command()): Command {
-  if (process.argv.includes("--no-color") || process.env.NO_COLOR) {
+  if (process.argv.includes("--no-color") || readCliEnv().NO_COLOR) {
     chalk.level = 0;
   }
   program

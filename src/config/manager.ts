@@ -6,10 +6,11 @@ import {
   type FrontalConfig,
   type ProfileConfig,
 } from "@/config/schema.js";
+import { readCliEnv } from "@/lib/env.js";
 
 // FRONTAL_CONFIG_DIR lets tests and CI isolate the CLI from ~/.frontal.
 const CONFIG_DIR =
-  process.env.FRONTAL_CONFIG_DIR ?? join(homedir(), ".frontal");
+  readCliEnv().FRONTAL_CONFIG_DIR ?? join(homedir(), ".frontal");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
 export class ConfigManager {
@@ -85,13 +86,15 @@ export class ConfigManager {
 
   setDefault(key: string, value: unknown): void {
     const config = this.load();
-    (config.defaults as Record<string, unknown>)[key] = value;
+    const defaults: Record<string, unknown> = config.defaults;
+    defaults[key] = value;
     this.save(config);
   }
 
   getDefault(key: string): unknown {
     const config = this.load();
-    return (config.defaults as Record<string, unknown>)[key];
+    const defaults: Record<string, unknown> = config.defaults;
+    return defaults[key];
   }
 }
 

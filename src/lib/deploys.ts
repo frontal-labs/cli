@@ -1,26 +1,37 @@
+import { z } from "zod";
 import { ProjectState } from "@/lib/state.js";
 
-export type DeployTarget = "preview" | "prod";
+const deployTargetSchema = z.enum(["preview", "prod"]);
+export type DeployTarget = z.infer<typeof deployTargetSchema>;
 
 /**
  * Record of a deployment made from this project, kept under
  * `.frontal/state/deploys/`. `frontal deploy` writes it; `env push`,
  * `promote` and `rollback` read it.
  */
-export interface DeployRecord {
-  /** Directory holding the bundled artifact that was deployed. */
-  artifactDir: string;
-  createdAt: string;
-  entrypoint: string;
-  env: string;
-  id: string;
-  /** Worker name on the platform. */
-  name: string;
-  requestId?: string;
-  /** Content hash of the artifact. */
-  sha: string;
-  target: DeployTarget;
-  url: string;
+const deployRecordSchema = z
+  .object({
+    /** Directory holding the bundled artifact that was deployed. */
+    artifactDir: z.string(),
+    createdAt: z.string(),
+    entrypoint: z.string(),
+    env: z.string(),
+    id: z.string(),
+    /** Worker name on the platform. */
+    name: z.string(),
+    requestId: z.string().optional(),
+    /** Content hash of the artifact. */
+    sha: z.string(),
+    target: deployTargetSchema,
+    url: z.string(),
+  })
+  .loose();
+
+export type DeployRecord = z.infer<typeof deployRecordSchema>;
+
+function parseDeployRecord(value: unknown): DeployRecord | undefined {
+  const parsed = deployRecordSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
 }
 
 const CURRENT_PREFIX = "current-";
@@ -38,7 +49,7 @@ export function readCurrentDeploy(
   const key = target
     ? `${CURRENT_PREFIX}${env}-${target}`
     : `${CURRENT_PREFIX}${env}`;
-  return state.read<DeployRecord>("deploys", key);
+  return state.readAs("deploys", key, parseDeployRecord);
 }
 
 export function writeCurrentDeploy(root: string, record: DeployRecord): void {
@@ -66,7 +77,7 @@ export function listDeploys(root: string): DeployRecord[] {
   return state
     .ids("deploys")
     .filter((id) => !id.startsWith(CURRENT_PREFIX))
-    .map((id) => state.read<DeployRecord>("deploys", id))
+    .map((id) => state.readAs("deploys", id, parseDeployRecord))
     .filter((record): record is DeployRecord => record !== undefined)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

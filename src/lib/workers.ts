@@ -1,3 +1,4 @@
+import { isJsonRecord, type JsonRecord, jsonField } from "@/lib/json.js";
 import type { SdkHandle } from "@/lib/sdk.js";
 
 export interface DeployWorkerInput {
@@ -37,7 +38,7 @@ export async function deployWorker(
     handle.lastRequestId = requestId;
   }
   const text = await response.text();
-  const parsed =
-    text.length > 0 ? (JSON.parse(text) as Record<string, unknown>) : {};
-  return { ...parsed, name: String(parsed.name ?? input.name) };
+  const raw: unknown = text.length > 0 ? JSON.parse(text) : {};
+  const parsed: JsonRecord = isJsonRecord(raw) ? raw : {};
+  return { ...parsed, name: String(jsonField(parsed, "name") ?? input.name) };
 }

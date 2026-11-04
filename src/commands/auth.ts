@@ -21,6 +21,9 @@ import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
 import { handleError } from "@/errors/handler.js";
 import { runAction } from "@/lib/command.js";
+import { readCliEnv } from "@/lib/env.js";
+import { errorRequestId } from "@/lib/errno.js";
+import { jsonField, jsonFlag, jsonString } from "@/lib/json.js";
 import { withExamples } from "@/lib/output.js";
 import { createSdkHandle } from "@/lib/sdk.js";
 import { theme } from "@/output/theme.js";
@@ -30,6 +33,19 @@ import {
   promptSecret,
   promptText,
 } from "@/utils/interactive.js";
+
+/** The `frontal auth whoami` report. Optional fields are omitted when unset. */
+interface AuthStatus {
+  account?: unknown;
+  authMethod: string;
+  authUrl?: string | undefined;
+  baseUrl: string;
+  hasAccessToken: boolean;
+  hasApiKey: boolean;
+  profile: string;
+  tokenExpired?: boolean | undefined;
+  tokenExpiry?: string | undefined;
+}
 
 export function registerAuthCommands(program: Command): void {
   const auth = program.command("auth").description("Sign in, API keys and MFA");
@@ -80,8 +96,9 @@ export function registerAuthCommands(program: Command): void {
           globalOpts.profile ??
           configManager.getActiveProfileName();
 
-        const token = result.accessToken;
-        const { refreshToken, expiresAt } = result;
+        const token = jsonField(result, "accessToken");
+        const refreshToken = jsonField(result, "refreshToken");
+        const expiresAt = jsonField(result, "expiresAt");
 
         configManager.setProfile(profileName, {
           ...(typeof token === "string" ? { accessToken: token } : {}),
@@ -131,7 +148,7 @@ export function registerAuthCommands(program: Command): void {
           tokenExpiresAt: undefined,
         });
 
-        if (!(cmd.optsWithGlobals().json as boolean)) {
+        if (!jsonFlag(cmd.optsWithGlobals(), "json")) {
           console.log(
             theme.success(`Logged out from profile "${profileName}".`)
           );
@@ -157,7 +174,7 @@ export function registerAuthCommands(program: Command): void {
             authMethod = "oauth";
           }
 
-          const status: Record<string, unknown> = {
+          const status: AuthStatus = {
             authMethod,
             authUrl: config.authUrl,
             baseUrl: config.baseUrl,
@@ -362,11 +379,11 @@ async function loginWithApiKey(
         cause: err,
         exitCode: EXIT_CODES.AUTH_ERROR,
         fix: "Create a key in the Frontal dashboard and make sure it starts with frt_.",
-        requestId: (err as { requestId?: string }).requestId,
+        requestId: errorRequestId(err),
       });
     }
     // Any other failure (network, missing scope) should not block saving.
-    if (!(cmd.optsWithGlobals().json as boolean)) {
+    if (!jsonFlag(cmd.optsWithGlobals(), "json")) {
       console.error(
         theme.warn("Could not verify the key against the API; saving anyway.")
       );
@@ -376,7 +393,7 @@ async function loginWithApiKey(
   configManager.setProfile(profileName, { apiKey, baseUrl });
   configManager.setActiveProfile(profileName);
 
-  if (!(cmd.optsWithGlobals().json as boolean)) {
+  if (!jsonFlag(cmd.optsWithGlobals(), "json")) {
     console.log(
       theme.success(`Authenticated. Profile "${profileName}" saved.`)
     );
@@ -389,11 +406,11 @@ async function loginWithBrowser(
   cmd: Command
 ): Promise<void> {
   const globalOpts = cmd.optsWithGlobals();
-  const profile = configManager.getProfile(globalOpts.profile ?? undefined);
+  const profile = configManager.getProfile(jsonString(globalOpts, "profile"));
 
   const authUrl =
     opts.authUrl ??
-    process.env.FRONTAL_AUTH_URL ??
+    readCliEnv().FRONTAL_AUTH_URL ??
     profile.authUrl ??
     DEFAULT_AUTH_URL;
 
@@ -414,7 +431,7 @@ async function loginWithBrowser(
   authorizeUrl.searchParams.set("state", state);
 
   const opened = await openBrowser(authorizeUrl.toString());
-  if (!(opened || (globalOpts.json as boolean))) {
+  if (!(opened || jsonFlag(globalOpts, "json"))) {
     console.log(theme.warn("Could not open browser automatically."));
     console.log(theme.dim(authorizeUrl.toString()));
   }
@@ -443,7 +460,7 @@ async function loginWithBrowser(
     });
     configManager.setActiveProfile(profileName);
 
-    if (!(globalOpts.json as boolean)) {
+    if (!jsonFlag(globalOpts, "json")) {
       console.log(
         theme.success(`Authenticated. Profile "${profileName}" saved.`)
       );

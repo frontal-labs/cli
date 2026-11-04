@@ -41,7 +41,7 @@ export function registerWorkflowsCommands(program: Command): void {
           const result = await frontal.workflows.create(
             body as Parameters<typeof frontal.workflows.create>[0]
           );
-          fmt.object(result as unknown as Record<string, unknown>);
+          fmt.object(result);
         })
       ),
     ['frontal workflows create --body \'{"name":"nightly","steps":[]}\'']

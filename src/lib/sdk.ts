@@ -1,5 +1,6 @@
 import type { FrontalClient, HttpClient } from "@frontal-labs/core";
 import type { Frontal } from "@frontal-labs/sdk";
+import { z } from "zod";
 import { isTokenExpired, refreshTokens } from "@/auth/token-manager.js";
 import { configManager } from "@/config/manager.js";
 import {
@@ -10,6 +11,7 @@ import {
 } from "@/config/resolve.js";
 import { CliError } from "@/errors/cli-error.js";
 import { EXIT_CODES } from "@/errors/exit-codes.js";
+import { readCliEnv } from "@/lib/env.js";
 import {
   findProjectRoot,
   loadDotenvLocal,
@@ -23,11 +25,11 @@ export type Credential =
   | { kind: "api-key"; apiKey: string }
   | {
       accessToken: string;
-      authUrl?: string;
-      expiresAt?: number;
+      authUrl?: string | undefined;
+      expiresAt?: number | undefined;
       kind: "oauth";
       profileName: string;
-      refreshToken?: string;
+      refreshToken?: string | undefined;
     }
   | { kind: "anonymous" };
 
@@ -39,7 +41,7 @@ export interface SdkHandle {
   /** Generic HTTP access for endpoints the SDK does not model yet. */
   http: HttpClient;
   /** `X-Request-Id` of the most recent response, for error reporting. */
-  lastRequestId?: string;
+  lastRequestId?: string | undefined;
 }
 
 export interface GetSdkOptions {
@@ -78,24 +80,34 @@ let coreModulePromise: Promise<CoreModule> | undefined;
  * time and throws on invalid values. The CLI has already read what it needs,
  * so strip anything the SDK would reject before loading it.
  */
-export function sanitizeSdkEnv(): void {
-  const { env } = process;
-  // Assigning `undefined` stores the string "undefined"; delete instead.
-  const drop = (key: string) => Reflect.deleteProperty(env, key);
+/** The `apiUrl` field of a project config, when it is a string. */
+const projectApiUrlSchema = z.object({ apiUrl: z.string() });
 
-  if (env.FRONTAL_ENV !== undefined && !SDK_ENV_VALUES.has(env.FRONTAL_ENV)) {
+export function sanitizeSdkEnv(): void {
+  const processEnv = process.env;
+  // Assigning `undefined` stores the string "undefined"; delete instead.
+  const drop = (name: string) => Reflect.deleteProperty(processEnv, name);
+  const current = readCliEnv(processEnv);
+
+  if (
+    current.FRONTAL_ENV !== undefined &&
+    !SDK_ENV_VALUES.has(current.FRONTAL_ENV)
+  ) {
     drop("FRONTAL_ENV");
   }
-  if (env.FRONTAL_API_KEY !== undefined) {
-    const { FRONTAL_API_KEY: key } = env;
-    if (key.length < 9 || key.length > 128 || !API_KEY_PATTERN.test(key)) {
-      drop("FRONTAL_API_KEY");
-    }
+  const key = current.FRONTAL_API_KEY;
+  if (
+    key !== undefined &&
+    (key.length < 9 || key.length > 128 || !API_KEY_PATTERN.test(key))
+  ) {
+    drop("FRONTAL_API_KEY");
   }
-  if (env.FRONTAL_API_URL !== undefined && !isUrl(env.FRONTAL_API_URL)) {
+  const apiUrl = current.FRONTAL_API_URL;
+  if (apiUrl !== undefined && !isUrl(apiUrl)) {
     drop("FRONTAL_API_URL");
   }
-  if (env.FRONTAL_DEBUG !== undefined && !DEBUG_VALUES.has(env.FRONTAL_DEBUG)) {
+  const debug = current.FRONTAL_DEBUG;
+  if (debug !== undefined && !DEBUG_VALUES.has(debug)) {
     drop("FRONTAL_DEBUG");
   }
 }
@@ -151,10 +163,10 @@ export function mapEnvironment(env: string | undefined): string {
 
 interface AuthFetchHooks {
   /** Transport to use for the actual request (defaults to global fetch). */
-  fetch?: typeof fetch;
-  onRequestId?: (requestId: string) => void;
+  fetch?: typeof fetch | undefined;
+  onRequestId?: ((requestId: string) => void) | undefined;
   /** External abort signal merged into every request. */
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
 }
 
 /** Combines the SDK's per-request signal with an external one. */
@@ -237,7 +249,10 @@ export function createAuthFetch(
     } else if (credential.kind === "anonymous") {
       headers.delete("Authorization");
     }
-    return { ...init, headers, signal: mergeSignals(init, hooks.signal) };
+    const signal = mergeSignals(init, hooks.signal);
+    return signal === undefined
+      ? { ...init, headers }
+      : { ...init, headers, signal };
   };
 
   return async (input, init) => {
@@ -277,8 +292,9 @@ export function resolveProjectOverlay(
   const overlay: ProjectOverlay = { dotenv: loadDotenvLocal(root) };
   try {
     const { raw } = loadRawProjectConfig({ cwd: root, env: globalOpts.env });
-    if (typeof raw.apiUrl === "string") {
-      overlay.projectApiUrl = raw.apiUrl;
+    const projectApi = projectApiUrlSchema.safeParse(raw);
+    if (projectApi.success) {
+      overlay.projectApiUrl = projectApi.data.apiUrl;
     }
   } catch {
     // A broken .frontal/config.jsonc is reported by the commands that need it.
@@ -306,22 +322,22 @@ export async function getSdk(
     baseUrl: config.baseUrl,
     credential,
     debug: config.debug,
-    environment: mapEnvironment(globalOpts.env ?? process.env.FRONTAL_ENV),
+    environment: mapEnvironment(globalOpts.env ?? readCliEnv().FRONTAL_ENV),
     signal: options.signal,
-    verbose: Boolean(globalOpts.verbose || process.env.FRONTAL_DEBUG === "1"),
+    verbose: Boolean(globalOpts.verbose || readCliEnv().FRONTAL_DEBUG === "1"),
   });
 }
 
 export interface CreateSdkHandleInput {
   baseUrl: string;
   credential: Credential;
-  debug?: boolean;
-  environment?: string;
-  fetch?: typeof fetch;
-  maxRetries?: number;
-  signal?: AbortSignal;
-  timeout?: number;
-  verbose?: boolean;
+  debug?: boolean | undefined;
+  environment?: string | undefined;
+  fetch?: typeof fetch | undefined;
+  maxRetries?: number | undefined;
+  signal?: AbortSignal | undefined;
+  timeout?: number | undefined;
+  verbose?: boolean | undefined;
 }
 
 export async function createSdkHandle(
@@ -329,15 +345,13 @@ export async function createSdkHandle(
 ): Promise<SdkHandle> {
   const [sdk, core] = await Promise.all([getSdkModule(), getCoreModule()]);
 
-  const handle: Partial<SdkHandle> = {
-    baseUrl: input.baseUrl,
-    credential: input.credential,
-  };
+  // The transport reports request ids as they arrive; the handle reads them.
+  const requestState: { lastRequestId?: string | undefined } = {};
 
   const authFetch = createAuthFetch(input.credential, {
     fetch: input.fetch,
     onRequestId: (id) => {
-      handle.lastRequestId = id;
+      requestState.lastRequestId = id;
     },
     signal: input.signal,
   });
@@ -377,10 +391,19 @@ export async function createSdkHandle(
   const client = new core.FrontalClient(parsed.data);
   const frontal = new sdk.Frontal(client);
 
-  handle.client = client;
-  handle.frontal = frontal;
-  handle.http = client.httpClient;
-  return handle as SdkHandle;
+  return {
+    baseUrl: input.baseUrl,
+    client,
+    credential: input.credential,
+    frontal,
+    http: client.httpClient,
+    get lastRequestId() {
+      return requestState.lastRequestId;
+    },
+    set lastRequestId(value: string | undefined) {
+      requestState.lastRequestId = value;
+    },
+  };
 }
 
 function apiKeyFor(credential: Credential): string {

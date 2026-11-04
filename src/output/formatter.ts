@@ -1,4 +1,5 @@
 import YAML from "yaml";
+import { type JsonRecord, jsonFlag } from "@/lib/json.js";
 import { redact } from "@/output/redact.js";
 import { suppressSpinner } from "@/output/spinner.js";
 import { type Column, renderTable } from "@/output/table.js";
@@ -20,11 +21,11 @@ export class Formatter {
     }
   }
 
-  static from(globalOpts: Record<string, unknown>): Formatter {
+  static from(globalOpts: JsonRecord): Formatter {
     return new Formatter({
-      json: globalOpts.json as boolean,
-      quiet: globalOpts.quiet as boolean,
-      yaml: globalOpts.yaml as boolean,
+      json: jsonFlag(globalOpts, "json"),
+      quiet: jsonFlag(globalOpts, "quiet"),
+      yaml: jsonFlag(globalOpts, "yaml"),
     });
   }
 
@@ -45,7 +46,7 @@ export class Formatter {
     console.log(renderTable(data, columns));
   }
 
-  object(input: Record<string, unknown>): void {
+  object(input: object): void {
     const data = redact(input);
     if (this.opts.json) {
       console.log(JSON.stringify(data, null, 2));

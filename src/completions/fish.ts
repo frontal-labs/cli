@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { isHiddenCommand } from "@/completions/hidden.js";
 
 const STRIP_LEADING_DASHES = /^--/;
 const ESCAPE_FISH_BACKSLASH = /\\/g;
@@ -12,7 +13,7 @@ export function generateFishCompletions(program: Command): string {
   ];
 
   for (const cmd of program.commands) {
-    if ((cmd as { _hidden?: boolean })._hidden) {
+    if (isHiddenCommand(cmd)) {
       continue;
     }
     const name = cmd.name();
@@ -22,7 +23,7 @@ export function generateFishCompletions(program: Command): string {
     );
 
     for (const sub of cmd.commands) {
-      if ((sub as { _hidden?: boolean })._hidden) {
+      if (isHiddenCommand(sub)) {
         continue;
       }
       const subDesc = sub.description() || sub.name();

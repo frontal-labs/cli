@@ -16,10 +16,11 @@ export interface PaginatedResponse<T = Record<string, unknown>> {
   };
 }
 
-export function buildPaginationParams(
-  opts: Record<string, unknown>
-): Record<string, string> {
-  const params: Record<string, string> = {};
+export function buildPaginationParams(opts: {
+  limit?: unknown;
+  cursor?: unknown;
+}): { limit?: string; cursor?: string } {
+  const params: { limit?: string; cursor?: string } = {};
   if (opts.limit) {
     params.limit = String(opts.limit);
   }
@@ -37,10 +38,9 @@ export async function fetchAllPages<T = Record<string, unknown>>(
   let cursor: string | undefined;
 
   do {
-    const params = { ...baseParams };
-    if (cursor) {
-      params.cursor = cursor;
-    }
+    const params: Record<string, string> = cursor
+      ? { ...baseParams, cursor }
+      : { ...baseParams };
 
     // biome-ignore lint/performance/noAwaitInLoops: pages depend on the previous cursor
     const result = await fetcher(params);
