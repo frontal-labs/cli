@@ -448,36 +448,39 @@ cmd_resolve_internal() {
 # dispatch
 # ---------------------------------------------------------------------------
 
-case "${1:-}" in
-  test-auth)
-    cmd_test_auth
-    ;;
-  create-internal)
-    cmd_create_internal "${2:-}" "${3:-}" "${4:-}"
-    ;;
-  create-status-page)
-    cmd_create_status_page "${2:-}" "${3:-}" "${4:-}" "${5:-}"
-    ;;
-  post-update)
-    cmd_post_update "${2:-}" "${3:-}" "${4:-}" "${5:-}"
-    ;;
-  resolve)
-    cmd_resolve "${2:-}" "${3:-}"
-    ;;
-  resolve-internal)
-    cmd_resolve_internal "${2:-}" "${3:-}"
-    ;;
-  list-active-incidents)
-    cmd_list_active_incidents
-    ;;
-  get-status-page-structure)
-    cmd_get_status_page_structure "${2:-}"
-    ;;
-  derive-severity)
-    cmd_derive_severity "${2:-}"
-    ;;
-  *)
-    echo "Usage: $0 {test-auth|create-internal|create-status-page|post-update|resolve|resolve-internal|list-active-incidents|get-status-page-structure|derive-severity}" >&2
-    exit 1
-    ;;
-esac
+# Only dispatch when executed directly; sourcing must just define the functions.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  case "${1:-}" in
+    test-auth)
+      cmd_test_auth
+      ;;
+    create-internal)
+      cmd_create_internal "${2:-}" "${3:-}" "${4:-}"
+      ;;
+    create-status-page)
+      cmd_create_status_page "${2:-}" "${3:-}" "${4:-}" "${5:-}"
+      ;;
+    post-update)
+      cmd_post_update "${2:-}" "${3:-}" "${4:-}" "${5:-}"
+      ;;
+    resolve)
+      cmd_resolve "${2:-}" "${3:-}"
+      ;;
+    resolve-internal)
+      cmd_resolve_internal "${2:-}" "${3:-}"
+      ;;
+    list-active-incidents)
+      cmd_list_active_incidents
+      ;;
+    get-status-page-structure)
+      cmd_get_status_page_structure "${2:-}"
+      ;;
+    derive-severity)
+      cmd_derive_severity "${2:-}"
+      ;;
+    *)
+      echo "Usage: $0 {test-auth|create-internal|create-status-page|post-update|resolve|resolve-internal|list-active-incidents|get-status-page-structure|derive-severity}" >&2
+      exit 1
+      ;;
+  esac
+fi
