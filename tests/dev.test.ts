@@ -13,7 +13,7 @@ import { initProject } from "@/commands/init.js";
 import { PROXY_HEADER, serviceForPath } from "@/lib/dev/proxy.js";
 import { compilePath, Router } from "@/lib/dev/router.js";
 import { DevServer } from "@/lib/dev/server.js";
-import { TEST_API_KEY } from "./helpers/cli.js";
+import { TEST_API_KEY, waitFor } from "./helpers/cli.js";
 
 type Sdk = import("@frontal-labs/sdk").Frontal;
 
@@ -326,7 +326,7 @@ describe("frontal dev server", () => {
       },
     ] satisfies MockRoute[]);
     const sdkModule = await import("@/lib/sdk.js");
-    vi.spyOn(sdkModule, "getSdk").mockImplementation(() =>
+    vi.mocked(sdkModule.getSdk).mockImplementationOnce(() =>
       sdkModule.createSdkHandle({
         baseUrl: "https://api.test.frontal.dev/v1",
         credential: { apiKey: "frt_remote_key_000000", kind: "api-key" },
@@ -412,7 +412,7 @@ describe("frontal dev server", () => {
       })
     );
     // fs.watch latency varies by platform/load; the polling fallback fires within ~300ms.
-    await vi.waitFor(() => expect(reloads).toContain("live.json"), {
+    await waitFor(() => expect(reloads).toContain("live.json"), {
       interval: 100,
       timeout: 8000,
     });

@@ -1,31 +1,68 @@
 import { createMockFetch, type MockRoute } from "@frontal-labs/testing";
 import { vi } from "vitest";
+import { getSdk } from "@/lib/sdk.js";
 
 export const TEST_API_KEY = "frt_test_api_key_1234567890";
 export const TEST_BASE_URL = "https://api.test.frontal.dev/v1";
 
 export type MockApi = ReturnType<typeof createMockFetch>;
 
+// Hoisted so the `vi.mock` factory below can reference it: factories run
+// before module-level code, so a plain `const` here would be uninitialized.
+const mockState = vi.hoisted(() => ({
+  enabled: false,
+  fetch: null as ReturnType<typeof createMockFetch>["fetch"] | null,
+  routes: [] as MockRoute[],
+}));
+
+// Replace `getSdk` with a spy that routes through the real SDK client once
+// `mockApi()` has installed a fetch, and falls back to the real `getSdk`
+// otherwise. Everything else in the module stays the original.
+vi.mock("@/lib/sdk.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/sdk.js")>();
+  return {
+    ...actual,
+    getSdk: vi.fn(async (globalOpts: any, options: any) => {
+      if (!(mockState.enabled && mockState.fetch)) {
+        return actual.getSdk(globalOpts, options);
+      }
+      return actual.createSdkHandle({
+        baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
+        credential: options?.anonymous
+          ? { kind: "anonymous" }
+          : { apiKey: TEST_API_KEY, kind: "api-key" },
+        fetch: mockState.fetch,
+        maxRetries: 0,
+        signal: options?.signal,
+      });
+    }),
+  };
+});
+
 /**
  * Installs a mocked transport for `getSdk()` so commands exercise the real
  * SDK client against recorded routes. Returns the mock handle.
  */
 export async function mockApi(routes: MockRoute[] = []): Promise<MockApi> {
+  mockState.routes = routes;
+  mockState.enabled = true;
+  // Create the mock and store its fetch in mockState
   const mock = createMockFetch(routes);
-  const sdkModule = await import("@/lib/sdk.js");
-  vi.spyOn(sdkModule, "getSdk").mockImplementation((globalOpts, options) =>
-    sdkModule.createSdkHandle({
-      baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
-      credential: options?.anonymous
-        ? { kind: "anonymous" }
-        : { apiKey: TEST_API_KEY, kind: "api-key" },
-      fetch: mock.fetch,
-      maxRetries: 0,
-      signal: options?.signal,
-    })
-  );
+  mockState.fetch = mock.fetch;
   return mock;
 }
+
+/**
+ * Clears the mock state. Call in afterEach to prevent cross-test pollution.
+ */
+export function clearMockApi(): void {
+  mockState.routes = [];
+  mockState.fetch = null;
+  mockState.enabled = false;
+  vi.mocked(getSdk).mockClear();
+}
+
+export { mockState };
 
 export class ExitError extends Error {
   readonly exitCode: number;
@@ -55,10 +92,10 @@ export async function runCli(args: string[]): Promise<CliResult> {
   trapExit();
   const stdout: string[] = [];
   const stderr: string[] = [];
-  vi.mocked(console.log).mockImplementation((...parts: unknown[]) => {
+  vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
     stdout.push(parts.map(String).join(" "));
   });
-  vi.mocked(console.error).mockImplementation((...parts: unknown[]) => {
+  vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
     stderr.push(parts.map(String).join(" "));
   });
   // commander writes --help / usage errors straight to the streams.
@@ -88,4 +125,24 @@ export async function runCli(args: string[]): Promise<CliResult> {
 export function lastJson(lines: string[]): Record<string, unknown> {
   const text = lines.join("\n").trim();
   return JSON.parse(text) as Record<string, unknown>;
+}
+
+/** Retries `fn` until it stops throwing, failing with the last error on timeout. */
+export async function waitFor(
+  fn: () => void | Promise<void>,
+  { interval = 50, timeout = 3000 } = {}
+): Promise<void> {
+  const start = Date.now();
+  const attempt = async (): Promise<void> => {
+    try {
+      await fn();
+    } catch (err) {
+      if (Date.now() - start > timeout) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+      await attempt();
+    }
+  };
+  await attempt();
 }
