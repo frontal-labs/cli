@@ -1,49 +1,43 @@
 import { createMockFetch, type MockRoute } from "@frontal-labs/testing";
 import { vi } from "vitest";
-import * as sdkModule from "@/lib/sdk.js";
+import { getSdk } from "@/lib/sdk.js";
 
 export const TEST_API_KEY = "frt_test_api_key_1234567890";
 export const TEST_BASE_URL = "https://api.test.frontal.dev/v1";
 
 export type MockApi = ReturnType<typeof createMockFetch>;
 
-// Mock state - defined at module level before vi.mock
-const mockState = {
+// Hoisted so the `vi.mock` factory below can reference it: factories run
+// before module-level code, so a plain `const` here would be uninitialized.
+const mockState = vi.hoisted(() => ({
   enabled: false,
   fetch: null as ReturnType<typeof createMockFetch>["fetch"] | null,
   routes: [] as MockRoute[],
-};
-
-// Store the real functions for use in mock
-const realCreateSdkHandle = sdkModule.createSdkHandle;
-const realGetSdk = sdkModule.getSdk;
-
-// Mock getSdk function that reads from mockState
-const mockGetSdk = vi.fn(async (globalOpts: any, options: any) => {
-  // Only use mock if fetch is set up (mockApi was called)
-  if (!(mockState.enabled && mockState.fetch)) {
-    return realGetSdk(globalOpts, options);
-  }
-  return realCreateSdkHandle({
-    baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
-    credential: options?.anonymous
-      ? { kind: "anonymous" }
-      : { apiKey: TEST_API_KEY, kind: "api-key" },
-    fetch: mockState.fetch,
-    maxRetries: 0,
-    signal: options?.signal,
-  });
-});
-
-// Mock the sdk module at load time
-vi.mock("@/lib/sdk.js", () => ({
-  createAuthFetch: sdkModule.createAuthFetch,
-  createSdkHandle: realCreateSdkHandle,
-  getSdk: mockGetSdk,
-  mapEnvironment: sdkModule.mapEnvironment,
-  resolveCredential: sdkModule.resolveCredential,
-  sanitizeSdkEnv: sdkModule.sanitizeSdkEnv,
 }));
+
+// Replace `getSdk` with a spy that routes through the real SDK client once
+// `mockApi()` has installed a fetch, and falls back to the real `getSdk`
+// otherwise. Everything else in the module stays the original.
+vi.mock("@/lib/sdk.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/sdk.js")>();
+  return {
+    ...actual,
+    getSdk: vi.fn(async (globalOpts: any, options: any) => {
+      if (!(mockState.enabled && mockState.fetch)) {
+        return actual.getSdk(globalOpts, options);
+      }
+      return actual.createSdkHandle({
+        baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
+        credential: options?.anonymous
+          ? { kind: "anonymous" }
+          : { apiKey: TEST_API_KEY, kind: "api-key" },
+        fetch: mockState.fetch,
+        maxRetries: 0,
+        signal: options?.signal,
+      });
+    }),
+  };
+});
 
 /**
  * Installs a mocked transport for `getSdk()` so commands exercise the real
@@ -65,10 +59,10 @@ export function clearMockApi(): void {
   mockState.routes = [];
   mockState.fetch = null;
   mockState.enabled = false;
-  mockGetSdk.mockClear();
+  vi.mocked(getSdk).mockClear();
 }
 
-export { mockGetSdk, mockState };
+export { mockState };
 
 export class ExitError extends Error {
   readonly exitCode: number;

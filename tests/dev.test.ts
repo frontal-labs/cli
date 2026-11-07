@@ -22,23 +22,24 @@ const DEV_REQUEST_ID = /^req_dev_/;
 const AGENT_ID = /^agt_/;
 const UNKNOWN_SERVICE = /Unknown service "nope"/;
 
-/** Simple polling wait for async conditions. */
+/** Retries `fn` until it stops throwing, failing with the last error on timeout. */
 async function waitFor(
   fn: () => void | Promise<void>,
   { interval = 50, timeout = 3000 } = {}
 ): Promise<void> {
   const start = Date.now();
-  while (true) {
+  const attempt = async (): Promise<void> => {
     try {
       await fn();
-      return;
-    } catch {
+    } catch (err) {
       if (Date.now() - start > timeout) {
-        await fn(); // throw the last error
+        throw err;
       }
-      await new Promise((r) => setTimeout(r, interval));
+      await new Promise((resolve) => setTimeout(resolve, interval));
+      await attempt();
     }
-  }
+  };
+  await attempt();
 }
 
 async function sdkFor(baseUrl: string): Promise<Sdk> {
@@ -345,7 +346,7 @@ describe("frontal dev server", () => {
       },
     ] satisfies MockRoute[]);
     const sdkModule = await import("@/lib/sdk.js");
-    vi.spyOn(sdkModule, "getSdk").mockImplementation(() =>
+    vi.mocked(sdkModule.getSdk).mockImplementationOnce(() =>
       sdkModule.createSdkHandle({
         baseUrl: "https://api.test.frontal.dev/v1",
         credential: { apiKey: "frt_remote_key_000000", kind: "api-key" },

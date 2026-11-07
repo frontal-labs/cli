@@ -2,9 +2,10 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
-import { clearMockApi } from "../helpers/cli.js";
 
-// Isolate the CLI from the developer's real ~/.frontal profile store.
+// Isolate the CLI from the developer's real ~/.frontal profile store. This
+// must run before any `@/` module is imported: the config manager resolves
+// its path at import time, and static imports would be hoisted above it.
 process.env.FRONTAL_CONFIG_DIR = mkdtempSync(
   join(tmpdir(), "frontal-cli-test-")
 );
@@ -36,8 +37,9 @@ global.console = {
 // Mock environment variables
 process.env.NODE_ENV = "test";
 
-// Import configManager after env is set
-import { configManager } from "@/config/manager.js";
+// Imported after the env is set (see above).
+const { configManager } = await import("@/config/manager.js");
+const { clearMockApi } = await import("../helpers/cli.js");
 
 // Clear config before each test to prevent cross-test pollution
 beforeEach(() => {
