@@ -290,9 +290,9 @@ The live test (`tests/ontology-live.test.ts`) runs the real `frontal` binary aga
 (`tests/ontology-sdk-flow.test.ts`) builds a consumer project and runs create, put, get, relation,
 update, list and delete under `bun`.
 
-Run the suite with `bun run test`. The live and SDK-flow tests need `bun` on `PATH`, and the SDK flow
-needs an SDK checkout (`FRONTAL_SDK_SOURCE`, default `../sdk-typescript`). Both are skipped with a reason
-when those are missing.
+Run the suite with `bun run test`. The SDK flow test needs `bun` on `PATH`; it is skipped with a reason
+when `bun` is missing. The suites run against `tests/support/mock-sdk`, a test double for
+`@frontal-labs/sdk`, not a sibling checkout.
 
 ## Usage in CI
 
