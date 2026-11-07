@@ -13,6 +13,12 @@ updates:
       interval: "weekly"
     labels:
       - "dependencies"
+    # Major versions of these need a deliberate migration, not an automated bump.
+    ignore:
+      - dependency-name: "@frontal-labs/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "ora"
+        update-types: ["version-update:semver-major"]
     groups:
       dependencies:
         patterns:
