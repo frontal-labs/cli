@@ -1,0 +1,99 @@
+env:
+  BUN_VERSION: "1.3.8"
+
+# Retry policy for transient CI failures (e.g. agent lost, exit status -1).
+# Applied to every CI step through a YAML alias.
+retry_transient: &retry_transient
+  automatic:
+    - exit_status: -1
+      limit: 2
+
+steps:
+  # ------------------------------------------------------------------
+  # CI: runs on every push and every pull request
+  # ------------------------------------------------------------------
+
+  - label: ":mag: Lint & type-check"
+    key: "lint"
+    command: .buildkite/scripts/lint.sh
+    queue: "default"
+    timeout_in_minutes: 15
+    retry: *retry_transient
+    if: "build.pull_request.id == null || build.pull_request.draft == false"
+    # Skip when only docs or unrelated files changed (monorepo-style paths).
+    if_changed: "{src/**,tests/**,package.json,bun.lock,biome.jsonc,tsconfig.json,tsconfig.strict.json,vitest.config.ts,commitlint.config.cjs}"
+
+  - label: ":package: Build (bundle + binary)"
+    key: "build"
+    command: .buildkite/scripts/build.sh
+    queue: "default"
+    depends_on: ["lint"]
+    timeout_in_minutes: 20
+    retry: *retry_transient
+    artifact_paths:
+      - "dist/index.js"
+      - "dist/cli"
+    if_changed: "{src/**,scripts/**,package.json,bun.lock,tsup.config.ts,docker/Dockerfile}"
+
+  - label: ":vitest: Unit tests (parallel shards)"
+    key: "test"
+    command: .buildkite/scripts/test.sh
+    queue: "default"
+    depends_on: ["lint"]
+    timeout_in_minutes: 30
+    parallelism: 4
+    retry: *retry_transient
+    artifact_paths:
+      - "junit.xml"
+    if_changed: "{src/**,tests/**,package.json,bun.lock,vitest.config.ts}"
+
+  - label: ":rocket: Integration (smoke test built artifacts)"
+    key: "integration"
+    command: .buildkite/scripts/integration.sh
+    queue: "default"
+    depends_on: ["build"]
+    timeout_in_minutes: 15
+    retry: *retry_transient
+    if_changed: "{src/**,tests/**,scripts/**,package.json,bun.lock}"
+
+  # ------------------------------------------------------------------
+  # CD: deploys, main branch only
+  # ------------------------------------------------------------------
+
+  - label: ":docker: Deploy to staging"
+    key: "deploy-staging"
+    command: .buildkite/scripts/deploy-staging.sh
+    queue: "default"
+    depends_on: ["test", "integration"]
+    timeout_in_minutes: 25
+    if: build.branch == pipeline.default_branch
+    if_changed: "{src/**,scripts/**,package.json,bun.lock,docker/**,.buildkite/scripts/deploy-staging.sh}"
+    env:
+      DOCKER_IMAGE: "ghcr.io/frontal-labs/cli"
+
+  - wait: ~
+
+  - block: ":construction: Deploy to production"
+    key: "block-prod"
+    prompt: "Promote this build to production?"
+    timeout_in_minutes: 60
+    if: build.branch == pipeline.default_branch
+    fields:
+      - text: "environment"
+        default: "production"
+        hint: "Release target environment"
+
+  - label: ":rocket: Deploy to production"
+    key: "deploy-prod"
+    command: .buildkite/scripts/deploy-prod.sh
+    queue: "deploy"
+    concurrency: 1
+    concurrency_group: "frontal-cli/prod"
+    depends_on: ["block-prod", "test"]
+    timeout_in_minutes: 30
+    if: build.branch == pipeline.default_branch
+    if_changed: "{src/**,scripts/**,package.json,bun.lock,.buildkite/scripts/deploy-prod.sh}"
+    retry:
+      manual:
+        allowed: false
+        reason: "Re-run the pipeline from the production block instead of retrying a deployment"
