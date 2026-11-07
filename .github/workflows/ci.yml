@@ -125,9 +125,12 @@ jobs:
         env:
           OPENAPI_SPEC_STRICT: "0"
 
-      # Posts the size diff against the base branch as a PR comment.
+      # Posts the size diff against the base branch as a PR comment. This is
+      # informational only: enforcement is the step above. The action measures
+      # the base branch too, which fails until size-limit is on the base.
       - name: Report bundle size on pull request
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         uses: andresz1/size-limit-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
