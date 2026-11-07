@@ -41,7 +41,8 @@
     "test:watch": "vitest",
     "type-check": "tsc --noEmit && tsc -p tsconfig.strict.json --noEmit",
     "validate:bindings": "node ./scripts/validate-command-bindings.mjs",
-    "version-packages": "changeset version"
+    "version-packages": "changeset version",
+    "size": "bun run build && size-limit"
   },
   "overrides": {
     "esbuild": "0.25.0",
@@ -73,11 +74,13 @@
     "@commitlint/cli": "21.2.2",
     "@commitlint/config-conventional": "21.2.2",
     "@frontal-labs/testing": "1.0.4",
+    "@size-limit/file": "14.3.0",
     "@types/bun": "1.4.4",
     "@types/node": "26.5.1",
     "@vitest/coverage-v8": "5.0.0",
     "ajv": "8.20.0",
     "husky": "9.1.7",
+    "size-limit": "14.3.0",
     "tsup": "8.5.1",
     "typescript": "7.0.2",
     "ultracite": "7.11.1",
