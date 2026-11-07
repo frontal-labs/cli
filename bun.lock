@@ -37,6 +37,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "deepmerge@4.3.1": "patches/deepmerge@4.3.1.patch",
+  },
   "overrides": {
     "esbuild": "0.25.0",
     "fast-uri": "3.1.8",

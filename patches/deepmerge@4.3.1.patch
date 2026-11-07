@@ -1,0 +1,60 @@
+diff --git a/dist/cjs.js b/dist/cjs.js
+index 7c36cbdd06cc22c92d590be3f87a08a91ca06b40..c0c3fbd275d4691967058fb3ba841965d69b9a1b 100644
+--- a/dist/cjs.js
++++ b/dist/cjs.js
+@@ -76,15 +76,24 @@ function propertyIsUnsafe(target, key) {
+ 			&& Object.propertyIsEnumerable.call(target, key)) // and also unsafe if they're nonenumerable.
+ }
+ 
++// Keys that would reach Object.prototype through a plain assignment.
++// deepmerge copies them only into a fresh object, so skip them outright.
++function isReservedKey(key) {
++	return key === '__proto__' || key === 'constructor' || key === 'prototype'
++}
++
+ function mergeObject(target, source, options) {
+ 	var destination = {};
+ 	if (options.isMergeableObject(target)) {
+ 		getKeys(target).forEach(function(key) {
++		if (isReservedKey(key)) {
++			return
++		}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 		});
+ 	}
+ 	getKeys(source).forEach(function(key) {
+-		if (propertyIsUnsafe(target, key)) {
++		if (isReservedKey(key) || propertyIsUnsafe(target, key)) {
+ 			return
+ 		}
+ 
+diff --git a/index.js b/index.js
+index 77968aed5d456cccc294f60912ef381fa1e52a7b..a8abab3e9219c63edf26f1170e22b083060193db 100644
+--- a/index.js
++++ b/index.js
+@@ -51,15 +51,24 @@ function propertyIsUnsafe(target, key) {
+ 			&& Object.propertyIsEnumerable.call(target, key)) // and also unsafe if they're nonenumerable.
+ }
+ 
++// Keys that would reach Object.prototype through a plain assignment.
++// deepmerge copies them only into a fresh object, so skip them outright.
++function isReservedKey(key) {
++	return key === '__proto__' || key === 'constructor' || key === 'prototype'
++}
++
+ function mergeObject(target, source, options) {
+ 	var destination = {}
+ 	if (options.isMergeableObject(target)) {
+ 		getKeys(target).forEach(function(key) {
++		if (isReservedKey(key)) {
++			return
++		}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options)
+ 		})
+ 	}
+ 	getKeys(source).forEach(function(key) {
+-		if (propertyIsUnsafe(target, key)) {
++		if (isReservedKey(key) || propertyIsUnsafe(target, key)) {
+ 			return
+ 		}
+ 
