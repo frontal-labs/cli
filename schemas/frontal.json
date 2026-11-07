@@ -314,7 +314,7 @@
         "retryDelay": {
           "default": 1000,
           "type": "integer",
-          "exclusiveMinimum": 0
+          "minimum": 0
         },
         "timeout": {
           "default": 30000,
