@@ -10,7 +10,6 @@ concurrency:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   release:
@@ -33,16 +32,32 @@ jobs:
       - name: Run tests
         run: bun run test
 
-      # Versions + opens the "chore: release packages" PR while changesets are
-      # pending. Merging that PR tags vX.Y.Z; publish.yml does the publishing
-      # (npm via OIDC, GitHub Packages, GitHub Release with binaries).
-      - name: Create Release Pull Request or tag the release
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          version: bun run version-packages
-          publish: bun run build && changeset tag
-          commit: "chore: release packages"
-          title: "chore: release packages"
+      # Actions cannot open pull requests in this repo. While changesets are
+      # pending, push a "chore: release packages" branch and link to the compare
+      # page. Once that PR merges, the tag step below tags the release, and
+      # publish.yml does the publishing (npm via OIDC, GitHub Packages, GitHub
+      # Release with binaries).
+      - name: Version packages or tag the release
+        id: release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_BRANCH: changeset-release/main
+        run: |
+          PENDING="$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [[ "$PENDING" -gt 0 ]]; then
+            bun run version-packages
+            git checkout -B "$RELEASE_BRANCH"
+            git add -A
+            git commit -m "chore: release packages"
+            git push --force origin "$RELEASE_BRANCH"
+            {
+              echo "### Release branch pushed"
+              echo ""
+              echo "Open the pull request: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${RELEASE_BRANCH}?expand=1"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            bunx changeset tag
+            git push origin --tags
+            echo "Tagged release; run publish.yml with the new tag to publish." >> "$GITHUB_STEP_SUMMARY"
+          fi
