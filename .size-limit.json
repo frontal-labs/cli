@@ -1,0 +1,8 @@
+[
+  {
+    "name": "CLI bundle (dist/index.js, gzip)",
+    "path": "dist/index.js",
+    "gzip": true,
+    "limit": "82 KB"
+  }
+]
