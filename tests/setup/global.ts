@@ -47,6 +47,11 @@ beforeEach(() => {
   configManager.setActiveProfile("default");
 });
 
+// The first import of the CLI module takes several seconds on a loaded
+// machine. Load it here, where no test timeout applies, so the first test
+// that runs the CLI is not the one that pays for it.
+await import("@/cli.js");
+
 // Set up global test timeout
 vi.setConfig({
   hookTimeout: 10_000,
