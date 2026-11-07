@@ -1,31 +1,74 @@
 import { createMockFetch, type MockRoute } from "@frontal-labs/testing";
 import { vi } from "vitest";
+import * as sdkModule from "@/lib/sdk.js";
 
 export const TEST_API_KEY = "frt_test_api_key_1234567890";
 export const TEST_BASE_URL = "https://api.test.frontal.dev/v1";
 
 export type MockApi = ReturnType<typeof createMockFetch>;
 
+// Mock state - defined at module level before vi.mock
+const mockState = {
+  enabled: false,
+  fetch: null as ReturnType<typeof createMockFetch>["fetch"] | null,
+  routes: [] as MockRoute[],
+};
+
+// Store the real functions for use in mock
+const realCreateSdkHandle = sdkModule.createSdkHandle;
+const realGetSdk = sdkModule.getSdk;
+
+// Mock getSdk function that reads from mockState
+const mockGetSdk = vi.fn(async (globalOpts: any, options: any) => {
+  // Only use mock if fetch is set up (mockApi was called)
+  if (!(mockState.enabled && mockState.fetch)) {
+    return realGetSdk(globalOpts, options);
+  }
+  return realCreateSdkHandle({
+    baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
+    credential: options?.anonymous
+      ? { kind: "anonymous" }
+      : { apiKey: TEST_API_KEY, kind: "api-key" },
+    fetch: mockState.fetch,
+    maxRetries: 0,
+    signal: options?.signal,
+  });
+});
+
+// Mock the sdk module at load time
+vi.mock("@/lib/sdk.js", () => ({
+  createAuthFetch: sdkModule.createAuthFetch,
+  createSdkHandle: realCreateSdkHandle,
+  getSdk: mockGetSdk,
+  mapEnvironment: sdkModule.mapEnvironment,
+  resolveCredential: sdkModule.resolveCredential,
+  sanitizeSdkEnv: sdkModule.sanitizeSdkEnv,
+}));
+
 /**
  * Installs a mocked transport for `getSdk()` so commands exercise the real
  * SDK client against recorded routes. Returns the mock handle.
  */
 export async function mockApi(routes: MockRoute[] = []): Promise<MockApi> {
+  mockState.routes = routes;
+  mockState.enabled = true;
+  // Create the mock and store its fetch in mockState
   const mock = createMockFetch(routes);
-  const sdkModule = await import("@/lib/sdk.js");
-  vi.spyOn(sdkModule, "getSdk").mockImplementation((globalOpts, options) =>
-    sdkModule.createSdkHandle({
-      baseUrl: (globalOpts.apiUrl as string | undefined) ?? TEST_BASE_URL,
-      credential: options?.anonymous
-        ? { kind: "anonymous" }
-        : { apiKey: TEST_API_KEY, kind: "api-key" },
-      fetch: mock.fetch,
-      maxRetries: 0,
-      signal: options?.signal,
-    })
-  );
+  mockState.fetch = mock.fetch;
   return mock;
 }
+
+/**
+ * Clears the mock state. Call in afterEach to prevent cross-test pollution.
+ */
+export function clearMockApi(): void {
+  mockState.routes = [];
+  mockState.fetch = null;
+  mockState.enabled = false;
+  mockGetSdk.mockClear();
+}
+
+export { mockGetSdk, mockState };
 
 export class ExitError extends Error {
   readonly exitCode: number;
@@ -55,10 +98,10 @@ export async function runCli(args: string[]): Promise<CliResult> {
   trapExit();
   const stdout: string[] = [];
   const stderr: string[] = [];
-  vi.mocked(console.log).mockImplementation((...parts: unknown[]) => {
+  vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
     stdout.push(parts.map(String).join(" "));
   });
-  vi.mocked(console.error).mockImplementation((...parts: unknown[]) => {
+  vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
     stderr.push(parts.map(String).join(" "));
   });
   // commander writes --help / usage errors straight to the streams.

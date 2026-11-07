@@ -2,6 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
+import { clearMockApi } from "../helpers/cli.js";
 
 // Isolate the CLI from the developer's real ~/.frontal profile store.
 process.env.FRONTAL_CONFIG_DIR = mkdtempSync(
@@ -35,6 +36,15 @@ global.console = {
 // Mock environment variables
 process.env.NODE_ENV = "test";
 
+// Import configManager after env is set
+import { configManager } from "@/config/manager.js";
+
+// Clear config before each test to prevent cross-test pollution
+beforeEach(() => {
+  configManager.deleteProfile("default");
+  configManager.setActiveProfile("default");
+});
+
 // Set up global test timeout
 vi.setConfig({
   hookTimeout: 10_000,
@@ -45,4 +55,5 @@ vi.setConfig({
 afterEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  clearMockApi();
 });

@@ -117,7 +117,7 @@ describe("classifyError", () => {
 describe("renderError", () => {
   it("prints a machine-readable JSON envelope on stderr under --json", () => {
     const lines: string[] = [];
-    vi.mocked(console.error).mockImplementation((line: unknown) => {
+    vi.spyOn(console, "error").mockImplementation((line: unknown) => {
       lines.push(String(line));
     });
 
@@ -140,7 +140,7 @@ describe("renderError", () => {
 
   it("never prints secrets", () => {
     const lines: string[] = [];
-    vi.mocked(console.error).mockImplementation((line: unknown) => {
+    vi.spyOn(console, "error").mockImplementation((line: unknown) => {
       lines.push(String(line));
     });
 
@@ -155,7 +155,7 @@ describe("renderError", () => {
 
   it("prints code, fix, docs and request id for humans", () => {
     const lines: string[] = [];
-    vi.mocked(console.error).mockImplementation((line: unknown) => {
+    vi.spyOn(console, "error").mockImplementation((line: unknown) => {
       lines.push(String(line));
     });
 

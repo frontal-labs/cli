@@ -54,16 +54,16 @@
     "vite": "6.4.3"
   },
   "dependencies": {
-    "@frontal-labs/workflows": "^0.1.3",
-    "@clack/prompts": "^1.1.0",
+    "@frontal-labs/workflows": "0.1.3",
+    "@clack/prompts": "1.8.1",
     "@frontal-labs/core": "1.0.4",
     "@frontal-labs/sdk": "1.0.4",
     "chalk": "6.0.0",
-    "cli-table3": "^0.6.5",
-    "commander": "^15.0.0",
-    "ora": "^9.4.0",
-    "yaml": "^2.7.0",
-    "zod": "^4.4.3"
+    "cli-table3": "0.6.5",
+    "commander": "15.0.0",
+    "ora": "9.4.1",
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
@@ -71,12 +71,12 @@
     "@commitlint/cli": "21.2.2",
     "@commitlint/config-conventional": "21.2.2",
     "@frontal-labs/testing": "1.0.4",
-    "@types/bun": "^1.3.10",
+    "@types/bun": "1.4.4",
     "@types/node": "26.5.1",
     "@vitest/coverage-v8": "5.0.0",
     "ajv": "8.20.0",
     "husky": "9.1.7",
-    "tsup": "^8.0.0",
+    "tsup": "8.5.1",
     "typescript": "7.0.2",
     "ultracite": "7.11.1",
     "vite-tsconfig-paths": "6.1.1",

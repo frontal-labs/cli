@@ -22,6 +22,25 @@ const DEV_REQUEST_ID = /^req_dev_/;
 const AGENT_ID = /^agt_/;
 const UNKNOWN_SERVICE = /Unknown service "nope"/;
 
+/** Simple polling wait for async conditions. */
+async function waitFor(
+  fn: () => void | Promise<void>,
+  { interval = 50, timeout = 3000 } = {}
+): Promise<void> {
+  const start = Date.now();
+  while (true) {
+    try {
+      await fn();
+      return;
+    } catch {
+      if (Date.now() - start > timeout) {
+        await fn(); // throw the last error
+      }
+      await new Promise((r) => setTimeout(r, interval));
+    }
+  }
+}
+
 async function sdkFor(baseUrl: string): Promise<Sdk> {
   const { Frontal, FrontalClient } = await import("@frontal-labs/sdk");
   const { clientConfigSchema } = await import("@frontal-labs/core");
@@ -412,7 +431,7 @@ describe("frontal dev server", () => {
       })
     );
     // fs.watch latency varies by platform/load; the polling fallback fires within ~300ms.
-    await vi.waitFor(() => expect(reloads).toContain("live.json"), {
+    await waitFor(() => expect(reloads).toContain("live.json"), {
       interval: 100,
       timeout: 8000,
     });

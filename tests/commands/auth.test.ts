@@ -153,7 +153,9 @@ describe("frontal auth", () => {
     const mock = createMockFetch([
       { body: { id: "user_1" }, method: "GET", path: "/auth/account/profile" },
     ]);
-    vi.stubGlobal("fetch", mock.fetch);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(mock.fetch);
     const interactive = await import("@/utils/interactive.js");
     vi.spyOn(interactive, "promptSecret").mockResolvedValue(TEST_API_KEY);
     vi.spyOn(interactive, "promptText").mockResolvedValue(
@@ -170,7 +172,7 @@ describe("frontal auth", () => {
       apiKey: TEST_API_KEY,
       baseUrl: "https://api.test.frontal.dev/v1",
     });
-    vi.unstubAllGlobals();
+    fetchSpy.mockRestore();
   });
 
   it("login --method api-key rejects a key the API refuses", async () => {
@@ -182,7 +184,9 @@ describe("frontal auth", () => {
         status: 401,
       },
     ]);
-    vi.stubGlobal("fetch", mock.fetch);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(mock.fetch);
     const interactive = await import("@/utils/interactive.js");
     vi.spyOn(interactive, "promptSecret").mockResolvedValue(
       "frt_rejected_key_000"
@@ -205,7 +209,7 @@ describe("frontal auth", () => {
       requestId: "req_x",
     });
     expect(configManager.getProfile("default").apiKey).toBeUndefined();
-    vi.unstubAllGlobals();
+    fetchSpy.mockRestore();
   });
 
   it("logout clears credentials and token prints nothing without them", async () => {

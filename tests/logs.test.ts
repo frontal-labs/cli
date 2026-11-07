@@ -15,6 +15,25 @@ const NON_NAME = /[^a-z0-9-]+/g;
 let root: string;
 let server: DevServer | undefined;
 
+/** Simple polling wait for async conditions. */
+async function waitFor(
+  fn: () => void | Promise<void>,
+  { interval = 50, timeout = 3000 } = {}
+): Promise<void> {
+  const start = Date.now();
+  while (true) {
+    try {
+      await fn();
+      return;
+    } catch {
+      if (Date.now() - start > timeout) {
+        await fn(); // throw the last error
+      }
+      await new Promise((r) => setTimeout(r, interval));
+    }
+  }
+}
+
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "frontal-logs-"));
   initProject(root, {});
@@ -160,7 +179,7 @@ describe("frontal logs --follow", () => {
     const sdkModule = await import("@/lib/sdk.js");
     const globalOpts = { apiKey: TEST_API_KEY, apiUrl: baseUrl, json: true };
     const lines: string[] = [];
-    vi.mocked(console.log).mockImplementation((line: unknown) => {
+    vi.spyOn(console, "log").mockImplementation((line: unknown) => {
       lines.push(String(line));
     });
 
@@ -185,7 +204,7 @@ describe("frontal logs --follow", () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
     await fetch(`${info.url}/v1/agents`);
     await fetch(`${info.url}/v1/ontology/graph/entities`);
-    await vi.waitFor(
+    await waitFor(
       () => expect(lines.some((l) => l.includes("GET /agents"))).toBe(true),
       { timeout: 3000 }
     );
@@ -194,7 +213,7 @@ describe("frontal logs --follow", () => {
     // Drop the server: the follower reports a reconnect and keeps trying.
     await server.stop();
     server = undefined;
-    await vi.waitFor(
+    await waitFor(
       () =>
         expect(lines.some((l) => l.includes('"type":"reconnect"'))).toBe(true),
       {

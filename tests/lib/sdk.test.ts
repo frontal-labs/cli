@@ -13,6 +13,17 @@ import {
 } from "@/lib/sdk.js";
 import { TEST_API_KEY, TEST_BASE_URL } from "../helpers/cli.js";
 
+beforeEach(() => {
+  configManager.setProfile("default", {
+    accessToken: undefined,
+    apiKey: undefined,
+    authUrl: undefined,
+    refreshToken: undefined,
+    tokenExpiresAt: undefined,
+  });
+  configManager.setActiveProfile("default");
+});
+
 const BEARER_JWT = /^Bearer .+\..+\..+$/;
 
 function jwtWithExp(exp: number): string {
@@ -176,7 +187,9 @@ describe("createAuthFetch", () => {
       { body: { ok: true }, method: "GET", path: "/ping" },
     ]);
     // refreshTokens() uses the global fetch.
-    vi.stubGlobal("fetch", mock.fetch);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(mock.fetch);
     const setProfile = vi.spyOn(configManager, "setProfile");
 
     const authFetch = createAuthFetch(
@@ -204,7 +217,7 @@ describe("createAuthFetch", () => {
         refreshToken: "refresh-2",
       })
     );
-    vi.unstubAllGlobals();
+    fetchSpy.mockRestore();
   });
 
   it("fails with TOKEN_EXPIRED when there is nothing to refresh with", async () => {
@@ -242,6 +255,11 @@ describe("createAuthFetch", () => {
 });
 
 describe("createSdkHandle / getSdk", () => {
+  beforeEach(() => {
+    configManager.deleteProfile("default");
+    configManager.setActiveProfile("default");
+  });
+
   it("builds a client that sends the API key and CLI header through the SDK", async () => {
     const mock = createMockFetch([
       {
@@ -281,10 +299,8 @@ describe("createSdkHandle / getSdk", () => {
   });
 
   it("throws NO_CREDENTIALS when nothing is configured", async () => {
-    configManager.setProfile("default", {
-      accessToken: undefined,
-      apiKey: undefined,
-    });
+    configManager.deleteProfile("default");
+    configManager.setActiveProfile("default");
     await expect(getSdk({})).rejects.toBeInstanceOf(CliError);
     await expect(getSdk({})).rejects.toMatchObject({ code: "NO_CREDENTIALS" });
   });
