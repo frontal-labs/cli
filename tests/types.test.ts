@@ -38,9 +38,11 @@ describe("renderTypes", () => {
     const config = await validateProjectConfig(parseJsonc(FIXTURE));
     const output = renderTypes(config, ["frontal.jsonc"]);
     expect(output.startsWith(GENERATED_HEADER)).toBe(true);
-    await expect(output).toMatchFileSnapshot(
-      join(FIXTURE_DIR, "frontal-configuration.d.ts.snap")
+    const expected = await import.meta.resolve(
+      "./fixtures/frontal-configuration.d.ts.snap"
     );
+    const snapshot = readFileSync(new URL(expected), "utf-8");
+    expect(output).toBe(snapshot);
   });
 
   it("emits vars, secrets and services from the config", async () => {

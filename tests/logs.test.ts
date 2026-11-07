@@ -6,7 +6,13 @@ import { initProject } from "@/commands/init.js";
 import { followLogs, matchesFilter, sinceToIso } from "@/commands/logs.js";
 import { DevServer } from "@/lib/dev/server.js";
 import { Formatter } from "@/output/formatter.js";
-import { lastJson, mockApi, runCli, TEST_API_KEY } from "./helpers/cli.js";
+import {
+  lastJson,
+  mockApi,
+  runCli,
+  TEST_API_KEY,
+  waitFor,
+} from "./helpers/cli.js";
 
 const INVALID_SINCE = /Invalid --since/;
 const ISO_YEAR = /^\d{4}-/;
@@ -160,7 +166,7 @@ describe("frontal logs --follow", () => {
     const sdkModule = await import("@/lib/sdk.js");
     const globalOpts = { apiKey: TEST_API_KEY, apiUrl: baseUrl, json: true };
     const lines: string[] = [];
-    vi.mocked(console.log).mockImplementation((line: unknown) => {
+    vi.spyOn(console, "log").mockImplementation((line: unknown) => {
       lines.push(String(line));
     });
 
@@ -185,7 +191,7 @@ describe("frontal logs --follow", () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
     await fetch(`${info.url}/v1/agents`);
     await fetch(`${info.url}/v1/ontology/graph/entities`);
-    await vi.waitFor(
+    await waitFor(
       () => expect(lines.some((l) => l.includes("GET /agents"))).toBe(true),
       { timeout: 3000 }
     );
@@ -194,7 +200,7 @@ describe("frontal logs --follow", () => {
     // Drop the server: the follower reports a reconnect and keeps trying.
     await server.stop();
     server = undefined;
-    await vi.waitFor(
+    await waitFor(
       () =>
         expect(lines.some((l) => l.includes('"type":"reconnect"'))).toBe(true),
       {
