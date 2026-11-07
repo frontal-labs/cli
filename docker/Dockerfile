@@ -7,6 +7,8 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json bun.lock ./
+# bun applies the patches listed in patchedDependencies during install.
+COPY patches ./patches
 
 # Install all dependencies (build tooling is a devDependency)
 RUN bun install --frozen-lockfile
