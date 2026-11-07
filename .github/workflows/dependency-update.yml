@@ -6,6 +6,9 @@ on:
     - cron: '0 9 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   update-dependencies:
     name: Update Dependencies
@@ -39,32 +42,21 @@ jobs:
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
           
-      - name: Create Pull Request
+      # Actions cannot open pull requests in this repo, so push the branch and
+      # link to the compare page. Open the PR from that link.
+      - name: Push update branch
         if: steps.verify-changed-files.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update dependencies"
-          title: "chore: update dependencies"
-          body: |
-            ## Dependency Updates
-            
-            This PR updates project dependencies to their latest versions.
-            
-            ### Changes
-            - Updated all dependencies to latest compatible versions
-            - Ran tests to ensure compatibility
-            
-            ### Checklist
-            - [ ] All tests pass
-            - [ ] No breaking changes detected
-            - [ ] Documentation updated if needed
-            
-            ---
-            
-            This PR was created automatically by the dependency update workflow.
-          branch: chore/update-dependencies
-          delete-branch: true
-          labels: |
-            dependencies
-            automated
+        env:
+          BRANCH: chore/update-dependencies
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add -A
+          git commit -m "chore: update dependencies"
+          git push --force origin "$BRANCH"
+          {
+            echo "### Dependency update pushed"
+            echo ""
+            echo "Open the pull request: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${BRANCH}?expand=1"
+          } >> "$GITHUB_STEP_SUMMARY"
