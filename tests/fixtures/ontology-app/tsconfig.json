@@ -6,12 +6,7 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "noUnusedLocals": false,
-    "paths": {
-      "@frontal-labs/sdk": [
-        "../../../../sdk-typescript/packages/sdk/src/index.ts"
-      ]
-    }
+    "noUnusedLocals": false
   },
   "include": ["src/**/*.ts", ".frontal/**/*.ts"]
 }

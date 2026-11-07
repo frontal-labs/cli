@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -9,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type BunRun, runBun } from "./support/bun-run.js";
 import {
@@ -17,32 +18,19 @@ import {
   type MockObjectType,
   type MockOntologyBackend,
 } from "./support/mock-ontology-backend.js";
+import { SDK_PACKAGES, SDK_SOURCE } from "./support/sdk-source.js";
 
 /**
  * Runs the generated client's object flow (create, get, relation, update, list,
  * delete) under bun, against the mock backend over real HTTP.
  *
- * The SDK is resolved from FRONTAL_SDK_SOURCE (path to packages/sdk/src/index.ts),
- * or the sibling checkout. Core and ontology are mapped to the same checkout's
- * source, so the run uses one consistent SDK. Skipped with a reason when bun or
+ * The SDK is resolved from the installed `@frontal-labs/*` packages (see
+ * ./support/sdk-source.ts). Core and ontology are mapped to the same packages
+ * root, so the run uses one consistent SDK. Skipped with a reason when bun or
  * that source is missing.
  */
 const FIXTURE = join(import.meta.dirname, "fixtures", "ontology-app");
 const FLOW_SOURCE = join(import.meta.dirname, "support", "sdk-object-flow.ts");
-const SDK_SOURCE = resolve(
-  process.env.FRONTAL_SDK_SOURCE ??
-    join(
-      import.meta.dirname,
-      "..",
-      "..",
-      "sdk-typescript",
-      "packages",
-      "sdk",
-      "src",
-      "index.ts"
-    )
-);
-const SDK_PACKAGES = resolve(dirname(SDK_SOURCE), "..", "..");
 const BUN_AVAILABLE = spawnSync("bun", ["--version"]).status === 0;
 const SDK_AVAILABLE = existsSync(SDK_SOURCE);
 const RUN_TIMEOUT_MS = 120_000;
@@ -76,6 +64,7 @@ function consumerProject(): string {
   const dir = join(scratch, "app");
   mkdirSync(dir, { recursive: true });
   copyFileSync(FLOW_SOURCE, join(dir, "main.ts"));
+  cpSync(join(FIXTURE, ".frontal"), join(dir, ".frontal"), { recursive: true });
   writeFileSync(
     join(dir, "tsconfig.json"),
     JSON.stringify(
@@ -160,8 +149,8 @@ describe.skipIf(!(BUN_AVAILABLE && SDK_AVAILABLE))(
             .requests()
             .every((entry) => entry.method !== "PUT" || entry.authorized)
         ).toBe(true);
-        // Without a runtime argument the SDK reads the object types once for the
-        // whole run, however many entity calls follow.
+        // The generated client carries the object types (pinned mode), so the
+        // run never asks the backend for them.
         const metadataReads = mock
           .requests()
           .filter(
@@ -169,7 +158,7 @@ describe.skipIf(!(BUN_AVAILABLE && SDK_AVAILABLE))(
               entry.method === "GET" &&
               entry.path.endsWith("/ontology/objects/object-types")
           );
-        expect(metadataReads).toHaveLength(1);
+        expect(metadataReads).toHaveLength(0);
       },
       RUN_TIMEOUT_MS
     );

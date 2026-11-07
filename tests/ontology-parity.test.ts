@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
+import { ENTITY_DERIVE_SOURCE } from "./support/sdk-source.js";
 
 /**
  * The SDK derives runtime metadata from the live object types (used when no
@@ -9,29 +10,7 @@ import { describe, expect, it } from "vitest";
  * `.frontal/client.ts` (the pinned mode). Both must agree for the same input.
  */
 const FIXTURE = join(import.meta.dirname, "fixtures", "ontology-app");
-const SDK_SOURCE = resolve(
-  process.env.FRONTAL_SDK_SOURCE ??
-    join(
-      import.meta.dirname,
-      "..",
-      "..",
-      "sdk-typescript",
-      "packages",
-      "sdk",
-      "src",
-      "index.ts"
-    )
-);
-const DERIVE_SOURCE = resolve(
-  SDK_SOURCE,
-  "..",
-  "..",
-  "..",
-  "ontology",
-  "src",
-  "entity-derive.ts"
-);
-const SDK_AVAILABLE = existsSync(DERIVE_SOURCE);
+const SDK_AVAILABLE = existsSync(ENTITY_DERIVE_SOURCE);
 
 /** Evaluates the `const runtime = {...} as const;` literal from the generated client. */
 const RUNTIME_LITERAL = /const runtime = (\{[\s\S]*?\n\}) as const;/;
@@ -47,10 +26,12 @@ function generatedRuntime(): unknown {
 }
 
 describe.skipIf(!SDK_AVAILABLE)(
-  `runtime metadata parity: SDK derivation equals generated client (SDK at ${DERIVE_SOURCE})`,
+  `runtime metadata parity: SDK derivation equals generated client (SDK at ${ENTITY_DERIVE_SOURCE})`,
   () => {
     it("derives the same runtime metadata as the CLI generator for the fixture", async () => {
-      const derive = (await import(pathToFileURL(DERIVE_SOURCE).href)) as {
+      const derive = (await import(
+        pathToFileURL(ENTITY_DERIVE_SOURCE).href
+      )) as {
         deriveOntologyRuntime: (response: unknown) => unknown;
       };
       const objectTypes = JSON.parse(
