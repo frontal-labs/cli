@@ -29,6 +29,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # The zsh completion test parses generated scripts with `zsh -n`.
+      - name: Install zsh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
+
       - name: Run tests
         run: bun run test
 
