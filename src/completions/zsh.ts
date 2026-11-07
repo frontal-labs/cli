@@ -52,6 +52,17 @@ _frontal "$@"
 `;
 }
 
+const LINE_BREAKS = /[\r\n]+/g;
+
+/**
+ * Escapes text for a single-quoted `_describe` entry. Backslashes go first so
+ * the escapes added for quotes and colons are not doubled, and line breaks
+ * become spaces so a description cannot end the quoted string early.
+ */
 function escapeZsh(str: string): string {
-  return str.replace(/'/g, "'\\''").replace(/:/g, "\\:");
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "'\\''")
+    .replace(/:/g, "\\:")
+    .replace(LINE_BREAKS, " ");
 }
