@@ -26,6 +26,18 @@ readonly RUN_ID="${GITHUB_RUN_ID:-local-$(date +%s)}"
 
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 
+# Milliseconds since the epoch. GNU date supports %3N; BSD/macOS date does not,
+# so fall back to whole seconds there instead of printing a literal "N".
+now_ms() {
+  local stamp
+  stamp="$(date +%s%3N)"
+  if [[ "$stamp" =~ ^[0-9]+$ ]]; then
+    echo "$stamp"
+  else
+    echo "$(( $(date +%s) * 1000 ))"
+  fi
+}
+
 run_journey() {
   local name="$1"
   shift
@@ -36,9 +48,9 @@ run_journey() {
   stdout_file="$(mktemp)"
   stderr_file="$(mktemp)"
 
-  start=$(date +%s%3N)
+  start=$(now_ms)
   timeout "$TIMEOUT_SECS" "${cmd[@]}" >"$stdout_file" 2>"$stderr_file" && exit_code=$? || exit_code=$?
-  end=$(date +%s%3N)
+  end=$(now_ms)
   duration=$((end - start))
 
   # Collect output (truncated for JSON safety)
@@ -63,8 +75,8 @@ run_journey() {
 
   cat <<INNER_JSON
     {
-      "name": $(jq -Rs . <<<"$name"),
-      "status": $(jq -Rs . <<<"$status"),
+      "name": $(printf '%s' "$name" | jq -Rs .),
+      "status": $(printf '%s' "$status" | jq -Rs .),
       "duration_ms": $duration,
       "exit_code": $exit_code,
       "stdout": $stdout_preview,
@@ -125,7 +137,7 @@ journey_interactive() {
 main() {
   local start_ts="$(now_iso)"
   local overall_start overall_end overall_duration
-  overall_start=$(date +%s%3N)
+  overall_start=$(now_ms)
 
   echo "=== Frontal CLI E2E Journey Runner ==="
   echo "CLI binary: $CLI"
@@ -163,7 +175,7 @@ main() {
   local interactive_json
   interactive_json="$(journey_interactive)" || true
 
-  overall_end=$(date +%s%3N)
+  overall_end=$(now_ms)
   overall_duration=$((overall_end - overall_start))
 
   # Aggregate results
