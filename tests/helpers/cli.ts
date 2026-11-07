@@ -126,3 +126,23 @@ export function lastJson(lines: string[]): Record<string, unknown> {
   const text = lines.join("\n").trim();
   return JSON.parse(text) as Record<string, unknown>;
 }
+
+/** Retries `fn` until it stops throwing, failing with the last error on timeout. */
+export async function waitFor(
+  fn: () => void | Promise<void>,
+  { interval = 50, timeout = 3000 } = {}
+): Promise<void> {
+  const start = Date.now();
+  const attempt = async (): Promise<void> => {
+    try {
+      await fn();
+    } catch (err) {
+      if (Date.now() - start > timeout) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+      await attempt();
+    }
+  };
+  await attempt();
+}

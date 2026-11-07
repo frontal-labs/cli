@@ -6,7 +6,13 @@ import { initProject } from "@/commands/init.js";
 import { followLogs, matchesFilter, sinceToIso } from "@/commands/logs.js";
 import { DevServer } from "@/lib/dev/server.js";
 import { Formatter } from "@/output/formatter.js";
-import { lastJson, mockApi, runCli, TEST_API_KEY } from "./helpers/cli.js";
+import {
+  lastJson,
+  mockApi,
+  runCli,
+  TEST_API_KEY,
+  waitFor,
+} from "./helpers/cli.js";
 
 const INVALID_SINCE = /Invalid --since/;
 const ISO_YEAR = /^\d{4}-/;
@@ -14,25 +20,6 @@ const NON_NAME = /[^a-z0-9-]+/g;
 
 let root: string;
 let server: DevServer | undefined;
-
-/** Simple polling wait for async conditions. */
-async function waitFor(
-  fn: () => void | Promise<void>,
-  { interval = 50, timeout = 3000 } = {}
-): Promise<void> {
-  const start = Date.now();
-  while (true) {
-    try {
-      await fn();
-      return;
-    } catch {
-      if (Date.now() - start > timeout) {
-        await fn(); // throw the last error
-      }
-      await new Promise((r) => setTimeout(r, interval));
-    }
-  }
-}
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "frontal-logs-"));

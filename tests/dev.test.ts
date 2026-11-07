@@ -13,7 +13,7 @@ import { initProject } from "@/commands/init.js";
 import { PROXY_HEADER, serviceForPath } from "@/lib/dev/proxy.js";
 import { compilePath, Router } from "@/lib/dev/router.js";
 import { DevServer } from "@/lib/dev/server.js";
-import { TEST_API_KEY } from "./helpers/cli.js";
+import { TEST_API_KEY, waitFor } from "./helpers/cli.js";
 
 type Sdk = import("@frontal-labs/sdk").Frontal;
 
@@ -21,26 +21,6 @@ const NUMERIC_ID = /^\/x\/(?<id>\d+)$/;
 const DEV_REQUEST_ID = /^req_dev_/;
 const AGENT_ID = /^agt_/;
 const UNKNOWN_SERVICE = /Unknown service "nope"/;
-
-/** Retries `fn` until it stops throwing, failing with the last error on timeout. */
-async function waitFor(
-  fn: () => void | Promise<void>,
-  { interval = 50, timeout = 3000 } = {}
-): Promise<void> {
-  const start = Date.now();
-  const attempt = async (): Promise<void> => {
-    try {
-      await fn();
-    } catch (err) {
-      if (Date.now() - start > timeout) {
-        throw err;
-      }
-      await new Promise((resolve) => setTimeout(resolve, interval));
-      await attempt();
-    }
-  };
-  await attempt();
-}
 
 async function sdkFor(baseUrl: string): Promise<Sdk> {
   const { Frontal, FrontalClient } = await import("@frontal-labs/sdk");
