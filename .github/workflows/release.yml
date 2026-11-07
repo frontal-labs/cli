@@ -9,6 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -44,6 +45,7 @@ jobs:
       - name: Version packages or tag the release
         id: release
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_BRANCH: changeset-release/main
         run: |
           PENDING="$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')"
@@ -61,7 +63,19 @@ jobs:
               echo "Open the pull request: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${RELEASE_BRANCH}?expand=1"
             } >> "$GITHUB_STEP_SUMMARY"
           else
+            # Tags pushed with GITHUB_TOKEN do not start other workflows, so
+            # dispatch publish.yml for any tag this run creates.
+            BEFORE="$(git tag -l 'v*' | sort)"
             bunx changeset tag
+            AFTER="$(git tag -l 'v*' | sort)"
+            NEW_TAGS="$(comm -13 <(echo "$BEFORE") <(echo "$AFTER") | sed '/^$/d')"
+            if [[ -z "$NEW_TAGS" ]]; then
+              echo "No new release tag; nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             git push origin --tags
-            echo "Tagged release; run publish.yml with the new tag to publish." >> "$GITHUB_STEP_SUMMARY"
+            while read -r TAG; do
+              gh workflow run publish.yml --ref main -f tag="$TAG"
+              echo "Dispatched publish.yml for ${TAG}." >> "$GITHUB_STEP_SUMMARY"
+            done <<< "$NEW_TAGS"
           fi
