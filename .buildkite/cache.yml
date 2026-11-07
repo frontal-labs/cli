@@ -1,0 +1,10 @@
+caches:
+  # Bun's global install cache, keyed by OS/arch + lockfile checksum.
+  - name: "bun-install"
+    cache_key:
+      - "bun-install-v1"
+      - agent: "os"
+      - agent: "arch"
+      - checksum: "bun.lock"
+    target_paths:
+      - "~/.bun/install/cache"
