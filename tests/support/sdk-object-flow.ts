@@ -1,11 +1,11 @@
 /**
  * Consumer code for tests/ontology-sdk-flow.test.ts. It is copied into a temp
- * project and run with `bun`, using `new Frontal()` from @frontal-labs/sdk the
- * way an application would.
+ * project next to the generated `.frontal/client.ts` and run with `bun`, the way
+ * an application would.
  *
  * It prints one JSON line with what it observed; the test asserts on that.
  */
-import { Frontal } from "@frontal-labs/sdk";
+import { createFrontal } from "./.frontal/client";
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -15,8 +15,8 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-// No runtime argument: the SDK reads the object types once, on first use.
-const frontal = new Frontal({
+// The generated client carries the object types, so no runtime lookup is needed.
+const frontal = createFrontal({
   apiKey: requiredEnv("FRONTAL_API_KEY"),
   baseUrl: requiredEnv("FRONTAL_API_URL"),
 });

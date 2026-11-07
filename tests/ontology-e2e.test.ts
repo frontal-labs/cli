@@ -9,37 +9,21 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GENERATOR_VERSION } from "@/lib/ontology/constants.js";
 import { syncOntology } from "@/lib/ontology/sync.js";
 import { objectType } from "./support/object-types.js";
+import { REPO_ROOT, SDK_PACKAGES, SDK_SOURCE } from "./support/sdk-source.js";
 
 /**
  * End-to-end: a consumer project compiled against the real SDK source.
  *
- * The SDK is resolved from FRONTAL_SDK_SOURCE (a path to packages/sdk/src/index.ts)
- * or, by default, the sibling checkout ../sdk-typescript. The suite is skipped
- * with a message when that source is absent.
+ * The SDK is resolved from the installed `@frontal-labs/*` packages (see
+ * ./support/sdk-source.ts), so no sibling checkout is needed.
  */
-const SDK_SOURCE = resolve(
-  process.env.FRONTAL_SDK_SOURCE ??
-    join(
-      import.meta.dirname,
-      "..",
-      "..",
-      "sdk-typescript",
-      "packages",
-      "sdk",
-      "src",
-      "index.ts"
-    )
-);
-/** `packages/` of the SDK monorepo, used to map `@frontal-labs/ontology` to source as well. */
-const SDK_PACKAGES = resolve(SDK_SOURCE, "..", "..", "..");
-const SDK_ROOT = resolve(SDK_PACKAGES, "..");
 const SDK_AVAILABLE = existsSync(SDK_SOURCE);
-const TSC = join(import.meta.dirname, "..", "node_modules", ".bin", "tsc");
+const TSC = join(REPO_ROOT, "node_modules", ".bin", "tsc");
 const FIXTURE = join(import.meta.dirname, "fixtures", "ontology-app");
 const COMPILE_TIMEOUT_MS = 240_000;
 /** A real directive: a line whose first token is `// @ts-expect-error`. Prose mentions do not count. */
@@ -74,7 +58,7 @@ function compile(projectDir: string): Compiled {
           strict: true,
           target: "ES2022",
           // The SDK sources reference Node globals (Error.captureStackTrace, Buffer).
-          typeRoots: [join(SDK_ROOT, "node_modules", "@types")],
+          typeRoots: [join(REPO_ROOT, "node_modules", "@types")],
           types: ["node"],
         },
         include: ["src/**/*.ts", ".frontal/**/*.ts"],
@@ -107,7 +91,7 @@ function writeApp(dir: string, name: string, source: string): void {
 describe.skipIf(!SDK_AVAILABLE)(
   SDK_AVAILABLE
     ? `ontology consumer fixture (SDK at ${SDK_SOURCE})`
-    : `ontology consumer fixture (skipped: no SDK source at ${SDK_SOURCE}; set FRONTAL_SDK_SOURCE)`,
+    : `ontology consumer fixture (skipped: SDK source missing at ${SDK_SOURCE}; run bun install)`,
   () => {
     it(
       "compiles the typed client, and every negative case fails for the intended reason",
