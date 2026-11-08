@@ -232,6 +232,15 @@ jobs:
         env:
           FRONTAL_CONFIG_DIR: ${{ runner.temp }}/frontal-config
 
+      # Runs the account and workflow smoke against a mock API, so no secrets
+      # are needed.
+      - name: Live smoke (mock API)
+        run: bun run vitest run tests/live
+        env:
+          FRONTAL_CONFIG_DIR: ${{ runner.temp }}/frontal-config
+
+      # Optional: the same smoke against a real environment, when a staging key
+      # is configured.
       - name: Live smoke (staging key)
         if: ${{ env.TEST_API_KEY != '' }}
         run: |
