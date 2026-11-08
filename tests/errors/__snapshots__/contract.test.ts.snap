@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`--json error contract > keeps the stderr envelope for CliError 1`] = `"{"error":{"code":"NO_PROJECT","docs":"https://frontal.dev/docs/cli/errors#no-project","fix":"Run \`frontal init\`.","message":"No project config found in /work.","requestId":"req_contract_1"}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for CliError with custom docs and exit code 1`] = `"{"error":{"code":"CONFIG_INVALID","docs":"https://frontal.dev/docs/custom","message":"Unknown environment."}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for ConflictError 1`] = `"{"error":{"code":"CONFLICT","docs":"https://frontal.dev/docs/cli/errors#conflict","fix":"The resource changed underneath you; re-fetch and retry.","message":"boom","requestId":"req_contract_1","statusCode":409}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for ForbiddenError 1`] = `"{"error":{"code":"FORBIDDEN","docs":"https://frontal.dev/docs/cli/errors#forbidden","fix":"Check your role with \`frontal auth whoami\` or ask an admin.","message":"boom","requestId":"req_contract_1","statusCode":403}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for FrontalError with unmapped status 1`] = `"{"error":{"code":"CUSTOM","docs":"https://frontal.dev/docs/cli/errors#custom","message":"boom","requestId":"req_contract_1","statusCode":418}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for NetworkError 1`] = `"{"error":{"code":"NETWORK_ERROR","docs":"https://frontal.dev/docs/cli/errors#network-error","fix":"Check your connection and the API URL (\`frontal config list\`).","message":"Could not reach the Frontal API."}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for NotFoundError 1`] = `"{"error":{"code":"NOT_FOUND","docs":"https://frontal.dev/docs/cli/errors#not-found","fix":"Verify the resource id belongs to this workspace/environment.","message":"gone","requestId":"req_contract_1","statusCode":404}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for RateLimitError with retryAfter 1`] = `"{"error":{"code":"RATE_LIMITED","docs":"https://frontal.dev/docs/cli/errors#rate-limited","fix":"Back off and retry, or lower request concurrency.","message":"boom","requestId":"req_contract_1","retryAfter":5,"statusCode":429}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for ServiceError 503 1`] = `"{"error":{"code":"INTERNAL","docs":"https://frontal.dev/docs/cli/errors#internal","fix":"The Frontal API returned a server error. Retry shortly.","message":"boom","requestId":"req_contract_1","statusCode":503}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for TimeoutError 1`] = `"{"error":{"code":"TIMEOUT","docs":"https://frontal.dev/docs/cli/errors#timeout","fix":"Try again; the API did not respond in time.","message":"Operation timed out"}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for UnauthorizedError 1`] = `"{"error":{"code":"UNAUTHORIZED","docs":"https://frontal.dev/docs/cli/errors#unauthorized","fix":"Run \`frontal auth login\` or set a valid FRONTAL_API_KEY.","message":"boom","requestId":"req_contract_1","statusCode":401}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for ValidationError with fields 1`] = `"{"error":{"code":"VALIDATION_ERROR","docs":"https://frontal.dev/docs/cli/errors#validation-error","fields":[{"field":"name","message":"Required"},{"field":"ports.0","message":"Expected number"}],"fix":"Fix the request payload; see the listed fields.","message":"boom","requestId":"req_contract_1","statusCode":400}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for ZodError 1`] = `"{"error":{"code":"VALIDATION_ERROR","docs":"https://frontal.dev/docs/cli/errors#validation-error","fields":[{"field":"name","message":"Invalid input: expected string, received number"},{"field":"port","message":"Invalid input: expected number, received string"}],"fix":"Fix the request payload; see the listed fields.","message":"Input validation failed."}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for non-Error value 1`] = `"{"error":{"code":"UNEXPECTED_ERROR","docs":"https://frontal.dev/docs/cli/errors#unexpected-error","message":"An unexpected error occurred."}}"`;
+
+exports[`--json error contract > keeps the stderr envelope for plain Error with a secret 1`] = `"{"error":{"code":"UNHANDLED_ERROR","docs":"https://frontal.dev/docs/cli/errors#unhandled-error","message":"key frt_[REDACTED] leaked"}}"`;

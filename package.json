@@ -35,32 +35,32 @@
     "prepare": "husky",
     "prepublishOnly": "bun run build",
     "release": "bun run build && changeset publish",
+    "size": "bun run build && size-limit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:readme": "bun run build && bun scripts/run-readme-blocks.ts",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit && tsc -p tsconfig.strict.json --noEmit",
     "validate:bindings": "node ./scripts/validate-command-bindings.mjs",
-    "version-packages": "changeset version",
-    "size": "bun run build && size-limit"
+    "version-packages": "changeset version"
   },
   "overrides": {
     "esbuild": "0.25.0",
     "fast-uri": "3.1.8",
     "js-yaml": "4.3.2",
+    "launch-editor": "2.14.2",
     "nanoid": "3.3.18",
     "postcss": "8.5.31",
     "shell-quote": "1.11.0",
     "source-map-js": "1.2.2",
-    "launch-editor": "2.14.2",
     "vite": "^8.3.3",
     "zod": "4.6.7"
   },
   "dependencies": {
-    "@frontal-labs/workflows": "0.1.3",
     "@clack/prompts": "1.8.1",
     "@frontal-labs/core": "1.1.0",
+    "@frontal-labs/error": "0.7.0",
     "@frontal-labs/sdk": "1.0.4",
+    "@frontal-labs/workflows": "0.1.3",
     "chalk": "6.0.1",
     "cli-table3": "0.6.5",
     "commander": "15.0.0",
@@ -90,7 +90,7 @@
   "packageManager": "bun@1.3.8",
   "engines": {
     "bun": ">=1.3.8",
-    "node": ">=18"
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public"

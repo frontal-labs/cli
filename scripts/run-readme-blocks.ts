@@ -18,6 +18,7 @@ import {
   rmSync,
   symlinkSync,
 } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,7 +65,25 @@ const binDir = join(work, "bin");
 mkdirSync(binDir);
 symlinkSync(join(repoRoot, "dist", "index.js"), join(binDir, "frontal"));
 
-const DEV_PORT = 8787;
+/** A port the OS has free right now, so a stray listener can't block the run. */
+function freePort(): Promise<number> {
+  return new Promise((done, fail) => {
+    const probe = createServer();
+    probe.once("error", fail);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      probe.close(() => {
+        if (address !== null && typeof address === "object") {
+          done(address.port);
+        } else {
+          fail(new Error("could not read a free port"));
+        }
+      });
+    });
+  });
+}
+
+const DEV_PORT = await freePort();
 const env = {
   ...process.env,
   CI: "1",

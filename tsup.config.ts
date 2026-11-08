@@ -15,5 +15,5 @@ export default defineConfig({
   format: ["esm"],
   platform: "node",
   shims: false,
-  target: "node18",
+  target: "node20",
 });

@@ -11,6 +11,7 @@ export default defineConfig({
       provider: "v8",
     },
     environment: "node",
+    globalSetup: ["./tests/setup/node20-reporter.ts"],
     globals: true,
     include: ["tests/**/*.test.ts"],
     setupFiles: ["./tests/setup/global.ts", "./tests/setup/after-env.ts"],

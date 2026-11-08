@@ -17,13 +17,13 @@ frontal deploy --preview          # shareable preview URL
 All seven project commands are available: `init`, `dev`, `types`, `env`, `deploy`
 (+ `promote`/`rollback`), `logs` and `policy check`.
 
-> The `bash` blocks in this README are executed in CI (`bun run test:readme`).
+> The `bash` blocks in this README are executed in CI (`bun scripts/run-readme-blocks.ts`).
 > Blocks tagged `skip` need a real account or an interactive terminal.
 
 ## Install
 
 ```bash skip
-npm install -g frontal-cli        # Node ≥ 18
+npm install -g frontal-cli        # Node ≥ 20
 # or
 brew tap frontal-labs/cli && brew install frontal-cli
 # or download a single binary from the GitHub releases page
@@ -71,7 +71,7 @@ listed in `.frontal/config.jsonc` is served from SDK-compatible fixtures persist
 cd my-app
 frontal dev --port 8788 --no-watch > dev.log 2>&1 &
 DEV_PID=$!
-sleep 1
+for _ in $(seq 50); do curl -s localhost:8788/health > /dev/null && break; sleep 0.2; done
 curl -s localhost:8788/health
 curl -s -X POST localhost:8788/v1/agents -H 'content-type: application/json' \
   -d '{"name":"triage","triggers":[{"event":"ticket.created"}]}'
@@ -306,10 +306,10 @@ frontal workflows list --api-url http://127.0.0.1:9/v1 --json || echo "exit code
 ```bash skip
 bun install
 bun run dev -- --help          # run from source
-bun run build                  # dist/index.js (npm bin, Node ≥ 18)
+bun run build                  # dist/index.js (npm bin, Node ≥ 20)
 bun run build:binary           # dist/cli single executable (bun build --compile)
 bun run type-check && bun run test && bun run lint
-bun run test:readme            # execute the bash blocks in this README
+bun scripts/run-readme-blocks.ts  # execute the bash blocks in this README
 ```
 
 See [docs/DEVELOPERS.md](./docs/DEVELOPERS.md) for the architecture and

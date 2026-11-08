@@ -30,7 +30,7 @@ below — and must be preserved across a re-mirror.)
 
 ## What is installed and why
 
-Stack: TypeScript (strict, ESM) · Bun + Node 18 · commander · clack/chalk/ora ·
+Stack: TypeScript (strict, ESM) · Bun + Node 20 · commander · clack/chalk/ora ·
 zod/ajv + JSON Schema · tsup + `bun build --compile` · vitest · biome/ultracite ·
 husky/commitlint/changesets · Dockerfile · GitHub Actions (OIDC) · OpenAPI ops
 generation · SDK-only HTTP · `.mcp.json` · shell completions.

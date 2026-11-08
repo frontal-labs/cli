@@ -469,7 +469,7 @@ export class DevServer {
       const match = this.localRouter.match("GET", "/health");
       const response = match
         ? await match.route.handler(req)
-        : apiError(404, "NOT_FOUND", "no health route", req.requestId);
+        : apiError(404, "NOT_FOUND", "no health route", req);
       return { mode: "local", response, service: "dev" };
     }
 
@@ -512,7 +512,7 @@ export class DevServer {
         404,
         "NOT_FOUND",
         `No local route for ${req.method} ${req.path}`,
-        req.requestId,
+        req,
         {
           fix: service
             ? `Mark "${service}" as remote (frontal dev --remote ${service}) or add a scenario route.`

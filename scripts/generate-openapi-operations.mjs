@@ -62,7 +62,8 @@ async function readSpecSource() {
   } catch (error) {
     if (strictRemote) {
       throw new Error(
-        `Failed to fetch remote OpenAPI spec (${remoteSpecUrl}): ${String(error)}`
+        `Failed to fetch remote OpenAPI spec (${remoteSpecUrl}): ${String(error)}`,
+        { cause: error }
       );
     }
 

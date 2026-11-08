@@ -23,11 +23,16 @@ const REPO_ROOT = join(import.meta.dirname, "..");
 const JOURNEY_SCRIPT = join(REPO_ROOT, ".github", "scripts", "e2e-journey.sh");
 const CLI_ENTRY = join(REPO_ROOT, "bin", "frontal.ts");
 const TEST_API_KEY = "frt_test_monitor_key_0000000000";
-const RUN_TIMEOUT_MS = 120_000;
+// Each journey starts a cold `bun` process; on a loaded machine that alone can
+// take tens of seconds, so the budgets leave room for slow starts.
+const JOURNEY_TIMEOUT_SECS = 120;
+const RUN_TIMEOUT_MS = 300_000;
 
 interface JourneyEntry {
+  exit_code: number;
   name: string;
   status: string;
+  stderr: string;
 }
 
 interface RunResult {
@@ -115,7 +120,7 @@ function runMonitor(
   const childEnv: Record<string, string> = {
     CLI_BIN: cliWrapper,
     E2E_RESULT_FILE: resultFile,
-    E2E_TIMEOUT_SECS: "60",
+    E2E_TIMEOUT_SECS: String(JOURNEY_TIMEOUT_SECS),
     HOME: scratch,
     PATH: process.env.PATH ?? "",
   };
@@ -127,7 +132,7 @@ function runMonitor(
   // The script exits non-zero when a journey fails. The result file is still
   // written, and that is what the tests assert on.
   return new Promise<RunResult>((resolve, reject) => {
-    execFile(
+    const child = execFile(
       "bash",
       [JOURNEY_SCRIPT],
       { cwd: scratch, env: childEnv, timeout: RUN_TIMEOUT_MS },
@@ -139,6 +144,8 @@ function runMonitor(
         resolve(JSON.parse(readFileSync(resultFile, "utf-8")) as RunResult);
       }
     );
+    // The journeys are non-interactive. Close stdin so nothing can wait on it.
+    child.stdin?.end();
   });
 }
 
@@ -158,7 +165,12 @@ function entries(result: RunResult): JourneyEntry[] {
         typeof record.name === "string" &&
         typeof record.status === "string"
       ) {
-        found.push({ name: record.name, status: record.status });
+        found.push({
+          exit_code: Number(record.exit_code),
+          name: record.name,
+          status: record.status,
+          stderr: typeof record.stderr === "string" ? record.stderr : "",
+        });
         return;
       }
       for (const item of Object.values(record)) {
@@ -180,9 +192,13 @@ describe("synthetic monitor journeys", () => {
       });
 
       const failed = entries(result).filter((entry) => entry.status !== "pass");
-      const details = JSON.stringify(
-        (result.journeys as Record<string, unknown>).api ?? null
-      ).slice(0, 1500);
+      const details = failed
+        .map(
+          (entry) =>
+            `${entry.name}: ${entry.status} exit=${entry.exit_code} ` +
+            `stderr=${JSON.stringify(entry.stderr).slice(0, 400)}`
+        )
+        .join("\n");
       expect(
         failed.map((entry) => entry.name),
         details

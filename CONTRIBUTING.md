@@ -17,7 +17,7 @@ Thank you for your interest in contributing to Frontal CLI! This guide will help
 
 ### Prerequisites
 
-- **Node.js**: Version 18.0.0 or higher
+- **Node.js**: Version 20.0.0 or higher
 - **Bun**: Version 1.3.8 or higher (recommended)
 - **Git**: Latest stable version
 

@@ -7,7 +7,7 @@ This guide covers installing and setting up the Frontal CLI on your system.
 Before installing the Frontal CLI, ensure your system meets the following requirements:
 
 ### Node.js
-- **Minimum Version**: Node.js 18.0.0 or higher
+- **Minimum Version**: Node.js 20.0.0 or higher
 - **Recommended Version**: Latest LTS release
 - **Installation**: Download from [nodejs.org](https://nodejs.org/) or use your system package manager
 
@@ -70,7 +70,7 @@ frontal --version
 
 You should see output similar to:
 ```
-frontal/0.1.0 darwin-arm64 node-v18.19.0
+frontal/0.1.0 darwin-arm64 node-v20.20.2
 ```
 
 Test the help command:
@@ -139,7 +139,7 @@ bun run dev
 bun run build
 ```
 
-The npm bundle is written to `dist/index.js` (runs on Node ≥ 18). For a
+The npm bundle is written to `dist/index.js` (runs on Node ≥ 20). For a
 self-contained executable:
 
 ```bash

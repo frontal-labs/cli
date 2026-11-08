@@ -131,7 +131,7 @@
     {
       "label": "test: readme blocks",
       "type": "shell",
-      "command": "bun run test:readme",
+      "command": "bun scripts/run-readme-blocks.ts",
       "group": "test",
       "presentation": {
         "echo": true,

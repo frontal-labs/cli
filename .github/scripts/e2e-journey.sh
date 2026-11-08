@@ -49,7 +49,8 @@ run_journey() {
   stderr_file="$(mktemp)"
 
   start=$(now_ms)
-  timeout "$TIMEOUT_SECS" "${cmd[@]}" >"$stdout_file" 2>"$stderr_file" && exit_code=$? || exit_code=$?
+  # Journeys are non-interactive: never let them inherit the caller's stdin.
+  timeout "$TIMEOUT_SECS" "${cmd[@]}" </dev/null >"$stdout_file" 2>"$stderr_file" && exit_code=$? || exit_code=$?
   end=$(now_ms)
   duration=$((end - start))
 
