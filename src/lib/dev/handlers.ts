@@ -116,8 +116,12 @@ function withFields(body: string, fields: FieldError[] | undefined): string {
   if (fields === undefined || !body.startsWith("{")) {
     return body;
   }
-  const parsed = JSON.parse(body) as { error: Record<string, unknown> };
-  return JSON.stringify({ error: { ...parsed.error, fields } });
+  const parsed: unknown = JSON.parse(body);
+  const error = isJsonRecord(parsed) ? jsonField(parsed, "error") : undefined;
+  if (!isJsonRecord(error)) {
+    return body;
+  }
+  return JSON.stringify({ error: { ...error, fields } });
 }
 
 function notFound(req: DevRequest, what: string): Response {

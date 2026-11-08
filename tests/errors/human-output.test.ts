@@ -51,8 +51,17 @@ describe("human error output", () => {
 
   it("has no ANSI codes when NO_COLOR is set", () => {
     process.env.NO_COLOR = "1";
-    const output = captureHuman({ color: true }, unauthorized());
-    expect(output).not.toContain(ESC);
+    const stderrTty = Object.getOwnPropertyDescriptor(process.stderr, "isTTY");
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    try {
+      const output = captureHuman({ color: true }, unauthorized());
+      expect(output).not.toContain(ESC);
+    } finally {
+      restoreTty("stderr", stderrTty);
+    }
   });
 
   it("has no ANSI codes when stderr is not a TTY", () => {
