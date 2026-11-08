@@ -26,8 +26,10 @@ const TEST_API_KEY = "frt_test_monitor_key_0000000000";
 const RUN_TIMEOUT_MS = 120_000;
 
 interface JourneyEntry {
+  exit_code: number;
   name: string;
   status: string;
+  stderr: string;
 }
 
 interface RunResult {
@@ -180,9 +182,13 @@ describe("synthetic monitor journeys", () => {
       });
 
       const failed = entries(result).filter((entry) => entry.status !== "pass");
-      const details = JSON.stringify(
-        (result.journeys as Record<string, unknown>).api ?? null
-      ).slice(0, 1500);
+      const details = failed
+        .map(
+          (entry) =>
+            `${entry.name}: ${entry.status} exit=${entry.exit_code} ` +
+            `stderr=${JSON.stringify(entry.stderr).slice(0, 400)}`
+        )
+        .join("\n");
       expect(
         failed.map((entry) => entry.name),
         details
