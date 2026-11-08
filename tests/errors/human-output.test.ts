@@ -49,19 +49,21 @@ describe("human error output", () => {
     expect(output).not.toContain(ESC);
   });
 
-  it("has no ANSI codes when NO_COLOR is set", () => {
-    process.env.NO_COLOR = "1";
-    const stderrTty = Object.getOwnPropertyDescriptor(process.stderr, "isTTY");
-    Object.defineProperty(process.stderr, "isTTY", {
-      configurable: true,
-      value: true,
+  it("colours a terminal error when NO_COLOR is unset", () => {
+    // Positive control: proves the terminal setup really enables colour, so
+    // the NO_COLOR test below is not passing for an unrelated reason.
+    withTerminal(() => {
+      const output = captureHuman({ color: true }, unauthorized());
+      expect(output).toContain(ESC);
     });
-    try {
+  });
+
+  it("has no ANSI codes when NO_COLOR is set on a terminal", () => {
+    process.env.NO_COLOR = "1";
+    withTerminal(() => {
       const output = captureHuman({ color: true }, unauthorized());
       expect(output).not.toContain(ESC);
-    } finally {
-      restoreTty("stderr", stderrTty);
-    }
+    });
   });
 
   it("has no ANSI codes when stderr is not a TTY", () => {
@@ -72,23 +74,11 @@ describe("human error output", () => {
 
   it("has no ANSI codes when only stdout is a TTY", () => {
     // `frontal ... 2> err.txt` from a terminal: stderr is what gets written.
-    const stdoutTty = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
-    const stderrTty = Object.getOwnPropertyDescriptor(process.stderr, "isTTY");
-    Object.defineProperty(process.stdout, "isTTY", {
-      configurable: true,
-      value: true,
-    });
-    Object.defineProperty(process.stderr, "isTTY", {
-      configurable: true,
-      value: false,
-    });
-    try {
+    withTerminal(() => {
+      setTty("stderr", false);
       const output = captureHuman({ color: true }, unauthorized());
       expect(output).not.toContain(ESC);
-    } finally {
-      restoreTty("stdout", stdoutTty);
-      restoreTty("stderr", stderrTty);
-    }
+    });
   });
 
   it("still redacts API keys in human output", () => {
@@ -103,6 +93,27 @@ describe("human error output", () => {
     expect(output).toContain("frontal auth login");
   });
 });
+
+/** Runs `fn` with both stdout and stderr reporting as terminals. */
+function withTerminal(fn: () => void): void {
+  const stdoutTty = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+  const stderrTty = Object.getOwnPropertyDescriptor(process.stderr, "isTTY");
+  setTty("stdout", true);
+  setTty("stderr", true);
+  try {
+    fn();
+  } finally {
+    restoreTty("stdout", stdoutTty);
+    restoreTty("stderr", stderrTty);
+  }
+}
+
+function setTty(name: "stderr" | "stdout", value: boolean): void {
+  Object.defineProperty(process[name], "isTTY", {
+    configurable: true,
+    value,
+  });
+}
 
 function restoreTty(
   name: "stderr" | "stdout",
