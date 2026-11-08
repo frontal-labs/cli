@@ -27,6 +27,12 @@
       "linter": { "enabled": false }
     },
     {
+      "includes": ["skills/**"],
+      "assist": { "enabled": false },
+      "formatter": { "enabled": false },
+      "linter": { "enabled": false }
+    },
+    {
       "includes": ["tests/**"],
       "linter": {
         "rules": {

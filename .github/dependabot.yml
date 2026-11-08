@@ -23,6 +23,12 @@ updates:
       - dependency-name: "ultracite"
       - dependency-name: "@biomejs/biome"
     groups:
+      # Pre-1.0 and pinned exactly; every bump is reviewed by hand, never auto-merged.
+      frontal-error:
+        patterns:
+          - "@frontal-labs/error"
       dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "@frontal-labs/error"

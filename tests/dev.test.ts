@@ -168,8 +168,30 @@ describe("frontal dev server", () => {
     const res = await fetch(`${url}/v1/pipelines/x`);
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({
-      code: "NOT_FOUND",
-      fix: expect.stringContaining("--remote pipelines"),
+      error: {
+        code: "NOT_FOUND",
+        fix: expect.stringContaining("--remote pipelines"),
+      },
+    });
+  });
+
+  it("sends readable ANSI errors to curl and JSON to the SDK", async () => {
+    const { url } = await startDev();
+
+    const curl = await fetch(`${url}/v1/agents/missing`, {
+      headers: { "user-agent": "curl/8.7.1" },
+    });
+    expect(curl.status).toBe(404);
+    expect(curl.headers.get("content-type")).not.toContain("application/json");
+    expect(await curl.text()).toContain("NOT_FOUND");
+    expect(curl.headers.get("x-request-id")).toBeTruthy();
+
+    const sdkRes = await fetch(`${url}/v1/agents/missing`, {
+      headers: { accept: "application/json" },
+    });
+    expect(sdkRes.headers.get("content-type")).toContain("application/json");
+    expect(await sdkRes.json()).toMatchObject({
+      error: { code: "NOT_FOUND", message: expect.any(String) },
     });
   });
 
@@ -363,10 +385,9 @@ describe("frontal dev server", () => {
     // Upstream errors are re-emitted as SDK-shaped error envelopes.
     const missing = await fetch(`${url}/v1/workflows/missing`);
     expect(missing.status).toBe(404);
+    expect(missing.headers.get("x-request-id")).toBe("req_404");
     expect(await missing.json()).toMatchObject({
-      code: "NOT_FOUND",
-      requestId: "req_404",
-      service: "workflows",
+      error: { code: "NOT_FOUND", message: "gone" },
     });
 
     // Local services never touch the upstream.
@@ -379,8 +400,10 @@ describe("frontal dev server", () => {
     const res = await fetch(`${url}/v1/ontology/graph/entities`);
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({
-      code: "NO_CREDENTIALS",
-      fix: expect.stringContaining("frontal auth login"),
+      error: {
+        code: "NO_CREDENTIALS",
+        fix: expect.stringContaining("frontal auth login"),
+      },
     });
   });
 

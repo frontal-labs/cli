@@ -7,6 +7,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { FrontalError } from "@frontal-labs/error";
+import { errorResponse } from "@frontal-labs/error/server";
 import { z } from "zod";
 import {
   agentRecord,
@@ -64,27 +66,62 @@ export function json(
   });
 }
 
+/** A field-level validation problem, as the SDK's `ValidationError` reads it. */
+export interface FieldError {
+  field: string;
+  message: string;
+}
+
+export interface ApiErrorOptions {
+  fields?: FieldError[] | undefined;
+  fix?: string | undefined;
+}
+
+/**
+ * A local API error. The body and format come from the error library, so
+ * SDK clients get the JSON envelope and curl users get readable ANSI text.
+ * The library only sends `public` text, so `fields` is added to the JSON
+ * envelope here; ANSI responses carry the message and fix only.
+ */
 export function apiError(
   status: number,
   code: string,
   message: string,
-  requestId: string,
-  extra: Obj = {}
+  req: Pick<DevRequest, "headers" | "requestId">,
+  options: ApiErrorOptions = {}
 ): Response {
-  return json(
-    {
-      code,
-      docs: `${DOCS_URL}#${code.toLowerCase()}`,
+  const error = new FrontalError(message, {
+    code,
+    public: {
+      link: `${DOCS_URL}#${code.toLowerCase()}`,
       message,
-      requestId,
-      ...extra,
+      ...(options.fix ? { fix: options.fix } : {}),
     },
-    status
-  );
+    scope: "dev",
+    statusCode: toErrorStatus(status),
+  });
+  const response = errorResponse(error, { request: req.headers });
+  return new Response(withFields(response.body, options.fields), {
+    headers: { ...response.headers, "x-request-id": req.requestId },
+    status: response.status,
+  });
+}
+
+/** The library only accepts 400–599; anything else becomes a 500. */
+function toErrorStatus(status: number): number {
+  return status >= 400 && status <= 599 ? status : 500;
+}
+
+function withFields(body: string, fields: FieldError[] | undefined): string {
+  if (fields === undefined || !body.startsWith("{")) {
+    return body;
+  }
+  const parsed = JSON.parse(body) as { error: Record<string, unknown> };
+  return JSON.stringify({ error: { ...parsed.error, fields } });
 }
 
 function notFound(req: DevRequest, what: string): Response {
-  return apiError(404, "NOT_FOUND", `${what} not found`, req.requestId);
+  return apiError(404, "NOT_FOUND", `${what} not found`, req);
 }
 
 /** A route parameter. The router only calls a handler with the params it matched. */
@@ -223,15 +260,9 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
         const definition = bodyObject(req);
         const definitionName = jsonString(definition, "name");
         if (definitionName === undefined || definitionName.length === 0) {
-          return apiError(
-            400,
-            "VALIDATION_ERROR",
-            "name is required",
-            req.requestId,
-            {
-              fields: [{ field: "name", message: "Required" }],
-            }
-          );
+          return apiError(400, "VALIDATION_ERROR", "name is required", req, {
+            fields: [{ field: "name", message: "Required" }],
+          });
         }
         const agent = agentRecord(definition, { environment: ctx.env });
         save(agent);
@@ -317,7 +348,7 @@ function agentRoutes(ctx: LocalContext): RouteDefinition[] {
             400,
             "VALIDATION_ERROR",
             `Cannot roll back agent ${jsonField(agent, "id")} to version ${target}`,
-            req.requestId,
+            req,
             {
               fields: [
                 {
@@ -499,7 +530,7 @@ function graphRoutes(ctx: LocalContext): RouteDefinition[] {
               400,
               "VALIDATION_ERROR",
               "conditions must be JSON",
-              req.requestId
+              req
             );
           }
         }
@@ -943,7 +974,7 @@ function blobRoutes(ctx: LocalContext): RouteDefinition[] {
               400,
               "VALIDATION_ERROR",
               "multipart field `file` is required",
-              req.requestId
+              req
             );
           }
           bytes = new Uint8Array(await file.arrayBuffer());
@@ -1477,21 +1508,15 @@ function workerRoutes(ctx: LocalContext): RouteDefinition[] {
             400,
             "VALIDATION_ERROR",
             "name must be lowercase letters, digits and dashes",
-            req.requestId,
+            req,
             { fields: [{ field: "name", message: "Invalid worker name" }] }
           );
         }
         const code = jsonString(body, "code");
         if (code === undefined || code.length === 0) {
-          return apiError(
-            400,
-            "VALIDATION_ERROR",
-            "code is required",
-            req.requestId,
-            {
-              fields: [{ field: "code", message: "Required" }],
-            }
-          );
+          return apiError(400, "VALIDATION_ERROR", "code is required", req, {
+            fields: [{ field: "code", message: "Required" }],
+          });
         }
         const previous = state.read("workers", name);
         const version =

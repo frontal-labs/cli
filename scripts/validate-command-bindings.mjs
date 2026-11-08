@@ -30,13 +30,13 @@ function readTsArrayLiteral(filePath, constName) {
   const start = src.indexOf("[", assignmentIdx);
   let depth = 0;
   let end = -1;
-  for (let i = start; i < src.length; i++) {
+  for (let i = start; i < src.length; i += 1) {
     const ch = src[i];
     if (ch === "[") {
-      depth++;
+      depth += 1;
     }
     if (ch === "]") {
-      depth--;
+      depth -= 1;
       if (depth === 0) {
         end = i;
         break;
@@ -54,17 +54,15 @@ function readTsArrayLiteral(filePath, constName) {
   return JSON.parse(jsonish);
 }
 
-function normalizePath(p) {
-  if (!p) {
+function normalizePath(rawPath) {
+  if (!rawPath) {
     return "/";
   }
-  if (!p.startsWith("/")) {
-    p = `/${p}`;
+  const rooted = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+  if (rooted.length > 1 && rooted.endsWith("/")) {
+    return rooted.slice(0, -1);
   }
-  if (p.length > 1 && p.endsWith("/")) {
-    return p.slice(0, -1);
-  }
-  return p;
+  return rooted;
 }
 
 const operations = readTsArrayLiteral(operationsFile, "OPENAPI_OPERATIONS");

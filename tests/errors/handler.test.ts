@@ -153,7 +153,7 @@ describe("renderError", () => {
     expect(lines.join("\n")).toContain("frt_[REDACTED]");
   });
 
-  it("prints code, fix, docs and request id for humans", () => {
+  it("prints code, fix, link and request id for humans", () => {
     const lines: string[] = [];
     vi.spyOn(console, "error").mockImplementation((line: unknown) => {
       lines.push(String(line));
@@ -163,8 +163,8 @@ describe("renderError", () => {
 
     const output = lines.join("\n");
     expect(output).toContain("UNAUTHORIZED");
-    expect(output).toContain("Fix:");
-    expect(output).toContain("Docs:");
+    expect(output).toContain("fix:");
+    expect(output).toContain("read more:");
     expect(output).toContain("Request ID: req_test_1");
   });
 });

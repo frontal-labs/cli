@@ -266,6 +266,29 @@ import { runAction } from "@/lib/command.js";
 SDK handle and routes any error through `handleError`, which prints
 `code`, `fix`, `docs` and the request id.
 
+#### Error Architecture
+
+Errors are built on `@frontal-labs/error` (pinned exactly):
+
+- `CliError` extends the library's `FrontalError` with `scope: "cli"`. Its
+  `code` is `UPPER_SNAKE`, and `docs` is a getter over the library's `link`.
+  `isFrontalError(err)` is true for CLI errors and for SDK errors that carry the
+  library's tag.
+- `classifyError` (in `src/errors/handler.ts`) decides the report in order:
+  `CliError`, tagged `FrontalError` (by `code`, then status), `ZodError`,
+  `NetworkError`, `TimeoutError`, untagged SDK errors (by class name, then
+  status), any other `Error`, and finally non-`Error` values. Name-based checks
+  stay as fallbacks for SDK versions that predate the library.
+- The `--json` envelope on stderr and the exit codes are a public contract.
+  `tests/errors/contract.test.ts` snapshots every error kind byte-for-byte, so
+  change them only with a deliberate, versioned release.
+- Human output is one `frame()` from `@frontal-labs/error/format`. It is plain
+  under `--no-color`, `NO_COLOR` and non-TTY stderr. Every output path still
+  passes through `redact()` or `redactString()`.
+- `frontal dev` builds its error bodies with `errorResponse()` from
+  `@frontal-labs/error/server`, so curl gets ANSI text and SDK clients get JSON.
+  Scenario routes keep their own bodies. Remote proxy responses pass through.
+
 #### Unit Tests
 
 ```bash

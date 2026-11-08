@@ -78,9 +78,8 @@ export class RemoteProxy {
       handle = await this.sdk();
     } catch (err) {
       const report = classifyError(err);
-      return apiError(503, report.code, report.message, req.requestId, {
+      return apiError(503, report.code, report.message, req, {
         fix: report.fix,
-        service,
       });
     }
 
@@ -101,8 +100,8 @@ export class RemoteProxy {
         report.statusCode ?? 502,
         report.code,
         report.message,
-        report.requestId ?? req.requestId,
-        { fields: report.fields, fix: report.fix, service }
+        { headers: req.headers, requestId: report.requestId ?? req.requestId },
+        { fields: report.fields, fix: report.fix }
       );
     }
   }
@@ -153,7 +152,7 @@ export class RemoteProxy {
           405,
           "METHOD_NOT_ALLOWED",
           `${req.method} not supported by the dev proxy`,
-          req.requestId
+          req
         );
     }
   }
