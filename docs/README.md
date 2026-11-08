@@ -83,7 +83,7 @@ For any command, you can use:
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 20
 - Bun >= 1.3.8 (recommended for development)
 
 ## License

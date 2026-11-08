@@ -7,7 +7,7 @@ This guide covers installing and setting up the Frontal CLI on your system.
 Before installing the Frontal CLI, ensure your system meets the following requirements:
 
 ### Node.js
-- **Minimum Version**: Node.js 18.0.0 or higher
+- **Minimum Version**: Node.js 20.0.0 or higher
 - **Recommended Version**: Latest LTS release
 - **Installation**: Download from [nodejs.org](https://nodejs.org/) or use your system package manager
 

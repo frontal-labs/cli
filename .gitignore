@@ -130,3 +130,6 @@ temp/
 
 # bun build --compile temp files
 *.bun-build
+
+# Left behind when a test run is killed before its cleanup
+.tmp-types-*/
