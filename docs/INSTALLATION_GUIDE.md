@@ -70,7 +70,7 @@ frontal --version
 
 You should see output similar to:
 ```
-frontal/0.1.0 darwin-arm64 node-v18.19.0
+frontal/0.1.0 darwin-arm64 node-v20.20.2
 ```
 
 Test the help command:
@@ -139,7 +139,7 @@ bun run dev
 bun run build
 ```
 
-The npm bundle is written to `dist/index.js` (runs on Node ≥ 18). For a
+The npm bundle is written to `dist/index.js` (runs on Node ≥ 20). For a
 self-contained executable:
 
 ```bash

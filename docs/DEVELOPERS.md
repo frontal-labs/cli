@@ -6,7 +6,7 @@ This guide is for developers who want to contribute to the Frontal CLI or build 
 
 ### Prerequisites
 
-- **Node.js**: 18.0.0 or higher
+- **Node.js**: 20.0.0 or higher
 - **Bun**: 1.3.8 or higher (recommended)
 - **Git**: Latest stable version
 - **VS Code**: Recommended IDE with extensions

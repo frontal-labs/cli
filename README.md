@@ -23,7 +23,7 @@ All seven project commands are available: `init`, `dev`, `types`, `env`, `deploy
 ## Install
 
 ```bash skip
-npm install -g frontal-cli        # Node ≥ 18
+npm install -g frontal-cli        # Node ≥ 20
 # or
 brew tap frontal-labs/cli && brew install frontal-cli
 # or download a single binary from the GitHub releases page
@@ -306,7 +306,7 @@ frontal workflows list --api-url http://127.0.0.1:9/v1 --json || echo "exit code
 ```bash skip
 bun install
 bun run dev -- --help          # run from source
-bun run build                  # dist/index.js (npm bin, Node ≥ 18)
+bun run build                  # dist/index.js (npm bin, Node ≥ 20)
 bun run build:binary           # dist/cli single executable (bun build --compile)
 bun run type-check && bun run test && bun run lint
 bun scripts/run-readme-blocks.ts  # execute the bash blocks in this README

@@ -165,7 +165,12 @@ function entries(result: RunResult): JourneyEntry[] {
         typeof record.name === "string" &&
         typeof record.status === "string"
       ) {
-        found.push({ name: record.name, status: record.status });
+        found.push({
+          exit_code: Number(record.exit_code),
+          name: record.name,
+          status: record.status,
+          stderr: typeof record.stderr === "string" ? record.stderr : "",
+        });
         return;
       }
       for (const item of Object.values(record)) {
