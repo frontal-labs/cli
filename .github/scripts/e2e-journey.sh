@@ -200,7 +200,7 @@ main() {
     "output": $output_json,
     "interactive": $interactive_json
   },
-  "summary": $(compute_summary)
+  "summary": $(compute_summary "$smoke_json" "$auth_json" "$config_json" "$api_json" "$output_json" "$interactive_json")
 }
 EOF
 
@@ -224,14 +224,18 @@ EOF
 
 compute_summary() {
   # Walk the journey results and count pass/fail
-  # Handles both singleton objects and arrays
+  # Handles both singleton objects and arrays.
+  # Journey results are passed as arguments ($1..$6) instead of
+  # implicitly reading main()'s local variables by the same name.
+  # This removes the hidden scope dependency and keeps the function
+  # honest about where its inputs come from.
+  local smoke_json="${1:-null}"
+  local auth_json="${2:-null}"
+  local config_json="${3:-null}"
+  local api_json="${4:-null}"
+  local output_json="${5:-null}"
+  local interactive_json="${6:-null}"
   local passed=0 failed=0
-  local smoke_json="$smoke_json"
-  local auth_json="$auth_json"
-  local config_json="$config_json"
-  local api_json="$api_json"
-  local output_json="$output_json"
-  local interactive_json="$interactive_json"
 
   count_status() {
     local json_str="$1"
